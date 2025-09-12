@@ -34,13 +34,13 @@
 }
 
 :root {
-    --site-banner: url('https://i.imgur.com/pkYWoIM.png');
-    --choice-button-hover: url('https://i.imgur.com/6477Nct.png');
-    --choice-button: url('https://i.imgur.com/5DspJvG.png');
-    --dialog-box: url('https://i.imgur.com/cH6ms0h.png');
-    --site-home: url('./img/tcoaal-home.webp');
-    --site-loading: url('https://i.imgur.com/E0E2oCJ.png');
-    --site-title: url('./img/tcoaal-title.webp');
-    --small-choice-button-hover: url('https://i.imgur.com/qDNa4Wr.png');
-    --small-choice-button: url('https://i.imgur.com/4Ew7ekk.png');
+    --site-banner: url("https://i.imgur.com/pkYWoIM.png");
+    --choice-button-hover: url("https://i.imgur.com/6477Nct.png");
+    --choice-button: url("https://i.imgur.com/5DspJvG.png");
+    --dialog-box: url("https://i.imgur.com/cH6ms0h.png");
+    --site-home: url("./img/tcoaal-home.webp");
+    --site-loading: url("https://i.imgur.com/E0E2oCJ.png");
+    --site-title: url("./img/tcoaal-title.webp");
+    --small-choice-button-hover: url("https://i.imgur.com/qDNa4Wr.png");
+    --small-choice-button: url("https://i.imgur.com/4Ew7ekk.png");
 }

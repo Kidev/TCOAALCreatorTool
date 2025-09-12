@@ -371,9 +371,6 @@ function setupGalleryOnlyMode() {
     }
 
     document.body.innerHTML = `
-    <div class="iframe-wrapper">
-    <iframe src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>
-    </div>
     <div class="editor-overlay gallery-only-mode initial active" id="editorOverlay">
     <div class="editor-header" id="editorHeader">
     <div class="editor-zone left">
@@ -442,6 +439,9 @@ function setupGalleryOnlyMode() {
     <div id="importProgressText" class="import-progress-text">Processing...</div>
     </div>
     </div>
+    <div id="buy-game-popup" class="iframe-wrapper">
+    <iframe src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>
+    </div>
     `;
 
     if (!window.gameImporter) {
@@ -488,6 +488,8 @@ function handleGalleryOnlyImport() {
                 editorOverlay.classList.add("importing");
                 editorOverlay.classList.remove("initial");
             }
+            document.getElementById("buy-game-popup").style.display = "none";
+            document.getElementById("buy-game-popup").style.zindex = "-1";
 
             if (!window.gameImporter) {
                 window.gameImporter = new GameImporter();

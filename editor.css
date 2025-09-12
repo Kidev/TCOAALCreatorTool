@@ -474,7 +474,7 @@ button.reset-default:hover {
 
 .game-import {
     background: var(--other-color);
-    color:  var(--txt-color);
+    color: var(--txt-color);
     border: none;
     border-radius: 4px;
     cursor: pointer;
@@ -519,7 +519,8 @@ button.reset-default:hover {
 }
 
 /* CHARACTER & SCENE STYLES */
-.character-item, .scene-item {
+.character-item,
+.scene-item {
     background: var(--bg-color-section-lighter);
     padding: 0.8vmax;
     margin-bottom: 0.4vmax;
@@ -915,7 +916,6 @@ button.reset-default:hover {
     font-size: inherit;
 }
 
-
 /* OVERLAY & MODAL STYLES */
 .editor-overlay {
     position: fixed;
@@ -982,7 +982,6 @@ button.reset-default:hover {
     background-size: contain;
     opacity: 0;
 }
-
 
 .editor-overlay.active.scrolled {
     position: fixed;
@@ -1887,7 +1886,7 @@ button.reset-default:hover {
 #gallerySection,
 #gallerySection .section-content {
     overflow: visible;
-    display:flex;
+    display: flex;
 }
 
 @media (max-width: 800px) {
