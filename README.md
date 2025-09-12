@@ -321,4 +321,5 @@ storyData.forEach(scene => dialogFramework.addScene(scene));
 
 Dialog system and assets inspired by _The Coffin of Andy and Leyley_ by Nemlei.  
 Faustina font by Google.  
-Created by Kidev as a fan tool for the community.
+[gif.js](https://github.com/jnordberg/gif.js/) by jnordberg.  
+Created by Kidev as a fan tool for the community.  
