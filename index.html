@@ -1,0 +1,243 @@
+<!--
+    TCOAAL Creator Tool
+    Copyright (C) 2025, Alexandre 'kidev' Poumaroux
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link href="favicon.ico" rel="icon" type="image/x-icon">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <meta name="author" content="Alexandre 'kidev' Poumaroux">
+    <title>kidev's TCOAAL Creator Tool</title>
+    <link href="colors.css" rel="stylesheet" >
+    <link href="viewer.css" rel="stylesheet">
+    <link href="editor.css" rel="stylesheet">
+</head>
+<body>
+<div id="importProgressModal" class="import-modal" style="display: none;">
+    <div class="import-modal-content">
+        <h2>Importing Game Assets</h2>
+        <div class="import-progress-bar">
+            <div id="importProgressFill" class="import-progress-fill"></div>
+        </div>
+        <div id="importProgressText" class="import-progress-text">Processing...</div>
+    </div>
+</div>
+<div id="galleryModal" class="gallery-modal" style="display: none;">
+    <div class="gallery-modal-content">
+        <div class="gallery-header">
+            <h2>Imported Assets Gallery</h2>
+            <button class="gallery-close-btn" onclick="closeGallery()">✕</button>
+        </div>
+        <div class="gallery-main-container">
+            <div class="gallery-left-panel">
+                <div class="gallery-tabs">
+                    <button class="gallery-tab active" onclick="switchGalleryTab('images')">Images</button>
+                    <button class="gallery-tab" onclick="switchGalleryTab('audio')">Audio</button>
+                </div>
+                <div class="gallery-categories" id="galleryCategories"></div>
+                <div class="gallery-content" id="galleryContent"></div>
+            </div>
+            <div class="gallery-preview-panel" id="galleryPreviewPanel">
+                <div class="preview-panel-header">
+                    <h3>Preview</h3>
+                    <button class="preview-download-btn" id="previewDownloadBtn" onclick="downloadPreviewAsset()">⬇ Download</button>
+                </div>
+                <div class="preview-panel-content" id="previewPanelContent">
+                    <div class="preview-placeholder">Select an item to preview</div>
+                </div>
+                <div class="preview-controls" id="previewControls"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<input type="file" id="folderInput" style="display: none;" webkitdirectory directory multiple>
+<div class="game-container">
+    <div class="dialog-container" id="dialogContainer">
+        <div class="dialog-content">
+            <div class="dialog-line speaker-line" id="speakerLine"></div>
+            <div class="dialog-line text-line" id="textLine1"></div>
+            <div class="dialog-line text-line" id="textLine2"></div>
+        </div>
+    </div>
+    <div class="controls" id='controlsContainer'>
+        <div class="controls-grid">
+            <button class="editor-btn tcoaal-button" onclick="openEditor()" title="Edit the dialog">Editor</button>
+        </div>
+
+        <div class="nav-controls" id="navControls">
+            <button id="prevButton" class="tcoaal-button-small" onclick="dialogFramework.previous()" title="Previous (left arrow)">⬅</button>
+            <div class="debug-info tcoaal-button-small" id="debugInfo">0 / 0</div>
+            <button id="nextButton" class="tcoaal-button-small" onclick="dialogFramework.next()" title="Next (right arrow, click or space)">➡</button>
+            <button id="resetButton" class="tcoaal-button-small" onclick="dialogFramework.reset()" title="Reset">⟲</button>
+        </div>
+        <div class="controls-footer">
+            <span class="controls-title">Use tab to toggle the interface</span>
+        </div>
+    </div>
+</div>
+<div class="interaction-blocker" id="interactionBlocker"></div>
+<div class="editor-overlay spa-mode" id="editorOverlay" onclick="event.stopPropagation()">
+    <div class="editor-header" id="editorHeader">
+        <div class="editor-zone left">
+            <div class="header-buttons">
+                <button class="game-import" onclick="handleGameImportClick()" title="Import all the assets from your game folder">
+                    Import game ⊞
+                </button>
+                <button class="overlay-close" onclick="closeEditor()"
+                        title="Cancel changes and return to the animation screen'">Cancel ✘
+                </button>
+            </div>
+        </div>
+        <div class="editor-zone center">
+            <div class="editor-header-content">
+                <div class="editor-header-content">
+                    <a href="https://github.com/Kidev/TCOAALCreatorTool" title="See on GitHub" target="_blank"><img alt="Dialog Creator" class="editor-title-image" src="img/tcoaal-title.webp"></a>
+                </div>
+            </div>
+        </div>
+        <div class="editor-zone right">
+            <div class="header-buttons">
+                <button class="save-button" onclick="runSequence()"
+                        title="Apply the changes made and return to the animation screen">✓ Apply
+                </button>
+                <button class="js-download" onclick="downloadSequence()"
+                        title="Export the generated sequence.js (for advanced users)">✉ Export JS
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="editor-container" onclick="event.stopPropagation()">
+        <div class="section">
+            <button class="section-header collapsible" onclick="toggleSection(this)">
+                Configuration & glitch settings
+            </button>
+            <div class="section-content">
+                <div class="subsection">
+                    <h3>General configuration</h3>
+                    <button class="reset-default reset-section" onclick="resetConfigToDefault()">Reset to default
+                    </button>
+                    <div class="form-group no-checkbox">
+                        <label for="configShowControls">Show controls:</label>
+                        <input checked id="configShowControls" type="checkbox">
+                    </div>
+                    <div class="form-group no-checkbox" style="display: none">
+                        <label for="configShowDebug">Show scene count and GitHub link:</label>
+                        <input checked id="configShowDebug" type="checkbox">
+                    </div>
+                    <div class="form-group">
+                        <input class="null-checkbox" id="backgroundMusicEnabled"
+                               onchange="toggleBackgroundMusic(this.checked)"
+                               title="Enable/disable background music"
+                               type="checkbox">
+                        <label for="backgroundMusicEnabled">Background music:</label>
+                        <div class="file-select-wrapper" id="bgmusic-wrapper" style="display: none;">
+                            <select class="file-type-select" id="select-bgmusic"
+                                    onchange="handleBackgroundMusicTypeChange(this.value)">
+                                <option value="local">Local</option>
+                                <option value="url">URL</option>
+                                <option value="gallery">Gallery</option>
+                            </select>
+                            <div id="select-bgmusic-container" style="flex: 1; display: flex; align-items: center; gap: 0.8vmax;">
+                                <input accept="audio/*" disabled id="backgroundMusicFile"
+                                       onchange="handleBackgroundMusicUpload(this)" type="file">
+                                <button class="file-select-button"
+                                        disabled
+                                        id="backgroundMusicButton"
+                                        onclick="document.getElementById('backgroundMusicFile').click()">
+                                    <span class="filename" id="selectbgMusicFile">Select file</span>
+                                </button>
+                                <button class="play-button" id="bg-music-button"
+                                        onclick="toggleBackgroundMusicPreview()" style="display: none;">▶ Play
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group" id="backgroundMusicVolumeGroup" style="display: none;">
+                        <label for="backgroundMusicVolume" style="grid-column: 2">Music volume:</label>
+                        <input id="backgroundMusicVolume" style="grid-column: 3" max="1" min="0" onchange="updateBackgroundMusicVolume(this.value)" step="0.1" type="number"
+                               value="0.5">
+                    </div>
+                </div>
+                <div class="subsection">
+                    <h3>Glitch Effect</h3>
+                    <button class="reset-default reset-section" onclick="resetGlitchToDefault()">Reset to default
+                    </button>
+                    <div class="form-group no-checkbox">
+                        <label for="glitchScrambledColor">Scrambled color:</label>
+                        <input id="glitchScrambledColor" type="color">
+                    </div>
+                    <div class="form-group no-checkbox">
+                        <label for="glitchRealColor">Real color:</label>
+                        <input id="glitchRealColor" type="color">
+                    </div>
+                    <div class="form-group no-checkbox">
+                        <label for="glitchChangeSpeed">Change speed:</label>
+                        <input id="glitchChangeSpeed" max="500" min="10" type="number" value="50">
+                    </div>
+                    <div class="form-group no-checkbox">
+                        <label for="glitchRealProbability">Real probability:</label>
+                        <input id="glitchRealProbability" max="100" min="0" type="number" value="5">
+                    </div>
+                    <div class="form-group no-checkbox">
+                        <label for="glitchAutoStart">Auto start:</label>
+                        <input checked id="glitchAutoStart" type="checkbox">
+                    </div>
+                    <div class="form-group no-checkbox">
+                        <label for="glitchCharsAllowed">Allowed characters:</label>
+                        <input id="glitchCharsAllowed" type="text"
+                               value="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <button class="section-header collapsible" onclick="toggleSection(this)">
+                Characters
+            </button>
+            <div class="section-content">
+                <button class="reset-default" onclick="resetCharactersToDefault()">Reset all characters</button>
+                <div id="charactersList"></div>
+                <div class="form-group add-character">
+                    <input id="newCharacterName" placeholder="Character name" type="text">
+                    <input id="newCharacterColor" type="color">
+                    <button class="success" onclick="addCharacter()">Add character</button>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <button class="section-header collapsible" onclick="toggleSection(this)">
+                Scenes
+            </button>
+            <div class="section-content">
+                <button class="reset-default" onclick="resetScenesToDefault()">Reset all scenes</button>
+                <div id="scenesList"></div>
+                <button class="success add-scene" onclick="addScene()">Create new scene</button>
+            </div>
+        </div>
+    </div>
+</div>
+<input accept=".json" id="fileInput" style="display: none;" type="file">
+<script src="js/filenameMapper.js"></script>
+<script src="js/dialog.js"></script>
+<script src="js/gameImporter.js"></script>
+<script src="js/interface.js"></script>
+<script src="js/sequence.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/galleryManager.js"></script>
+</body>
+</html>

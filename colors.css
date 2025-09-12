@@ -1,0 +1,46 @@
+:root {
+    --green: #2d781f;
+    --purple: #ec83c3;
+    --blue: #5a93e2;
+    --grey-blue: #8497b3;
+    --yellow: #eae670;
+    --grey: #5b5b5b;
+    --default: #d3d0c0;
+    --red: #b54849;
+    --black: #000000;
+    --white: #ffffff;
+}
+
+:root {
+    --bg-color: #1a1a1a;
+    --bg-color-darker: #121212;
+    --bg-color-section: #2a2a2a;
+    --bg-color-section-tr: rgba(42, 42, 42, 0.4);
+    --bg-color-section-lighter: #3a3a3a;
+    --bg-color-section-lighter-tr: rgba(58, 58, 58, 0.5);
+    --bg-color-section-lightest: #454545;
+    --txt-color: var(--default);
+    --txt-color-darker: #999999;
+    --txt-color-invert: #090909;
+    --accent-color: #555555;
+    --accent-color-tr: rgba(85, 85, 85, 0.9);
+    --accent-color-light: #666666;
+    --danger-color: var(--red);
+    --danger-color-deep: #cd4142;
+    --success-color: var(--green);
+    --success-color-deep: #115111;
+    --other-color: var(--blue);
+    --other-color-deep: #3d74b3;
+}
+
+:root {
+    --site-banner: url('https://i.imgur.com/pkYWoIM.png');
+    --choice-button-hover: url('https://i.imgur.com/6477Nct.png');
+    --choice-button: url('https://i.imgur.com/5DspJvG.png');
+    --dialog-box: url('https://i.imgur.com/cH6ms0h.png');
+    --site-home: url('./img/tcoaal-home.webp');
+    --site-loading: url('https://i.imgur.com/E0E2oCJ.png');
+    --site-title: url('./img/tcoaal-title.webp');
+    --small-choice-button-hover: url('https://i.imgur.com/qDNa4Wr.png');
+    --small-choice-button: url('https://i.imgur.com/4Ew7ekk.png');
+}
