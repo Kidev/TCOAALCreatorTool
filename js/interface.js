@@ -394,13 +394,14 @@ function setupGalleryOnlyMode() {
     <button class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:30vmax;padding:1vmax;font-size: 2vmax;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);">
     Select your game folder
     </button>
-    <div class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
-    <div class="dialog-content">
+    <div id="dialog-container-box" class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
+    <div id="dialog-content-box" class="dialog-content">
     <div class="dialog-line speaker-line"></div>
     <div class="dialog-line text-line" style="top:34%; font-size: 2vmax;">You need to own the game to go further.</div>
     <div class="dialog-line text-line" style="top:54%; font-size: 2vmax;">Demons are respectable entities, not filthy thieves.</div>
     </div>
     </div>
+
     </div>
     <div id="gallerySection" class="section" style="display: none; background: none;padding:0;margin:0;box-shadow:none;">
     <div class="section-content gallery-flex" style="display: flex; background: none;padding:0;margin:0;">
@@ -439,9 +440,7 @@ function setupGalleryOnlyMode() {
     <div id="importProgressText" class="import-progress-text">Processing...</div>
     </div>
     </div>
-    <div id="buy-game-popup" class="iframe-wrapper">
-    <iframe src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>
-    </div>
+    <iframe id="popup-buy-frame" src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>
     `;
 
     if (!window.gameImporter) {
@@ -532,9 +531,24 @@ function switchToEditorMode() {
 
 function updateStickyPositions() {
     const header = document.getElementById("editorHeader");
+    const dialogBox = document.getElementById("dialog-content-box");
+    const iFrame = document.getElementById("popup-buy-frame");
     if (header) {
         const headerHeight = header.offsetHeight;
         document.documentElement.style.setProperty("--header-height", headerHeight + "px");
+    }
+    if (dialogBox) {
+        const NATIVE_W = 646;
+        const NATIVE_H = 190;
+        const RATIO_BOX = 0.7;
+        const rect = dialogBox.getBoundingClientRect();
+
+        const sx = (rect.width * RATIO_BOX) / NATIVE_W;
+        const sy = (rect.height * RATIO_BOX) / NATIVE_H;
+
+        const s = Math.min(1, sx, sy);
+
+        iFrame.style.transform = `scale(${s})`;
     }
 }
 
