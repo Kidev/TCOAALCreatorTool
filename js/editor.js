@@ -1716,6 +1716,7 @@ function updateGalleryContent() {
                     item.style.display = itemName.startsWith(prefix) ? "" : "none";
                 }
             });
+            galleryManager.selectFirstElement();
         });
         if (document.getElementById("bustsFilterSelect") !== null) {
             document.getElementById("bustsFilterSelect").remove();
@@ -1725,7 +1726,7 @@ function updateGalleryContent() {
         document.getElementById("bustsFilterSelect").remove();
     }
 
-    assetEntries.forEach(([name, asset]) => {
+    assetEntries.forEach(([name, asset], index) => {
         if (currentGalleryTab === "images" && currentGalleryCategory === "Portraits" && bustFilterValue !== "All") {
             const baseName = name.toLowerCase().replace(/\.[^/.]+$/, "");
             if (!baseName.startsWith(bustFilterValue.toLowerCase() + "_")) return;
@@ -1734,6 +1735,10 @@ function updateGalleryContent() {
         const item = document.createElement("div");
         item.className = "gallery-item";
         item.dataset.filename = name;
+        item.dataset.assetIndex = index.toString();
+        item.dataset.baseFileName = asset.baseFileName;
+        item.dataset.originalName = asset.originalName;
+        item.dataset.formatName = formatName;
         item.onclick = function () {
             window.galleryManager.previewAsset(name, currentGalleryCategory, currentGalleryTab);
         };
@@ -1741,7 +1746,7 @@ function updateGalleryContent() {
             const thumbSrc =
                 galleryManager.globalImageViewMode === "cropped" && asset.croppedUrl ? asset.croppedUrl : asset.url;
             item.innerHTML = `
-                <img src="${asset.croppedUrl || asset.url}" alt="${name}">
+                <img src="${asset.croppedUrl || asset.url}" alt="${name}" loading="lazy">
                 <div class="gallery-item-name">${formatName}</div>
                 <div class="gallery-item-actions">
                 ${!isGalleryOnly ? `<button class="gallery-item-action" onclick="event.stopPropagation(); useGalleryAsset('${name}', '${currentGalleryCategory}')">Use</button>` : ""}
@@ -1758,6 +1763,8 @@ function updateGalleryContent() {
         }
         contentContainer.appendChild(item);
     });
+    galleryManager.unselectCurrent();
+    galleryManager.selectFirstElement();
 }
 
 function useGalleryAsset(name, category) {
@@ -1774,8 +1781,16 @@ function useGalleryAsset(name, category) {
 
 async function cropAllImages() {
     const imagesByCategory = window.gameImporterAssets.images;
+    const downloadAllButton = document.getElementById("download-all-button");
+    const updateDownloadButton = (percent, done = false) => {
+        downloadAllButton.textContent = `Download All`;
+        if (!done === false) {
+            downloadAllButton.textContent = `Download All`;
+            downloadAllButton.classList.remove("disabled");
+        }
+    };
+
     if (!imagesByCategory) return;
-    // Collect all images to crop (skip "Portraits" and sprites)
     const toCrop = [];
     for (const [category, assets] of Object.entries(imagesByCategory)) {
         if (category === "Portraits") continue;
@@ -1785,96 +1800,76 @@ async function cropAllImages() {
             }
         }
     }
-    // Sort by name (numeric order: Picture #3 before #4...)
     toCrop.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
     const total = toCrop.length;
-    const editorLeft = document.querySelector(".editor-zone.left");
-    if (editorLeft) {
-        if (!editorLeft.style.position) {
-            editorLeft.style.position = "relative";
-        }
-        const indicator = document.createElement("div");
-        indicator.id = "croppingProgressIndicator";
-        Object.assign(indicator.style, {
-            position: "absolute",
-            top: "5px",
-            left: "5px",
-            background: "rgba(0, 0, 0, 0.7)",
-            color: "#fff",
-            padding: "2px 6px",
-            fontSize: "12px",
-            borderRadius: "3px",
-        });
-        indicator.textContent = `Cropping images (0%): Starting...`;
-        editorLeft.appendChild(indicator);
+    const indicator = document.getElementById("croppingProgressIndicator");
+    indicator.style.display = "flex";
 
-        let count = 0;
-        // Sequentially crop each image
-        for (const { name, asset } of toCrop) {
-            await new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                    const w = img.width,
-                        h = img.height;
-                    const canvas = document.createElement("canvas");
-                    const ctx = canvas.getContext("2d");
-                    canvas.width = w;
-                    canvas.height = h;
-                    ctx.drawImage(img, 0, 0);
+    let count = 0;
+    for (const { name, asset } of toCrop) {
+        await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const w = img.width,
+                    h = img.height;
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d", { willReadFrequently: true });
+                canvas.width = w;
+                canvas.height = h;
+                ctx.drawImage(img, 0, 0);
 
-                    // Find non-transparent bounding box
-                    const data = ctx.getImageData(0, 0, w, h).data;
-                    let minX = w,
-                        minY = h,
-                        maxX = 0,
-                        maxY = 0;
-                    for (let y = 0; y < h; y++) {
-                        for (let x = 0; x < w; x++) {
-                            if (data[(y * w + x) * 4 + 3] > 0) {
-                                minX = Math.min(minX, x);
-                                minY = Math.min(minY, y);
-                                maxX = Math.max(maxX, x);
-                                maxY = Math.max(maxY, y);
-                            }
+                const data = ctx.getImageData(0, 0, w, h).data;
+                let minX = w,
+                    minY = h,
+                    maxX = 0,
+                    maxY = 0;
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        if (data[(y * w + x) * 4 + 3] > 0) {
+                            minX = Math.min(minX, x);
+                            minY = Math.min(minY, y);
+                            maxX = Math.max(maxX, x);
+                            maxY = Math.max(maxY, y);
                         }
                     }
+                }
 
-                    // Crop if there is any non transparent pixel
-                    if (maxX >= minX && maxY >= minY) {
-                        const cropW = maxX - minX + 1;
-                        const cropH = maxY - minY + 1;
-                        const cropCanvas = document.createElement("canvas");
-                        cropCanvas.width = cropW;
-                        cropCanvas.height = cropH;
-                        cropCanvas.getContext("2d").drawImage(img, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
-                        cropCanvas.toBlob((blob) => {
-                            if (blob) {
-                                const url = URL.createObjectURL(blob);
-                                asset.croppedUrl = url;
-                                // Update thumbnail image if present
-                                const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
-                                if (thumbImg) {
-                                    thumbImg.src = url;
-                                }
+                if (maxX >= minX && maxY >= minY) {
+                    const cropW = maxX - minX + 1;
+                    const cropH = maxY - minY + 1;
+                    const cropCanvas = document.createElement("canvas");
+                    cropCanvas.width = cropW;
+                    cropCanvas.height = cropH;
+                    cropCanvas.getContext("2d").drawImage(img, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+                    cropCanvas.toBlob((blob) => {
+                        if (blob) {
+                            const url = URL.createObjectURL(blob);
+                            asset.croppedUrl = url;
+                            const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
+                            if (thumbImg) {
+                                thumbImg.src = url;
                             }
-                            count++;
-                            const pct = Math.round((count / total) * 100);
-                            indicator.textContent = `Cropping images (${pct}%): ${name}`;
-                            resolve();
-                        });
-                    } else {
-                        // No cropping needed
+                        }
                         count++;
                         const pct = Math.round((count / total) * 100);
-                        indicator.textContent = `Cropping images (${pct}%): ${name}`;
+                        indicator.textContent = `Cropping ${name} (${pct}%)`;
+                        updateDownloadButton(pct);
                         resolve();
-                    }
-                };
-                img.src = asset.url;
-            });
-        }
-        indicator.remove();
+                    });
+                } else {
+                    count++;
+                    const pct = Math.round((count / total) * 100);
+                    indicator.textContent = `Cropping ${name} (${pct}%)`;
+                    updateDownloadButton(pct);
+                    resolve();
+                }
+            };
+            img.src = asset.url;
+        });
     }
+    //indicator.remove();
+    indicator.style.display = "none";
+    updateDownloadButton(100, true);
 }
 
 window.handleGameImportClick = function () {

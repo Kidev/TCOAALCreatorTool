@@ -99,14 +99,17 @@ h6 {
 .editor-zone.left {
     flex: 1 1 0;
     display: flex;
-    justify-content: right;
+    justify-content: flex-start;
     align-items: center;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-content: center;
+    margin-left: 1vmin;
 }
 
 .editor-zone.right {
     flex: 1 1 0;
     display: flex;
-    justify-content: left;
     align-items: center;
 }
 
@@ -1597,6 +1600,12 @@ button.reset-default:hover {
     margin-bottom: 1vmax;
     text-align: center;
 }
+.asset-filename-subtitle {
+    color: var(--txt-color-darker);
+    font-size: 0.8vmax;
+    margin-bottom: 1vmax;
+    text-align: center;
+}
 
 .audio-player-controls {
     display: flex;
@@ -1919,4 +1928,45 @@ button.reset-default:hover {
 .speed-unit {
     color: var(--txt-color-darker);
     font-size: 0.85vmax;
+}
+
+#download-all-button {
+    background: url("https://i.imgur.com/5DspJvG.png");
+    background-size: 100% 100%;
+    font-family: "Faustina", serif;
+    font-size: 1.1vmin;
+    width: 17vmin;
+    text-align: center;
+    color: var(--white);
+    text-shadow:
+            0 0 1px #000000,
+            0 0 1px #000000,
+            0 0 1px #000000,
+            0 0 1px #000000,
+            0 0 1px #000000,
+            0 0 1px #000000,
+            0 0 2px #000000,
+            0 0 3px #000000,
+            0 0 4px #000000;
+}
+
+#download-all-button.disabled {
+    cursor: not-allowed !important;
+    transform: none !important;
+    opacity: 0.5 !important;
+}
+
+#croppingProgressIndicator {
+    display: none;
+    background: rgba(0, 0, 0, 0.5);
+    color: #dddddd;
+    font-size: 0.9vmin;
+    border-radius: 3px;
+    width: 20vmin;
+    height: 1vmin;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
+    cursor: default;
 }

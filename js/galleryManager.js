@@ -30,6 +30,10 @@ class GalleryManager {
         this.spriteSheetData = null;
         this.extractedSprites = [];
         this.globalImageViewMode = "cropped";
+        this.currentlyCropping = false;
+        this.cropQueue = [];
+        this.isCropping = false;
+        this.willReadFrequently = true;
     }
 
     setGlobalImageViewMode(mode) {
@@ -66,6 +70,7 @@ class GalleryManager {
             item.classList.remove("selected");
         });
         event.currentTarget.classList.add("selected");
+        event.currentTarget.scrollIntoView({ behavior: "smooth", block: "end" });
 
         const assets =
             type === "images" ? window.gameImporterAssets.images[category] : window.gameImporterAssets.audio[category];
@@ -74,6 +79,10 @@ class GalleryManager {
         if (!asset) return;
 
         this.currentAsset = { name, category, type, asset };
+        // If this is an image (non-portrait) and not a sprite sheet, enqueue it
+        if (type === "images" && category !== "Portraits" && !asset.isSprite) {
+            this.enqueueCropImage(asset, name, category);
+        }
 
         const downloadBtn = document.getElementById("previewDownloadBtn");
         downloadBtn.classList.add("active");
@@ -252,13 +261,13 @@ class GalleryManager {
             }, 10);
 
             controlsDiv.innerHTML = `
-                <div class="asset-filename-title">${this.formatAssetTitle(name)}</div>
+                <div class="asset-filename-title">${this.formatAssetTitle(name, "images")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
                 <div class="preview-control-group preview-sprite-controls compact">
                     <button class="preview-control-btn" onclick="galleryManager.clearSpriteSelection()">Clear</button>
                     <button class="preview-control-btn" onclick="galleryManager.exportAsGif()">GIF</button>
+                    <button class="preview-control-btn" onclick="galleryManager.exportAsPng()">PNG(s)</button>
                     <span class="divider">|</span>
-                    <label class="preview-control-label inline" style="display: inline;">Speed (ms):</label>
-                    <input type="number" id="animationSpeed" style="display: inline; width: auto;" class="preview-control-input inline compact" value="250" min="10" max="5000" step="10" oninput="galleryManager.updateAnimationSpeed()">
+                    <label class="preview-control-label inline" style="display: inline;">Speed (ms): <input type="number" id="animationSpeed" style="display: inline; width: auto;" class="preview-control-input inline compact" value="250" min="10" max="5000" step="10" oninput="galleryManager.updateAnimationSpeed()"></label>
                 </div>
                 <div class="preview-control-group" style="display: flex; justify-content: center;">
                     <div id="preview-canvas-location" class="animation-preview" style="display: none;">
@@ -269,21 +278,20 @@ class GalleryManager {
             this.spriteSheetData = { img, cols, rows, cellWidth, cellHeight };
         };
         img.src = asset.url;
+        img.loading = "lazy";
     }
 
     previewImage(asset, name, contentDiv, controlsDiv) {
-        let imgSrc = asset.url;
         let showCroppedBox = asset.croppedUrl;
-        if (this.globalImageViewMode === "cropped" && asset.croppedUrl) {
-            imgSrc = asset.croppedUrl;
-        }
+        const src = this.globalImageViewMode === "cropped" && asset.croppedUrl ? asset.croppedUrl : asset.url;
         contentDiv.innerHTML = `
-            <div class="preview-image-container">
-                <img src="${imgSrc}" alt="${name}" class="preview-image" id="previewMainImage">
-            </div>`;
+        <div class="preview-image-container">
+          <img src="${src}" alt="${name}" class="preview-image" id="previewMainImage">
+        </div>
+    `;
 
         controlsDiv.innerHTML = `
-            <div class="asset-filename-title">${name}</div>
+            <div class="asset-filename-title">${this.formatAssetTitle(name, "images")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
             <div class="preview-control-group" ${showCroppedBox ? "" : "style='display: none;'"}>
                 <label class="preview-control-label">
                     <input type="checkbox" id="toggleCropped"
@@ -292,6 +300,81 @@ class GalleryManager {
                     Cropped
                 </label>
             </div>`;
+    }
+
+    previewAudio(asset, name, contentDiv, controlsDiv) {
+        if (!this._audioSessionId) this._audioSessionId = 0;
+        this._audioSessionId++;
+        const sessionId = this._audioSessionId;
+
+        if (this.currentAudio) {
+            try {
+                this.currentAudio.pause();
+            } catch (_) {}
+            if (this._onTimeUpdate) this.currentAudio.removeEventListener("timeupdate", this._onTimeUpdate);
+            if (this._onLoadedMeta) this.currentAudio.removeEventListener("loadedmetadata", this._onLoadedMeta);
+            if (this._onEnded) this.currentAudio.removeEventListener("ended", this._onEnded);
+            this.currentAudio.src = "";
+            this.currentAudio.load();
+            this.currentAudio = null;
+        }
+
+        contentDiv.innerHTML = `
+            <div class="audio-player-container compact">
+            <div class="audio-player-controls">
+            <button class="audio-player-btn" id="audioPlayBtn" onclick="galleryManager.toggleAudioPlay()">▶ Play</button>
+            <button class="audio-player-btn" onclick="galleryManager.restartAudio()">⏮ Restart</button>
+            <div style="display:flex;align-items:center;flex-direction:column-reverse;justify-content:flex-start;">
+            <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
+            oninput="galleryManager.setAudioVolume(this.value)" title="100%">
+            <span id="volumeValue" style="min-width:3ch; text-align:right;">100%</span>
+            </div>
+            </div>
+            <div class="audio-player-progress">
+            <div class="audio-progress-bar" onclick="galleryManager.seekAudio(event)">
+            <div class="audio-progress-fill" id="audioProgressFill" style="width: 0%;"></div>
+            </div>
+            <div class="audio-player-time">
+            <span id="audioCurrentTime">0:00</span>
+            <span id="audioDuration">0:00</span>
+            </div>
+            </div>
+            </div>`;
+
+        const progressFill = document.getElementById("audioProgressFill");
+        const curTimeEl = document.getElementById("audioCurrentTime");
+        const durEl = document.getElementById("audioDuration");
+        if (progressFill) progressFill.style.width = "0%";
+        if (curTimeEl) curTimeEl.textContent = "0:00";
+        if (durEl) durEl.textContent = "0:00";
+
+        controlsDiv.innerHTML = `<div class="asset-filename-title">${this.formatAssetTitle(name, "audio")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>`;
+
+        const audio = new Audio(asset.url);
+        this.currentAudio = audio;
+
+        this._onLoadedMeta = () => {
+            if (sessionId !== this._audioSessionId) return;
+            if (durEl) durEl.textContent = this.formatTime(audio.duration);
+        };
+        this._onTimeUpdate = () => {
+            if (sessionId !== this._audioSessionId) return;
+            const pct = audio.duration && isFinite(audio.duration) ? (audio.currentTime / audio.duration) * 100 : 0;
+            if (progressFill) progressFill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+            if (curTimeEl) curTimeEl.textContent = this.formatTime(audio.currentTime);
+        };
+        this._onEnded = () => {
+            if (sessionId !== this._audioSessionId) return;
+            const playBtn = document.getElementById("audioPlayBtn");
+            if (playBtn) playBtn.textContent = "▶ Play";
+        };
+
+        audio.addEventListener("loadedmetadata", this._onLoadedMeta);
+        audio.addEventListener("timeupdate", this._onTimeUpdate);
+        audio.addEventListener("ended", this._onEnded);
+
+        const volSlider = document.getElementById("volumeSlider");
+        if (volSlider) this.setAudioVolume(volSlider.value);
     }
 
     formatAssetTitle(rawName, category = null, type = null) {
@@ -402,7 +485,7 @@ class GalleryManager {
             this.selectedSprites.push(index);
             cell.classList.add("selected");
         }
-        galleryManager.animateSelectedSprites();
+        this.animateSelectedSprites();
     }
 
     selectAllSprites() {
@@ -417,7 +500,7 @@ class GalleryManager {
         document.querySelectorAll(".sprite-cell-preview").forEach((cell) => {
             cell.classList.remove("selected");
         });
-        galleryManager.animateSelectedSprites();
+        this.animateSelectedSprites();
     }
 
     exportAsGif() {
@@ -466,79 +549,38 @@ class GalleryManager {
         gif.render();
     }
 
-    previewAudio(asset, name, contentDiv, controlsDiv) {
-        if (!this._audioSessionId) this._audioSessionId = 0;
-        this._audioSessionId++;
-        const sessionId = this._audioSessionId;
-
-        if (this.currentAudio) {
-            try {
-                this.currentAudio.pause();
-            } catch (_) {}
-            if (this._onTimeUpdate) this.currentAudio.removeEventListener("timeupdate", this._onTimeUpdate);
-            if (this._onLoadedMeta) this.currentAudio.removeEventListener("loadedmetadata", this._onLoadedMeta);
-            if (this._onEnded) this.currentAudio.removeEventListener("ended", this._onEnded);
-            this.currentAudio.src = "";
-            this.currentAudio.load();
-            this.currentAudio = null;
+    exportAsPng() {
+        if (this.selectedSprites.length === 0) {
+            alert("Please select sprites to export");
+            return;
         }
-
-        contentDiv.innerHTML = `
-            <div class="audio-player-container compact">
-            <div class="audio-player-controls">
-            <button class="audio-player-btn" id="audioPlayBtn" onclick="galleryManager.toggleAudioPlay()">▶ Play</button>
-            <button class="audio-player-btn" onclick="galleryManager.restartAudio()">⏮ Restart</button>
-            <div style="display:flex;align-items:center;flex-direction:column-reverse;justify-content:flex-start;">
-            <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
-            oninput="galleryManager.setAudioVolume(this.value)" title="100%">
-            <span id="volumeValue" style="min-width:3ch; text-align:right;">100%</span>
-            </div>
-            </div>
-            <div class="audio-player-progress">
-            <div class="audio-progress-bar" onclick="galleryManager.seekAudio(event)">
-            <div class="audio-progress-fill" id="audioProgressFill" style="width: 0%;"></div>
-            </div>
-            <div class="audio-player-time">
-            <span id="audioCurrentTime">0:00</span>
-            <span id="audioDuration">0:00</span>
-            </div>
-            </div>
-            </div>`;
-
-        const progressFill = document.getElementById("audioProgressFill");
-        const curTimeEl = document.getElementById("audioCurrentTime");
-        const durEl = document.getElementById("audioDuration");
-        if (progressFill) progressFill.style.width = "0%";
-        if (curTimeEl) curTimeEl.textContent = "0:00";
-        if (durEl) durEl.textContent = "0:00";
-
-        controlsDiv.innerHTML = `<div class="asset-filename-title">${name}</div>`;
-
-        const audio = new Audio(asset.url);
-        this.currentAudio = audio;
-
-        this._onLoadedMeta = () => {
-            if (sessionId !== this._audioSessionId) return;
-            if (durEl) durEl.textContent = this.formatTime(audio.duration);
-        };
-        this._onTimeUpdate = () => {
-            if (sessionId !== this._audioSessionId) return;
-            const pct = audio.duration && isFinite(audio.duration) ? (audio.currentTime / audio.duration) * 100 : 0;
-            if (progressFill) progressFill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
-            if (curTimeEl) curTimeEl.textContent = this.formatTime(audio.currentTime);
-        };
-        this._onEnded = () => {
-            if (sessionId !== this._audioSessionId) return;
-            const playBtn = document.getElementById("audioPlayBtn");
-            if (playBtn) playBtn.textContent = "▶ Play";
-        };
-
-        audio.addEventListener("loadedmetadata", this._onLoadedMeta);
-        audio.addEventListener("timeupdate", this._onTimeUpdate);
-        audio.addEventListener("ended", this._onEnded);
-
-        const volSlider = document.getElementById("volumeSlider");
-        if (volSlider) this.setAudioVolume(volSlider.value);
+        if (typeof JSZip === "undefined") {
+            const script = document.createElement("script");
+            script.src = "js/libs/jszip.min.js";
+            script.onload = () => this.exportAsPng();
+            document.head.appendChild(script);
+            return;
+        }
+        const zip = new JSZip();
+        const promises = this.selectedSprites.map((index) => {
+            return new Promise((resolve) => {
+                const sprite = this.extractedSprites[index];
+                sprite.canvas.toBlob((blob) => {
+                    zip.file(`sprite_${index}.png`, blob);
+                    resolve();
+                }, "image/png");
+            });
+        });
+        Promise.all(promises).then(() => {
+            zip.generateAsync({ type: "blob" }).then((zipBlob) => {
+                const url = URL.createObjectURL(zipBlob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `sprites_${Date.now()}.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        });
     }
 
     toggleAudioPlay() {
@@ -608,54 +650,104 @@ class GalleryManager {
         a.download = name;
         a.click();
     }
-}
 
-async function cropImageAsset(asset) {
-    return new Promise((resolve) => {
-        // Create an image from the asset blob
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
+    enqueueCropImage(asset, name, category) {
+        if (asset.croppedBlob || asset.cropping) return;
+        asset.cropping = true;
+        this.cropQueue.unshift({ asset, name, category });
+        if (!this.isCropping) {
+            this.processCropQueue().then((r) => {});
+        }
+    }
 
-            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-            let top = null,
-                left = null,
-                right = null,
-                bottom = null;
-            for (let i = 0; i < data.length; i += 4) {
-                if (data[i + 3] !== 0) {
-                    // alpha > 0
-                    const x = (i / 4) % canvas.width;
-                    const y = Math.floor(i / 4 / canvas.width);
-                    top = top === null ? y : Math.min(top, y);
-                    left = left === null ? x : Math.min(left, x);
-                    right = right === null ? x : Math.max(right, x);
-                    bottom = bottom === null ? y : Math.max(bottom, y);
+    unselectCurrent() {
+        const current = document.querySelector(".gallery-item.selected");
+        if (current?.classList?.contains("selected")) {
+            current.classList.remove("selected");
+        }
+    }
+    selectFirstElement() {
+        const items = Array.from(document.querySelectorAll(".gallery-item")).filter(
+            (el) => el.style.display !== "none",
+        );
+
+        if (items.length === 0) return;
+
+        const first = items.reduce((min, el) =>
+            parseInt(el.dataset.assetIndex, 10) < parseInt(min.dataset.assetIndex, 10) ? el : min,
+        );
+
+        first.click();
+    }
+
+    async processCropQueue() {
+        if (this.isCropping) return;
+        this.isCropping = true;
+        while (this.cropQueue.length > 0) {
+            const { asset, name, category } = this.cropQueue.shift();
+            if (!asset.blob) {
+                asset.cropping = false;
+                continue;
+            }
+            try {
+                const imgBitmap = await createImageBitmap(asset.blob);
+                const w = imgBitmap.width,
+                    h = imgBitmap.height;
+                const canvas = document.createElement("canvas");
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d", { willReadFrequently: this.willReadFrequently });
+                ctx.drawImage(imgBitmap, 0, 0);
+                const imgData = ctx.getImageData(0, 0, w, h).data;
+                let minX = w,
+                    minY = h,
+                    maxX = 0,
+                    maxY = 0,
+                    found = false;
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const alpha = imgData[(y * w + x) * 4 + 3];
+                        if (alpha > 0) {
+                            found = true;
+                            minX = Math.min(minX, x);
+                            maxX = Math.max(maxX, x);
+                            minY = Math.min(minY, y);
+                            maxY = Math.max(maxY, y);
+                        }
+                    }
                 }
+                if (found) {
+                    const trimW = maxX - minX + 1;
+                    const trimH = maxY - minY + 1;
+                    // Crop only if bounding box is smaller than original
+                    if (trimW < w || trimH < h) {
+                        const croppedCanvas = document.createElement("canvas");
+                        croppedCanvas.width = trimW;
+                        croppedCanvas.height = trimH;
+                        const croppedCtx = croppedCanvas.getContext("2d");
+                        // Draw cropped area
+                        croppedCtx.drawImage(canvas, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+                        // Convert to Blob
+                        const blob = await new Promise((r) => croppedCanvas.toBlob(r, "image/png"));
+                        asset.croppedBlob = blob;
+                        asset.croppedUrl = URL.createObjectURL(blob);
+                        asset.cropped = true;
+
+                        const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
+                        if (thumbImg) {
+                            thumbImg.src = asset.croppedUrl;
+                            //thumbImg.loading = "lazy";
+                            thumbImg.click();
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Cropping failed for", name, err);
             }
-            if (top !== null) {
-                const cropWidth = right - left + 1;
-                const cropHeight = bottom - top + 1;
-                const trimmed = ctx.getImageData(left, top, cropWidth, cropHeight);
-                const croppedCanvas = document.createElement("canvas");
-                croppedCanvas.width = cropWidth;
-                croppedCanvas.height = cropHeight;
-                croppedCanvas.getContext("2d").putImageData(trimmed, 0, 0);
-                croppedCanvas.toBlob((blob) => {
-                    asset.croppedBlob = blob;
-                    asset.croppedUrl = URL.createObjectURL(blob);
-                    resolve();
-                });
-            } else {
-                resolve();
-            }
-        };
-        img.src = URL.createObjectURL(asset.blob);
-    });
+            asset.cropping = false;
+        }
+        this.isCropping = false;
+    }
 }
 
 window.galleryManager = new GalleryManager();

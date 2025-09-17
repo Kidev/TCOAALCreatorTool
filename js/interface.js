@@ -373,6 +373,7 @@ function setupGalleryOnlyMode() {
             <div class="editor-header" id="editorHeader">
                 <div class="editor-zone left">
                     <div class="header-buttons">
+                        <button id="scrollToTopBtn" style="display: none;" onclick="document.getElementById('editorOverlay').scrollTo({ top: 0, behavior: 'smooth' })" title="Scroll to top">⇮</button>
                     </div>
                 </div>
                 <div class="editor-zone center">
@@ -383,13 +384,15 @@ function setupGalleryOnlyMode() {
                     </div>
                 </div>
                 <div class="editor-zone right">
-                    <div class="header-buttons">
+                    <div class="header-buttons" style="display: flex;flex-direction: column;width:25vmin;gap:0.1vmin;font-size:1vmax;justify-content: center;align-items: center;border-radius: 4px;">
+                    <button style="display: none;" id="download-all-button" class="download-all disabled" onclick="downloadAllAssets()" title="Download all imported assets">Download All</button>
+                    <div id="croppingProgressIndicator">Cropping (0%)</div>
                     </div>
                 </div>
             </div>
             <div class="editor-container">
                 <div id="galleryInitialPrompt" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                    <button class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:30vmax;padding:1vmax;font-size: 2vmax;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);">
+                    <button class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:35vmax;padding:1vmax;font-size: 2vmax;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);">
                         Select your game folder
                     </button>
                     <div id="dialog-container-box" class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
@@ -457,6 +460,14 @@ function setupGalleryOnlyMode() {
         document.head.appendChild(editorScript);
     }
 
+    const iFrame = document.getElementById("popup-buy-frame");
+    requestAnimationFrame(() => {
+        iFrame.classList.add("show");
+    });
+    setTimeout(() => {
+        iFrame.classList.remove("show");
+    }, 10000);
+
     initGalleryScrollHandler();
     updateStickyPositions();
 }
@@ -467,8 +478,12 @@ function initGalleryScrollHandler() {
         editorOverlay.addEventListener("scroll", function () {
             if (editorOverlay.scrollTop > 20) {
                 editorOverlay.classList.add("scrolled");
+                const scrollBtn = document.getElementById("scrollToTopBtn");
+                if (scrollBtn) scrollBtn.style.display = "inline-block";
             } else {
                 editorOverlay.classList.remove("scrolled");
+                const scrollBtn = document.getElementById("scrollToTopBtn");
+                if (scrollBtn) scrollBtn.style.display = "none";
             }
         });
     }
@@ -526,6 +541,73 @@ function switchToEditorMode() {
     window.location.href = window.location.pathname;
 }
 
+async function downloadAllAssets() {
+    const buttonDownload = document.getElementById("download-all-button");
+    if (buttonDownload?.classList?.contains("disabled")) {
+        return;
+    }
+
+    if (!window.gameImporterAssets) {
+        alert("No imported assets to download.");
+        return;
+    }
+
+    if (typeof JSZip === "undefined") {
+        const script = document.createElement("script");
+        script.src = "js/libs/jszip.min.js";
+        script.onload = () => this.downloadAllAssets();
+        document.head.appendChild(script);
+        return;
+    }
+
+    const zip = new JSZip();
+    const imgFolder = zip.folder("images");
+    const audioFolder = zip.folder("audio");
+
+    function addImageCategory(categoryName, folder) {
+        const assets = window.gameImporterAssets.images[categoryName] || {};
+        const catFolder = folder.folder(categoryName.toLowerCase());
+        for (const [fileName, asset] of Object.entries(assets)) {
+            catFolder.file(fileName, asset.blob);
+            if (asset.croppedBlob) {
+                const croppedFolder = catFolder.folder("cropped");
+                croppedFolder.file(fileName, asset.croppedBlob);
+            }
+        }
+    }
+
+    ["Portraits", "Game sprites", "Backgrounds", "Pictures", "System sprites", "Misc"].forEach((cat) => {
+        addImageCategory(cat, imgFolder);
+    });
+
+    function addAudioCategory(categoryName, folder) {
+        const assets = window.gameImporterAssets.audio[categoryName] || {};
+        const catFolder = folder.folder(categoryName.toLowerCase());
+        for (const [fileName, asset] of Object.entries(assets)) {
+            catFolder.file(fileName, asset.blob);
+        }
+    }
+    ["Background songs", "Background sounds", "Event sounds", "Sound effects"].forEach((cat) => {
+        addAudioCategory(cat, audioFolder);
+    });
+
+    if (buttonDownload) {
+        buttonDownload.classList.add("disabled");
+        buttonDownload.textContent = "Generating archive...";
+    }
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "TCOAAL-assets.zip";
+    a.click();
+    URL.revokeObjectURL(url);
+    if (buttonDownload) {
+        buttonDownload.classList.remove("disabled");
+        buttonDownload.textContent = "Download All";
+    }
+}
+
 function updateStickyPositions() {
     const header = document.getElementById("editorHeader");
     const dialogBox = document.getElementById("dialog-content-box");
@@ -537,7 +619,7 @@ function updateStickyPositions() {
     if (dialogBox) {
         const NATIVE_W = 646;
         const NATIVE_H = 190;
-        const RATIO_BOX = 0.7;
+        const RATIO_BOX = 0.5;
         const rect = dialogBox.getBoundingClientRect();
 
         const sx = (rect.width * RATIO_BOX) / NATIVE_W;
@@ -619,14 +701,23 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 });
 
+let lastKeyPress = 0;
+const keyPressCooldown = 200;
+
 document.addEventListener("keydown", (e) => {
     const gallery = document.getElementById("gallerySection");
     if (!gallery || gallery.style.display === "none") return;
 
-    const activeItems = Array.from(document.querySelectorAll(".gallery-item"));
+    const activeItems = Array.from(document.querySelectorAll(".gallery-item")).filter(
+        (el) => getComputedStyle(el).display !== "none",
+    );
     if (!activeItems.length) return;
     const current = document.querySelector(".gallery-item.selected");
     let idx = activeItems.indexOf(current);
+
+    const now = Date.now();
+    if (now - lastKeyPress < keyPressCooldown) return;
+    lastKeyPress = now;
 
     // LEFT / RIGHT: move in list
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
@@ -650,7 +741,7 @@ document.addEventListener("keydown", (e) => {
         e.preventDefault();
         galleryManager.clearSpriteSelection();
         galleryManager.clearPreview();
-        current.classList.remove("selected");
+        galleryManager.unselectCurrent();
     }
 
     // TAB: switch to next group
@@ -658,13 +749,14 @@ document.addEventListener("keydown", (e) => {
         e.preventDefault();
         const btns = Array.from(document.querySelectorAll(".gallery-category-btn"));
         const activeBtn = document.querySelector(".gallery-category-btn.active");
-        let bi = btns.indexOf(activeBtn);
-        const nextBtn = btns[(bi + 1) % btns.length];
-        if (nextBtn) nextBtn.click();
 
         galleryManager.clearSpriteSelection();
         galleryManager.clearPreview();
-        current.classList.remove("selected");
+        galleryManager.unselectCurrent();
+
+        let bi = btns.indexOf(activeBtn);
+        const nextBtn = btns[(bi + 1) % btns.length];
+        if (nextBtn) nextBtn.click();
     }
 
     // UP / DOWN: cycle portrait category, cycle sprites
@@ -682,7 +774,6 @@ document.addEventListener("keydown", (e) => {
                 }
                 filterSelect.dispatchEvent(new Event("change"));
             }
-            galleryManager.clearPreview();
         } else if (cat.includes("sprites")) {
             if (galleryManager.extractedSprites.length > 0) {
                 const total = galleryManager.extractedSprites.length;

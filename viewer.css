@@ -845,4 +845,13 @@ body {
     border: 0;
     position: absolute;
     z-index: 1000;
+    transition: top 1s ease, opacity 1s ease;
+    top: -200px;
+    left: 20px;
+    opacity: 0;
+}
+
+#popup-buy-frame.show {
+    top: 20px;
+    opacity: 1;
 }

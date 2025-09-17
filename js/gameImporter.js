@@ -92,6 +92,7 @@ class GameImporter {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("mode") === "gallery") {
             document.getElementById("gallerySection").style.display = "block";
+            document.getElementById("download-all-button").style.display = "block";
 
             const importBtn = document.getElementById("galleryModeImportBtn");
             if (importBtn) {
@@ -119,6 +120,7 @@ class GameImporter {
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
+                const originalPath = folderInfo.path.replace("www/", "") + "/" + fileName + "." + folderInfo.type;
                 const decrypted = await this.decryptFile(
                     new Uint8Array(arrayBuffer),
                     folderInfo.path.replace("www/", "") + "/" + fileName,
@@ -143,6 +145,7 @@ class GameImporter {
                             blob: blob,
                             name: assetName,
                             originalName: fileName,
+                            baseFileName: originalPath,
                             isSprite:
                                 folderInfo.category === "Game sprites" || folderInfo.category === "System sprites",
                         };
@@ -155,6 +158,7 @@ class GameImporter {
                             blob: blob,
                             name: assetName,
                             originalName: fileName,
+                            baseFileName: originalPath,
                         };
                     }
                 }
