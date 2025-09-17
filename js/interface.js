@@ -221,9 +221,8 @@ function createLoadingIndicator() {
         loadingDiv.id = "loadingIndicator";
         loadingDiv.className = "loading-indicator";
         loadingDiv.innerHTML = `
-        <div class="loading-spinner"></div>
-        <span id="loadingText">Preloading assets</span>
-        `;
+            <div class="loading-spinner"></div>
+            <span id="loadingText">Preloading assets</span>`;
         document.body.appendChild(loadingDiv);
     }
 }
@@ -260,30 +259,29 @@ function createMobileControls() {
 
     mobileControls.innerHTML = `
     <div class="mobile-controls-wrapper">
-    <div class="mobile-controls-ribbon" id="mobileRibbon">
-    <div class="mobile-controls-content" onclick="event.stopPropagation()">
-    <div class="mobile-controls-grid">
-    <button onclick="event.stopPropagation(); openEditor()" class="mobile-editor-btn">Editor</button>
-    </div>
-    <div class="mobile-nav-controls">
-    <button onclick="event.stopPropagation(); dialogFramework.previous()" id="mobilePrevButton">⬅</button>
-    <button onclick="event.stopPropagation(); dialogFramework.next()" id="mobileNextButton">➡</button>
-    <button onclick="event.stopPropagation(); dialogFramework.reset()" id="mobileResetButton">⟲</button>
-    </div>
-    <div class="mobile-debug-info" id="mobileDebugInfo">
-    <div class="mobile-scene-counter" id="mobileSceneCounter">Scene: 0 / 0</div>
-    <a href="https://github.com/Kidev/TCOAALCreatorTool" target="_blank" rel="noopener" class="mobile-github-link" onclick="event.stopPropagation()">
-    <svg class="github-icon" viewBox="0 0 24 24">
-    <path d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z"/>
-    </svg>
-    <span>View on GitHub</span>
-    </a>
-    </div>
-    </div>
-    <button class="mobile-controls-tab" id="controls-tab-menu-drop" onclick="event.stopPropagation(); toggleMobileControls()">Controls</button>
-    </div>
-    </div>
-    `;
+        <div class="mobile-controls-ribbon" id="mobileRibbon">
+            <div class="mobile-controls-content" onclick="event.stopPropagation()">
+                <div class="mobile-controls-grid">
+                    <button onclick="event.stopPropagation(); openEditor()" class="mobile-editor-btn">Editor</button>
+                </div>
+                <div class="mobile-nav-controls">
+                    <button onclick="event.stopPropagation(); dialogFramework.previous()" id="mobilePrevButton">⬅</button>
+                    <button onclick="event.stopPropagation(); dialogFramework.next()" id="mobileNextButton">➡</button>
+                    <button onclick="event.stopPropagation(); dialogFramework.reset()" id="mobileResetButton">⟲</button>
+                </div>
+                <div class="mobile-debug-info" id="mobileDebugInfo">
+                    <div class="mobile-scene-counter" id="mobileSceneCounter">Scene: 0 / 0</div>
+                    <a href="https://github.com/Kidev/TCOAALCreatorTool" target="_blank" rel="noopener" class="mobile-github-link" onclick="event.stopPropagation()">
+                        <svg class="github-icon" viewBox="0 0 24 24">
+                            <path d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z"/>
+                        </svg>
+                        <span>View on GitHub</span>
+                    </a>
+                </div>
+            </div>
+            <button class="mobile-controls-tab" id="controls-tab-menu-drop" onclick="event.stopPropagation(); toggleMobileControls()">Controls</button>
+        </div>
+    </div>`;
 
     document.body.appendChild(mobileControls);
 
@@ -371,77 +369,76 @@ function setupGalleryOnlyMode() {
     }
 
     document.body.innerHTML = `
-    <div class="editor-overlay gallery-only-mode initial active" id="editorOverlay">
-    <div class="editor-header" id="editorHeader">
-    <div class="editor-zone left">
-    <div class="header-buttons">
-    </div>
-    </div>
-    <div class="editor-zone center">
-    <div class="editor-header-content">
-    <a href="https://github.com/Kidev/TCOAALCreatorTool" title="See on GitHub" target="_blank">
-    <img alt="Dialog Creator" class="editor-title-image" src="img/tcoaal-title.webp">
-    </a>
-    </div>
-    </div>
-    <div class="editor-zone right">
-    <div class="header-buttons">
-    </div>
-    </div>
-    </div>
-    <div class="editor-container">
-    <div id="galleryInitialPrompt" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-    <button class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:30vmax;padding:1vmax;font-size: 2vmax;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);">
-    Select your game folder
-    </button>
-    <div id="dialog-container-box" class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
-    <div id="dialog-content-box" class="dialog-content">
-    <div class="dialog-line speaker-line"></div>
-    <div class="dialog-line text-line" style="top:34%; font-size: 2vmax;">You need to own the game to go further.</div>
-    <div class="dialog-line text-line" style="top:54%; font-size: 2vmax;">Demons are respectable entities, not filthy thieves.</div>
-    </div>
-    </div>
-
-    </div>
-    <div id="gallerySection" class="section" style="display: none; background: none;padding:0;margin:0;box-shadow:none;">
-    <div class="section-content gallery-flex" style="display: flex; background: none;padding:0;margin:0;">
-    <div class="gallery-embedded-container">
-    <div class="gallery-left-panel">
-    <div class="gallery-tabs">
-    <button class="gallery-tab active" onclick="switchGalleryTab('images')">Images</button>
-    <button class="gallery-tab" onclick="switchGalleryTab('audio')">Audio</button>
-    </div>
-    <div class="gallery-categories" id="galleryCategories"></div>
-    <div class="gallery-content gallery-content-embedded" id="galleryContent"></div>
-    </div>
-    </div>
-    <div class="gallery-preview-panel" id="galleryPreviewPanel">
-    <div class="preview-panel-header">
-    <h3>Preview</h3>
-    <button class="preview-download-btn" id="previewDownloadBtn" onclick="downloadPreviewAsset()">⬇ Download</button>
-    </div>
-    <div class="preview-panel-content" id="previewPanelContent">
-    <div class="preview-placeholder">Select an item to preview</div>
-    </div>
-    <div class="preview-controls" id="previewControls"></div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    <input type="file" id="folderInput" style="display: none;" webkitdirectory directory multiple>
-    <div id="importProgressModal" class="import-modal" style="display: none;">
-    <div class="import-modal-content">
-    <img src="https://i.imgur.com/E0E2oCJ.png" style="margin: 0 auto 1.5vmax; display: block;">
-    <h2>Importing Game Assets</h2>
-    <div class="import-progress-bar">
-    <div id="importProgressFill" class="import-progress-fill"></div>
-    </div>
-    <div id="importProgressText" class="import-progress-text">Processing...</div>
-    </div>
-    </div>
-    <iframe id="popup-buy-frame" src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>
-    `;
+        <div class="editor-overlay gallery-only-mode initial active" id="editorOverlay">
+            <div class="editor-header" id="editorHeader">
+                <div class="editor-zone left">
+                    <div class="header-buttons">
+                    </div>
+                </div>
+                <div class="editor-zone center">
+                    <div class="editor-header-content">
+                        <a href="https://github.com/Kidev/TCOAALCreatorTool" title="See on GitHub" target="_blank">
+                            <img alt="Dialog Creator" class="editor-title-image" src="img/tcoaal-title.webp">
+                        </a>
+                    </div>
+                </div>
+                <div class="editor-zone right">
+                    <div class="header-buttons">
+                    </div>
+                </div>
+            </div>
+            <div class="editor-container">
+                <div id="galleryInitialPrompt" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <button class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:30vmax;padding:1vmax;font-size: 2vmax;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);">
+                        Select your game folder
+                    </button>
+                    <div id="dialog-container-box" class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
+                        <div id="dialog-content-box" class="dialog-content">
+                            <div class="dialog-line speaker-line"></div>
+                            <div class="dialog-line text-line" style="top:34%; font-size: 2vmax;">You need to own the game to go further.</div>
+                            <div class="dialog-line text-line" style="top:54%; font-size: 2vmax;">Demons are respectable entities, not filthy thieves.</div>
+                        </div>
+                    </div>
+                    
+                </div>
+                <div id="gallerySection" class="section" style="display: none; background: none;padding:0;margin:0;box-shadow:none;">
+                    <div class="section-content gallery-flex" style="display: flex; background: none;padding:0;margin:0;">
+                        <div class="gallery-embedded-container">
+                            <div class="gallery-left-panel">
+                                <div class="gallery-tabs">
+                                    <button class="gallery-tab active" onclick="switchGalleryTab('images')">Images</button>
+                                    <button class="gallery-tab" onclick="switchGalleryTab('audio')">Audio</button>
+                                </div>
+                                <div class="gallery-categories" id="galleryCategories"></div>
+                                <div class="gallery-content gallery-content-embedded" id="galleryContent"></div>
+                            </div>
+                        </div>
+                        <div class="gallery-preview-panel" id="galleryPreviewPanel">
+                            <div class="preview-panel-header">
+                                <h3>Preview</h3>
+                                <button class="preview-download-btn" id="previewDownloadBtn" onclick="downloadPreviewAsset()">⬇ Download</button>
+                            </div>
+                            <div class="preview-panel-content" id="previewPanelContent">
+                                <div class="preview-placeholder">Select an item to preview</div>
+                            </div>
+                            <div class="preview-controls" id="previewControls"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <input type="file" id="folderInput" style="display: none;" webkitdirectory directory multiple>
+        <div id="importProgressModal" class="import-modal" style="display: none;">
+            <div class="import-modal-content">
+                <img src="https://i.imgur.com/E0E2oCJ.png" style="margin: 0 auto 1.5vmax; display: block;">
+                <h2>Importing Game Assets</h2>
+                <div class="import-progress-bar">
+                    <div id="importProgressFill" class="import-progress-fill"></div>
+                </div>
+                <div id="importProgressText" class="import-progress-text">Processing...</div>
+            </div>
+        </div>
+        <iframe id="popup-buy-frame" src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>`;
 
     if (!window.gameImporter) {
         const script = document.createElement("script");
@@ -487,8 +484,8 @@ function handleGalleryOnlyImport() {
                 editorOverlay.classList.add("importing");
                 editorOverlay.classList.remove("initial");
             }
-            document.getElementById("buy-game-popup").style.display = "none";
-            document.getElementById("buy-game-popup").style.zindex = "-1";
+            document.getElementById("popup-buy-frame").style.display = "none";
+            document.getElementById("popup-buy-frame").style.zindex = "-1";
 
             if (!window.gameImporter) {
                 window.gameImporter = new GameImporter();
@@ -619,6 +616,106 @@ document.addEventListener("DOMContentLoaded", async function () {
         updateMobileControlsDebugVisibility();
         updateMobileButtonStates();
         updateMobileDebugInfo();
+    }
+});
+
+document.addEventListener("keydown", (e) => {
+    const gallery = document.getElementById("gallerySection");
+    if (!gallery || gallery.style.display === "none") return;
+
+    const activeItems = Array.from(document.querySelectorAll(".gallery-item"));
+    if (!activeItems.length) return;
+    const current = document.querySelector(".gallery-item.selected");
+    let idx = activeItems.indexOf(current);
+
+    // LEFT / RIGHT: move in list
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        //idx = idx < 0 ? 0 : idx;
+        const nextIdx =
+            e.key === "ArrowRight"
+                ? (idx + 1) % activeItems.length
+                : (idx - 1 + activeItems.length) % activeItems.length;
+        activeItems[nextIdx].click();
+    }
+
+    // ENTER: Download selected
+    if (e.key === "Enter") {
+        e.preventDefault();
+        galleryManager.downloadAsset();
+    }
+
+    // ESC: Unselect
+    if (e.key === "Escape") {
+        e.preventDefault();
+        galleryManager.clearSpriteSelection();
+        galleryManager.clearPreview();
+        current.classList.remove("selected");
+    }
+
+    // TAB: switch to next group
+    if (e.key === "Tab") {
+        e.preventDefault();
+        const btns = Array.from(document.querySelectorAll(".gallery-category-btn"));
+        const activeBtn = document.querySelector(".gallery-category-btn.active");
+        let bi = btns.indexOf(activeBtn);
+        const nextBtn = btns[(bi + 1) % btns.length];
+        if (nextBtn) nextBtn.click();
+
+        galleryManager.clearSpriteSelection();
+        galleryManager.clearPreview();
+        current.classList.remove("selected");
+    }
+
+    // UP / DOWN: cycle portrait category, cycle sprites
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const cat = currentGalleryCategory;
+        if (cat === "Portraits") {
+            const filterSelect = document.getElementById("bustsFilterSelect");
+            if (filterSelect) {
+                const count = filterSelect.options.length;
+                if (e.key === "ArrowDown") {
+                    filterSelect.selectedIndex = (filterSelect.selectedIndex + 1) % count;
+                } else {
+                    filterSelect.selectedIndex = (filterSelect.selectedIndex - 1 + count) % count;
+                }
+                filterSelect.dispatchEvent(new Event("change"));
+            }
+            galleryManager.clearPreview();
+        } else if (cat.includes("sprites")) {
+            if (galleryManager.extractedSprites.length > 0) {
+                const total = galleryManager.extractedSprites.length;
+                let nextIndex;
+                if (galleryManager.selectedSprites.length === 0) {
+                    // No sprite selected: pick first or last
+                    nextIndex = e.key === "ArrowDown" ? 0 : total - 1;
+                } else {
+                    const selected = galleryManager.selectedSprites[0];
+                    nextIndex = e.key === "ArrowDown" ? (selected + 1) % total : (selected - 1 + total) % total;
+                }
+                galleryManager.clearSpriteSelection();
+                galleryManager.toggleSpriteSelection(nextIndex);
+            }
+        }
+    }
+
+    // SPACE: toggle cropped view mode or play/pause sound
+    if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        const current = galleryManager.currentAsset;
+        if (!current) return;
+
+        if (current.type === "images" && current.category !== "Portraits") {
+            galleryManager.globalImageViewMode =
+                galleryManager.globalImageViewMode === "cropped" ? "original" : "cropped";
+
+            const contentDiv = document.getElementById("previewPanelContent");
+            const controlsDiv = document.getElementById("previewControls");
+            galleryManager.previewImage(current.asset, current.name, contentDiv, controlsDiv);
+        } else if (current.type === "audio") {
+            galleryManager.toggleAudioPlay();
+        }
     }
 });
 

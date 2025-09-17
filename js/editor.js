@@ -1613,6 +1613,11 @@ function updateGalleryCategories() {
 
         selectGalleryCategory(targetCategory);
     }
+    // Start cropping after gallery is loaded
+    if (!window.imagesCroppingStarted) {
+        window.imagesCroppingStarted = true;
+        cropAllImages();
+    }
 }
 
 function selectGalleryCategory(category) {
@@ -1733,23 +1738,23 @@ function updateGalleryContent() {
             window.galleryManager.previewAsset(name, currentGalleryCategory, currentGalleryTab);
         };
         if (currentGalleryTab === "images") {
+            const thumbSrc =
+                galleryManager.globalImageViewMode === "cropped" && asset.croppedUrl ? asset.croppedUrl : asset.url;
             item.innerHTML = `
-            <img src="${asset.url}" alt="${name}">
-            <div class="gallery-item-name">${formatName}</div>
-            <div class="gallery-item-actions">
-            ${!isGalleryOnly ? `<button class="gallery-item-action" onclick="event.stopPropagation(); useGalleryAsset('${name}', '${currentGalleryCategory}')">Use</button>` : ""}
-            </div>
-            `;
+                <img src="${asset.croppedUrl || asset.url}" alt="${name}">
+                <div class="gallery-item-name">${formatName}</div>
+                <div class="gallery-item-actions">
+                ${!isGalleryOnly ? `<button class="gallery-item-action" onclick="event.stopPropagation(); useGalleryAsset('${name}', '${currentGalleryCategory}')">Use</button>` : ""}
+                </div>`;
         } else {
             item.innerHTML = `
-            <div class="gallery-item-audio compact">
-            <div class="audio-icon">🎵</div>
-            <div class="gallery-item-name">${formatName}</div>
-            </div>
-            <div class="gallery-item-actions">
-            ${!isGalleryOnly ? `<button class="gallery-item-action" onclick="event.stopPropagation(); useGalleryAsset('${name}', '${currentGalleryCategory}')">Use</button>` : ""}
-            </div>
-            `;
+                <div class="gallery-item-audio compact">
+                <div class="audio-icon">🎵</div>
+                <div class="gallery-item-name">${formatName}</div>
+                </div>
+                <div class="gallery-item-actions">
+                ${!isGalleryOnly ? `<button class="gallery-item-action" onclick="event.stopPropagation(); useGalleryAsset('${name}', '${currentGalleryCategory}')">Use</button>` : ""}
+                </div>`;
         }
         contentContainer.appendChild(item);
     });
@@ -1765,6 +1770,111 @@ function useGalleryAsset(name, category) {
     };
 
     //console.log("Selected asset:", name, "from", category);
+}
+
+async function cropAllImages() {
+    const imagesByCategory = window.gameImporterAssets.images;
+    if (!imagesByCategory) return;
+    // Collect all images to crop (skip "Portraits" and sprites)
+    const toCrop = [];
+    for (const [category, assets] of Object.entries(imagesByCategory)) {
+        if (category === "Portraits") continue;
+        for (const [name, asset] of Object.entries(assets)) {
+            if (!asset.isSprite) {
+                toCrop.push({ name, asset });
+            }
+        }
+    }
+    // Sort by name (numeric order: Picture #3 before #4...)
+    toCrop.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    const total = toCrop.length;
+    const editorLeft = document.querySelector(".editor-zone.left");
+    if (editorLeft) {
+        if (!editorLeft.style.position) {
+            editorLeft.style.position = "relative";
+        }
+        const indicator = document.createElement("div");
+        indicator.id = "croppingProgressIndicator";
+        Object.assign(indicator.style, {
+            position: "absolute",
+            top: "5px",
+            left: "5px",
+            background: "rgba(0, 0, 0, 0.7)",
+            color: "#fff",
+            padding: "2px 6px",
+            fontSize: "12px",
+            borderRadius: "3px",
+        });
+        indicator.textContent = `Cropping images (0%): Starting...`;
+        editorLeft.appendChild(indicator);
+
+        let count = 0;
+        // Sequentially crop each image
+        for (const { name, asset } of toCrop) {
+            await new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const w = img.width,
+                        h = img.height;
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+                    canvas.width = w;
+                    canvas.height = h;
+                    ctx.drawImage(img, 0, 0);
+
+                    // Find non-transparent bounding box
+                    const data = ctx.getImageData(0, 0, w, h).data;
+                    let minX = w,
+                        minY = h,
+                        maxX = 0,
+                        maxY = 0;
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < w; x++) {
+                            if (data[(y * w + x) * 4 + 3] > 0) {
+                                minX = Math.min(minX, x);
+                                minY = Math.min(minY, y);
+                                maxX = Math.max(maxX, x);
+                                maxY = Math.max(maxY, y);
+                            }
+                        }
+                    }
+
+                    // Crop if there is any non transparent pixel
+                    if (maxX >= minX && maxY >= minY) {
+                        const cropW = maxX - minX + 1;
+                        const cropH = maxY - minY + 1;
+                        const cropCanvas = document.createElement("canvas");
+                        cropCanvas.width = cropW;
+                        cropCanvas.height = cropH;
+                        cropCanvas.getContext("2d").drawImage(img, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+                        cropCanvas.toBlob((blob) => {
+                            if (blob) {
+                                const url = URL.createObjectURL(blob);
+                                asset.croppedUrl = url;
+                                // Update thumbnail image if present
+                                const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
+                                if (thumbImg) {
+                                    thumbImg.src = url;
+                                }
+                            }
+                            count++;
+                            const pct = Math.round((count / total) * 100);
+                            indicator.textContent = `Cropping images (${pct}%): ${name}`;
+                            resolve();
+                        });
+                    } else {
+                        // No cropping needed
+                        count++;
+                        const pct = Math.round((count / total) * 100);
+                        indicator.textContent = `Cropping images (${pct}%): ${name}`;
+                        resolve();
+                    }
+                };
+                img.src = asset.url;
+            });
+        }
+        indicator.remove();
+    }
 }
 
 window.handleGameImportClick = function () {

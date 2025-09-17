@@ -29,6 +29,19 @@ class GalleryManager {
         this.isLooping = false;
         this.spriteSheetData = null;
         this.extractedSprites = [];
+        this.globalImageViewMode = "cropped";
+    }
+
+    setGlobalImageViewMode(mode) {
+        this.globalImageViewMode = mode;
+        const checkbox = document.getElementById("toggleCropped");
+        if (checkbox) checkbox.checked = mode === "cropped";
+        if (this.currentAsset && this.currentAsset.type === "images") {
+            const { name, category, asset } = this.currentAsset;
+            const contentDiv = document.getElementById("previewPanelContent");
+            const controlsDiv = document.getElementById("previewControls");
+            this.previewImage(asset, name, contentDiv, controlsDiv);
+        }
     }
 
     init() {}
@@ -212,23 +225,21 @@ class GalleryManager {
             }
 
             contentDiv.innerHTML = `
-            <div class="sprite-sheet-preview">
-            <h4>Sprite Sheet: ${cols}x${rows}</h4>
-            <div class="sprite-grid" style="grid-template-columns: repeat(${Math.min(cols, 8)}, 1fr);">
-            ${this.extractedSprites
-                .map(
-                    (sprite, i) => `
-                <div class="sprite-cell-preview"
-                data-index="${i}"
-                onclick="galleryManager.toggleSpriteSelection(${i})">
-                <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
-                </div>
-                `,
-                )
-                .join("")}
-                </div>
-                </div>
-                `;
+                <div class="sprite-sheet-preview">
+                    <h4>Sprite Sheet: ${cols}x${rows}</h4>
+                    <div class="sprite-grid" style="grid-template-columns: repeat(${Math.min(cols, 8)}, 1fr);">
+                        ${this.extractedSprites
+                            .map(
+                                (sprite, i) => `
+                                    <div class="sprite-cell-preview"
+                                    data-index="${i}"
+                                    onclick="galleryManager.toggleSpriteSelection(${i})">
+                                        <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
+                                    </div>`,
+                            )
+                            .join("")}
+                    </div>
+                </div>`;
 
             setTimeout(() => {
                 this.extractedSprites.forEach((sprite, i) => {
@@ -241,20 +252,19 @@ class GalleryManager {
             }, 10);
 
             controlsDiv.innerHTML = `
-            <div class="asset-filename-title">${this.formatAssetTitle(name)}</div>
-    <div class="preview-control-group preview-sprite-controls compact">
-        <button class="preview-control-btn" onclick="galleryManager.clearSpriteSelection()">Clear</button>
-        <button class="preview-control-btn" onclick="galleryManager.exportAsGif()">GIF</button>
-        <span class="divider">|</span>
-        <label class="preview-control-label inline" style="display: inline;">Speed (ms):</label>
-        <input type="number" id="animationSpeed" style="display: inline; width: auto;" class="preview-control-input inline compact" value="250" min="10" max="5000" step="10" oninput="galleryManager.updateAnimationSpeed()">
-    </div>
-    <div class="preview-control-group" style="display: flex; justify-content: center;">
-        <div id="preview-canvas-location" class="animation-preview" style="display: none;">
-            <canvas id="animationCanvas" style="display: block;"></canvas>
-        </div>
-    </div>
-`;
+                <div class="asset-filename-title">${this.formatAssetTitle(name)}</div>
+                <div class="preview-control-group preview-sprite-controls compact">
+                    <button class="preview-control-btn" onclick="galleryManager.clearSpriteSelection()">Clear</button>
+                    <button class="preview-control-btn" onclick="galleryManager.exportAsGif()">GIF</button>
+                    <span class="divider">|</span>
+                    <label class="preview-control-label inline" style="display: inline;">Speed (ms):</label>
+                    <input type="number" id="animationSpeed" style="display: inline; width: auto;" class="preview-control-input inline compact" value="250" min="10" max="5000" step="10" oninput="galleryManager.updateAnimationSpeed()">
+                </div>
+                <div class="preview-control-group" style="display: flex; justify-content: center;">
+                    <div id="preview-canvas-location" class="animation-preview" style="display: none;">
+                        <canvas id="animationCanvas" style="display: block;"></canvas>
+                    </div>
+                </div>`;
 
             this.spriteSheetData = { img, cols, rows, cellWidth, cellHeight };
         };
@@ -262,23 +272,26 @@ class GalleryManager {
     }
 
     previewImage(asset, name, contentDiv, controlsDiv) {
+        let imgSrc = asset.url;
+        let showCroppedBox = asset.croppedUrl;
+        if (this.globalImageViewMode === "cropped" && asset.croppedUrl) {
+            imgSrc = asset.croppedUrl;
+        }
         contentDiv.innerHTML = `
-        <div class="preview-image-container">
-        <img src="${asset.url}" alt="${name}" class="preview-image" id="previewMainImage">
-        </div>
-        `;
+            <div class="preview-image-container">
+                <img src="${imgSrc}" alt="${name}" class="preview-image" id="previewMainImage">
+            </div>`;
 
         controlsDiv.innerHTML = `
-        <div class="asset-filename-title">${name}</div>
-        <div class="preview-control-group">
-        <!--<label class="preview-control-label">View Mode:</label>
-        <select class="preview-control-select" onchange="galleryManager.changeImageMode(this.value)">
-        <option value="original">Original</option>
-        <option value="fit">Fit to Container</option>
-        <option value="actual">Actual Size</option>
-        </select>-->
-        </div>
-        `;
+            <div class="asset-filename-title">${name}</div>
+            <div class="preview-control-group" ${showCroppedBox ? "" : "style='display: none;'"}>
+                <label class="preview-control-label">
+                    <input type="checkbox" id="toggleCropped"
+                           onchange="window.galleryManager.setGlobalImageViewMode(this.checked ? 'cropped' : 'original')"
+                           ${this.globalImageViewMode === "cropped" ? "checked" : ""}>
+                    Cropped
+                </label>
+            </div>`;
     }
 
     formatAssetTitle(rawName, category = null, type = null) {
@@ -453,28 +466,6 @@ class GalleryManager {
         gif.render();
     }
 
-    changeImageMode(mode) {
-        const img = document.getElementById("previewMainImage");
-        if (!img) return;
-
-        switch (mode) {
-            case "fit":
-                img.style.width = "100%";
-                img.style.height = "auto";
-                img.style.objectFit = "contain";
-                break;
-            case "actual":
-                img.style.width = "auto";
-                img.style.height = "auto";
-                img.style.objectFit = "none";
-                break;
-            default:
-                img.style.width = "100%";
-                img.style.height = "auto";
-                img.style.objectFit = "contain";
-        }
-    }
-
     previewAudio(asset, name, contentDiv, controlsDiv) {
         if (!this._audioSessionId) this._audioSessionId = 0;
         this._audioSessionId++;
@@ -493,27 +484,27 @@ class GalleryManager {
         }
 
         contentDiv.innerHTML = `
-        <div class="audio-player-container compact">
-        <div class="audio-player-controls">
-        <button class="audio-player-btn" id="audioPlayBtn" onclick="galleryManager.toggleAudioPlay()">▶ Play</button>
-        <button class="audio-player-btn" onclick="galleryManager.restartAudio()">⏮ Restart</button>
-        <div style="display:flex;align-items:center;flex-direction:column-reverse;justify-content:flex-start;">
-        <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
-        oninput="galleryManager.setAudioVolume(this.value)" title="100%">
-        <span id="volumeValue" style="min-width:3ch; text-align:right;">100%</span>
-        </div>
-        </div>
-        <div class="audio-player-progress">
-        <div class="audio-progress-bar" onclick="galleryManager.seekAudio(event)">
-        <div class="audio-progress-fill" id="audioProgressFill" style="width: 0%;"></div>
-        </div>
-        <div class="audio-player-time">
-        <span id="audioCurrentTime">0:00</span>
-        <span id="audioDuration">0:00</span>
-        </div>
-        </div>
-        </div>
-        `;
+            <div class="audio-player-container compact">
+            <div class="audio-player-controls">
+            <button class="audio-player-btn" id="audioPlayBtn" onclick="galleryManager.toggleAudioPlay()">▶ Play</button>
+            <button class="audio-player-btn" onclick="galleryManager.restartAudio()">⏮ Restart</button>
+            <div style="display:flex;align-items:center;flex-direction:column-reverse;justify-content:flex-start;">
+            <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
+            oninput="galleryManager.setAudioVolume(this.value)" title="100%">
+            <span id="volumeValue" style="min-width:3ch; text-align:right;">100%</span>
+            </div>
+            </div>
+            <div class="audio-player-progress">
+            <div class="audio-progress-bar" onclick="galleryManager.seekAudio(event)">
+            <div class="audio-progress-fill" id="audioProgressFill" style="width: 0%;"></div>
+            </div>
+            <div class="audio-player-time">
+            <span id="audioCurrentTime">0:00</span>
+            <span id="audioDuration">0:00</span>
+            </div>
+            </div>
+            </div>`;
+
         const progressFill = document.getElementById("audioProgressFill");
         const curTimeEl = document.getElementById("audioCurrentTime");
         const durEl = document.getElementById("audioDuration");
@@ -613,10 +604,58 @@ class GalleryManager {
 
         const { name, asset } = this.currentAsset;
         const a = document.createElement("a");
-        a.href = asset.url;
+        a.href = asset.croppedUrl && this.globalImageViewMode === "cropped" ? asset.croppedUrl : asset.url;
         a.download = name;
         a.click();
     }
+}
+
+async function cropImageAsset(asset) {
+    return new Promise((resolve) => {
+        // Create an image from the asset blob
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            let top = null,
+                left = null,
+                right = null,
+                bottom = null;
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] !== 0) {
+                    // alpha > 0
+                    const x = (i / 4) % canvas.width;
+                    const y = Math.floor(i / 4 / canvas.width);
+                    top = top === null ? y : Math.min(top, y);
+                    left = left === null ? x : Math.min(left, x);
+                    right = right === null ? x : Math.max(right, x);
+                    bottom = bottom === null ? y : Math.max(bottom, y);
+                }
+            }
+            if (top !== null) {
+                const cropWidth = right - left + 1;
+                const cropHeight = bottom - top + 1;
+                const trimmed = ctx.getImageData(left, top, cropWidth, cropHeight);
+                const croppedCanvas = document.createElement("canvas");
+                croppedCanvas.width = cropWidth;
+                croppedCanvas.height = cropHeight;
+                croppedCanvas.getContext("2d").putImageData(trimmed, 0, 0);
+                croppedCanvas.toBlob((blob) => {
+                    asset.croppedBlob = blob;
+                    asset.croppedUrl = URL.createObjectURL(blob);
+                    resolve();
+                });
+            } else {
+                resolve();
+            }
+        };
+        img.src = URL.createObjectURL(asset.blob);
+    });
 }
 
 window.galleryManager = new GalleryManager();

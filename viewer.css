@@ -840,18 +840,9 @@ body {
     }
 }
 
-.iframe-wrapper {
-    height: 15%;
-    width: 23%;
-    overflow: hidden;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 5000;
-}
-
-.iframe-wrapper iframe {
-    transform: scale(0.6, 0.6);
+#popup-buy-frame {
     transform-origin: top left;
     border: 0;
+    position: absolute;
+    z-index: 1000;
 }

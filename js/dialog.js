@@ -621,7 +621,7 @@ class DialogFramework {
             sound: options.sound || null,
             soundVolume: options.soundVolume || 1.0,
             soundDelay: options.soundDelay || 0,
-            soundBlobUrl: options.soundBlobUrl || null, // ADD THIS
+            soundBlobUrl: options.soundBlobUrl || null,
             censorSpeaker: options.censorSpeaker !== undefined ? options.censorSpeaker : false,
 
             bustLeft: options.bustLeft !== undefined ? options.bustLeft : null,
@@ -1858,7 +1858,7 @@ class DialogFramework {
         this.currentBustRight = null;
         this.cleanupGlitchEffects();
         this.hideDialog();
-        this.stopBackgroundMusic(); // ADD THIS LINE
+        this.stopBackgroundMusic();
 
         const images = document.querySelectorAll(".background-image");
         images.forEach((img) => img.remove());
