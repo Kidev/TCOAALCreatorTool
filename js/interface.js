@@ -158,64 +158,6 @@ function downloadSequence() {
     URL.revokeObjectURL(url);
 }
 
-document.addEventListener("DOMContentLoaded", async function () {
-    createLoadingIndicator();
-
-    if (typeof createMobileControls === "function") {
-        createMobileControls();
-    }
-
-    if (typeof enhanceGameActions === "function") {
-        enhanceGameActions();
-    }
-
-    if (typeof setupScene === "function") {
-        setupScene();
-
-        if (
-            typeof dialogFramework !== "undefined" &&
-            dialogFramework &&
-            typeof dialogFramework.preloadAssets === "function"
-        ) {
-            showLoadingIndicator("Preloading assets");
-            await dialogFramework.preloadAssets();
-            hideLoadingIndicator();
-
-            if (typeof dialogFramework.updateDebugInfo === "function") {
-                dialogFramework.updateDebugInfo();
-            }
-        }
-    } else if (typeof setupScenes === "function") {
-        setupScenes();
-
-        if (
-            typeof dialogFramework !== "undefined" &&
-            dialogFramework &&
-            typeof dialogFramework.preloadAssets === "function"
-        ) {
-            showLoadingIndicator("Preloading assets");
-            await dialogFramework.preloadAssets();
-            hideLoadingIndicator();
-
-            if (typeof dialogFramework.updateDebugInfo === "function") {
-                dialogFramework.updateDebugInfo();
-            }
-        }
-    } else {
-        if (
-            typeof dialogFramework !== "undefined" &&
-            dialogFramework &&
-            typeof dialogFramework.updateDebugInfo === "function"
-        ) {
-            dialogFramework.updateDebugInfo();
-        }
-    }
-
-    if (typeof updateMobileControlsDebugVisibility === "function") updateMobileControlsDebugVisibility();
-    if (typeof updateMobileButtonStates === "function") updateMobileButtonStates();
-    if (typeof updateMobileDebugInfo === "function") updateMobileDebugInfo();
-});
-
 function createLoadingIndicator() {
     if (!document.getElementById("loadingIndicator")) {
         const loadingDiv = document.createElement("div");
@@ -660,7 +602,6 @@ function updateStickyPositions() {
     }
 }
 
-// TODO THE DOUBLE LOAD BUG IS SURELY HERE
 document.addEventListener("DOMContentLoaded", async function () {
     createLoadingIndicator();
 

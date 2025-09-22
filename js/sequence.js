@@ -80,6 +80,5 @@ function setupScene() {
         .addScene({
             line1: "The narrator speaks!",
             censorSpeaker: false,
-        })
-        .addScene({});
+        });
 }
