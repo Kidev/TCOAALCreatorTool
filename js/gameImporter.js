@@ -47,6 +47,7 @@ class GameImporter {
             "www/img/system/",
             "www/img/tilesets/",
             "www/img/titles1/",
+            "www/icon/",
         ];
 
         for (const file of files) {
@@ -79,6 +80,7 @@ class GameImporter {
             { path: "www/img/system", type: "png", category: "System sprites" },
             { path: "www/img/tilesets", type: "png", category: "Misc" },
             { path: "www/img/titles1", type: "png", category: "Misc" },
+            { path: "www/icon", type: "png", category: "Misc" },
         ];
 
         for (const folder of folders) {

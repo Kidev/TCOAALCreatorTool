@@ -1527,7 +1527,8 @@ function openGallery() {
     const modal = document.getElementById("galleryModal");
     if (modal) {
         modal.style.display = "flex";
-        switchGalleryTab("images");
+        //switchGalleryTab("images");
+        updateGalleryCategories();
     }
 }
 
@@ -1678,6 +1679,7 @@ function updateGalleryContent() {
             "Ashley",
             "Leyley",
             "Ashley-teen",
+            "Ashley-teen dressed like Julia",
             "Julia",
             "Julia-teen",
             "Renee",
@@ -1783,10 +1785,12 @@ async function cropAllImages() {
     const imagesByCategory = window.gameImporterAssets.images;
     const downloadAllButton = document.getElementById("download-all-button");
     const updateDownloadButton = (percent, done = false) => {
-        downloadAllButton.textContent = `Download All`;
-        if (!done === false) {
+        if (downloadAllButton) {
             downloadAllButton.textContent = `Download All`;
-            downloadAllButton.classList.remove("disabled");
+            if (!done === false) {
+                downloadAllButton.textContent = `Download All`;
+                downloadAllButton.classList.remove("disabled");
+            }
         }
     };
 

@@ -59,6 +59,7 @@ function openEditor() {
     if (blocker) {
         blocker.classList.add("active");
     }
+    document.getElementById("editorHeaderZoneLeft").style.justifyContent =  "center";
 
     if (typeof dialogFramework !== "undefined" && dialogFramework.scenes.length > 0) {
         const extractedData = {
@@ -392,9 +393,14 @@ function setupGalleryOnlyMode() {
             </div>
             <div class="editor-container">
                 <div id="galleryInitialPrompt" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                    <button class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:35vmax;padding:1vmax;font-size: 2vmax;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);">
-                        Select your game folder
+                    <div id="menu-buttons" style="width:35vmax;height:10vmax;font-size: 2vmax;position:fixed;left:50%;top:60%;transform:translate(-50%,-60%);">
+                    <button id="button-open-gallery-mode" class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:35vmax;">
+                        Gallery
                     </button>
+                    <button class="tcoaal-button" onclick="reopenWithMode('editor')" style="width:35vmax;margin-top:0.5vmax;">
+                    Dialog creator
+                    </button>
+                    </div>
                     <div id="dialog-container-box" class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
                         <div id="dialog-content-box" class="dialog-content">
                             <div class="dialog-line speaker-line"></div>
@@ -468,8 +474,28 @@ function setupGalleryOnlyMode() {
         iFrame.classList.remove("show");
     }, 10000);
 
+    const btn = document.getElementById("button-open-gallery-mode");
+
+    btn.addEventListener("mouseenter", () => {
+        btn.textContent = "Select game folder...";
+    });
+
+    btn.addEventListener("mouseleave", () => {
+        btn.textContent = "Gallery";
+    });
+
     initGalleryScrollHandler();
     updateStickyPositions();
+}
+
+function reopenWithMode(mode) {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("mode") === mode) {
+        window.location.reload();
+        return;
+    }
+    url.searchParams.set("mode", mode);
+    window.location.replace(url.toString());
 }
 
 function initGalleryScrollHandler() {
@@ -631,6 +657,7 @@ function updateStickyPositions() {
     }
 }
 
+// TODO THE DOUBLE LOAD BUG IS SURELY HERE
 document.addEventListener("DOMContentLoaded", async function () {
     createLoadingIndicator();
 
@@ -640,7 +667,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     const urlParams = new URLSearchParams(window.location.search);
     let mode = urlParams.get("mode");
 
-    // TODO AUTO GALLERY: CHANGE TO NOT MAKE GALLERY THE DEFAULT AGAIN
     if (mode === null || mode === undefined) {
         mode = "gallery";
     }

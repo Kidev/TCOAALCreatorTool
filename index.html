@@ -39,8 +39,8 @@
         </div>
         <div id="galleryModal" class="gallery-modal" style="display: none">
             <div class="gallery-modal-content">
-                <div class="gallery-header">
-                    <h2>Imported Assets Gallery</h2>
+                <div class="gallery-header" style="display:flex;flex-direction:row;justify-content:space-between;align-items:center;padding:1vmin;">
+                    <h2>Assets Gallery<div id="croppingProgressIndicator" style="font-size:auto;width:auto;height:auto;">Cropping (0%)</div></h2>
                     <button class="gallery-close-btn" onclick="closeGallery()">✕</button>
                 </div>
                 <div class="gallery-main-container">
@@ -122,7 +122,7 @@
         <div class="interaction-blocker" id="interactionBlocker"></div>
         <div class="editor-overlay spa-mode" id="editorOverlay" onclick="event.stopPropagation()">
             <div class="editor-header" id="editorHeader">
-                <div class="editor-zone left">
+                <div class="editor-zone left" id="editorHeaderZoneLeft">
                     <div class="header-buttons">
                         <button
                             class="game-import"

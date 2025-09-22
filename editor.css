@@ -1180,16 +1180,11 @@ button.reset-default:hover {
 .gallery-modal-content {
     background: var(--bg-color-section);
     width: 90%;
-    height: 85%;
-    max-width: 1200px;
+    height: 90%;
     border-radius: 8px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-}
-
-.gallery-header {
-    display: none;
 }
 
 .gallery-header h2 {
@@ -1265,8 +1260,7 @@ button.reset-default:hover {
 }
 
 .gallery-content {
-    flex: 1;
-    padding: 0.5vmax;
+    padding: 1.5vmax;
     overflow-y: auto;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -1815,10 +1809,6 @@ button.reset-default:hover {
 
 .gallery-left-panel {
     overflow-y: auto;
-}
-
-.gallery-header {
-    display: none !important;
 }
 
 .gallery-modal-content {

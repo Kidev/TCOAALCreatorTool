@@ -824,7 +824,7 @@ body {
     }
     .tcoaal-button {
         top: 10% !important;
-        transform: translate(-50%, -10%) !important;
+        transform: translateY(-10%) !important;
     }
     .dialog-line.text-line {
         font-size: 5vmin !important;
