@@ -50,6 +50,7 @@ if (!document.getElementById("outputCode")) {
 }
 
 function loadProjectData(data) {
+
     projectData = JSON.parse(JSON.stringify(data));
 
     document.getElementById("configShowControls").checked = projectData.config.showControls;
@@ -419,6 +420,7 @@ function updateScenesList(onlyUpdateIndex = null) {
 }
 
 function createSceneElement(index) {
+
     const scene = projectData.scenes[index];
     const nbScenes = projectData.scenes.length;
     const item = document.createElement("div");
@@ -1651,6 +1653,13 @@ function selectGalleryCategory(category) {
 function updateGalleryContent() {
     const contentContainer = document.getElementById("galleryContent");
     if (!contentContainer || !window.gameImporterAssets || !currentGalleryCategory) return;
+
+    const modalGallery =  document.getElementById("galleryModal");
+    const downloadAllButton = document.getElementById("download-all-button");
+
+    if (!modalGallery && downloadAllButton) {
+        downloadAllButton.style.display = "block";
+    }
 
     contentContainer.innerHTML = "";
 

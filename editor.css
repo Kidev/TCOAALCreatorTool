@@ -1941,9 +1941,9 @@ button.reset-default:hover {
 }
 
 #download-all-button.disabled {
-    cursor: not-allowed !important;
-    transform: none !important;
-    opacity: 0.5 !important;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.5;
 }
 
 #croppingProgressIndicator {

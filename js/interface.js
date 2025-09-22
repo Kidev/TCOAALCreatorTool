@@ -386,7 +386,7 @@ function setupGalleryOnlyMode() {
                 </div>
                 <div class="editor-zone right">
                     <div class="header-buttons" style="display: flex;flex-direction: column;width:25vmin;gap:0.1vmin;font-size:1vmax;justify-content: center;align-items: center;border-radius: 4px;">
-                    <button style="display: none;" id="download-all-button" class="download-all disabled" onclick="downloadAllAssets()" title="Download all imported assets">Download All</button>
+                    <button id="download-all-button" class="download-all disabled" onclick="downloadAllAssets()" title="Download all imported assets">Download All</button>
                     <div id="croppingProgressIndicator">Cropping (0%)</div>
                     </div>
                 </div>
@@ -473,6 +473,9 @@ function setupGalleryOnlyMode() {
     setTimeout(() => {
         iFrame.classList.remove("show");
     }, 10000);
+
+    const downloadButton = document.getElementById("download-all-button");
+    downloadButton.style.display = "none";
 
     const btn = document.getElementById("button-open-gallery-mode");
 
