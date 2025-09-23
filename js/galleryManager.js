@@ -63,6 +63,26 @@ class GalleryManager {
         return null;
     }
 
+    scrollIfRequired(el) {
+        const rect = el.getBoundingClientRect();
+        const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+        const offset = document.getElementById("editorHeader")?.offsetHeight || 0;
+        const container = document.getElementById("editorOverlay") || document.documentElement;
+
+        const fullyVisible = rect.top >= offset && rect.bottom <= viewHeight;
+        const hiddenTop = rect.top < offset;
+        const hiddenBottom = rect.bottom > viewHeight;
+
+        if (fullyVisible) return;
+
+        if (hiddenTop) {
+            const targetTop = rect.top + container.scrollTop - offset;
+            container.scrollTo({ top: targetTop, behavior: "smooth" });
+        } else if (hiddenBottom) {
+            el.scrollIntoView({ behavior: "smooth", block: "end" });
+        }
+    }
+
     previewAsset(name, category, type) {
         this.clearPreview();
 
@@ -70,7 +90,8 @@ class GalleryManager {
             item.classList.remove("selected");
         });
         event.currentTarget.classList.add("selected");
-        event.currentTarget.scrollIntoView({ behavior: "smooth", block: "end" });
+
+        this.scrollIfRequired(event.currentTarget);
 
         const assets =
             type === "images" ? window.gameImporterAssets.images[category] : window.gameImporterAssets.audio[category];

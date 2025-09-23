@@ -1940,8 +1940,14 @@ button.reset-default:hover {
             0 0 4px #000000;
 }
 
+#download-all-button:hover {
+    cursor: pointer;
+    transform: none;
+    opacity: 0.5;
+}
+
 #download-all-button.disabled {
-    cursor: not-allowed;
+    cursor: progress;
     transform: none;
     opacity: 0.5;
 }
