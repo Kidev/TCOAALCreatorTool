@@ -441,11 +441,13 @@ body {
         0 0 4px #000000;
 }
 
+.tcoaal-button.disabled,
 .tcoaal-button:hover {
     background: url("https://i.imgur.com/6477Nct.png");
     background-size: 100% 100%;
 }
 
+.tcoaal-button-small.disabled,
 .tcoaal-button-small:hover {
     background: url("https://i.imgur.com/qDNa4Wr.png");
     background-size: 100% 100%;

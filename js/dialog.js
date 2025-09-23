@@ -1877,9 +1877,12 @@ class DialogFramework {
         const debugInfo = document.getElementById("debugInfo");
         if (debugInfo) {
             if (this.currentScene >= this.scenes.length) {
-                debugInfo.textContent = `Endscreen`;
+                debugInfo.textContent = `End`;
                 debugInfo.style.cursor = "default";
                 debugInfo.onclick = null;
+                if (!debugInfo.classList.contains("disabled")) {
+                    debugInfo.classList.add("disabled");
+                }
             } else {
                 debugInfo.textContent = `${this.currentScene + 1} / ${this.scenes.length}`;
                 debugInfo.style.cursor = "pointer";
@@ -1887,6 +1890,9 @@ class DialogFramework {
                     e.stopPropagation(); // Prevent click-through
                     this.showSceneJumpInput();
                 };
+                if (debugInfo.classList.contains("disabled")) {
+                    debugInfo.classList.remove("disabled");
+                }
             }
         }
 
