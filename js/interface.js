@@ -59,7 +59,7 @@ function openEditor() {
     if (blocker) {
         blocker.classList.add("active");
     }
-    document.getElementById("editorHeaderZoneLeft").style.justifyContent =  "center";
+    document.getElementById("editorHeaderZoneLeft").style.justifyContent = "center";
 
     if (typeof dialogFramework !== "undefined" && dialogFramework.scenes.length > 0) {
         const extractedData = {
@@ -272,7 +272,7 @@ function updateMobileDebugInfo() {
     if (typeof dialogFramework === "undefined") return;
 
     if (dialogFramework.currentScene >= dialogFramework.scenes.length) {
-        sceneCounter.textContent = "Endscreen";
+        sceneCounter.textContent = "End";
     } else {
         sceneCounter.textContent = `Scene: ${dialogFramework.currentScene + 1} / ${dialogFramework.scenes.length}`;
     }
@@ -625,10 +625,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             setupScene();
             await dialogFramework.preloadAssets();
             dialogFramework.updateDebugInfo();
-        } else if (typeof setupScenes === "function") {
-            setupScenes();
-            await dialogFramework.preloadAssets();
-            dialogFramework.updateDebugInfo();
         }
 
         setTimeout(() => {
@@ -640,16 +636,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         if (typeof setupScene === "function") {
             setupScene();
-
-            showLoadingIndicator("Preloading assets");
-            //console.log("Initializing and preloading assets...");
-            await dialogFramework.preloadAssets();
-            hideLoadingIndicator();
-            //console.log("Ready to play!");
-
-            dialogFramework.updateDebugInfo();
-        } else if (typeof setupScenes === "function") {
-            setupScenes();
 
             showLoadingIndicator("Preloading assets");
             //console.log("Initializing and preloading assets...");

@@ -50,7 +50,6 @@ if (!document.getElementById("outputCode")) {
 }
 
 function loadProjectData(data) {
-
     projectData = JSON.parse(JSON.stringify(data));
 
     document.getElementById("configShowControls").checked = projectData.config.showControls;
@@ -162,6 +161,7 @@ function updateCharactersList() {
         container.appendChild(item);
 
         projectData.characters[name].color = data.color;
+        projectData.characters[name].aliases = aliases;
     });
 }
 
@@ -171,16 +171,23 @@ function editCharacterAliases(characterName) {
 
     const newAliases = prompt(`Enter aliases for ${characterName} (comma-separated):`, aliases);
     if (newAliases !== null) {
-        character.aliases = newAliases
-            .split(",")
-            .map((alias) => alias.trim())
-            .filter((alias) => alias.length > 0);
+        updateCharacterAliases(
+            characterName,
+            newAliases
+                .split(",")
+                .map((alias) => alias.trim())
+                .filter((alias) => alias.length > 0),
+        );
         updateCharactersList();
     }
 }
 
 function updateCharacterColor(name, color) {
     projectData.characters[name].color = color;
+}
+
+function updateCharacterAliases(name, aliases) {
+    projectData.characters[name].aliases = aliases;
 }
 
 function deleteCharacter(name) {
@@ -420,7 +427,6 @@ function updateScenesList(onlyUpdateIndex = null) {
 }
 
 function createSceneElement(index) {
-
     const scene = projectData.scenes[index];
     const nbScenes = projectData.scenes.length;
     const item = document.createElement("div");
@@ -1326,7 +1332,8 @@ function generateCode() {
     Object.entries(projectData.characters).forEach(([name, data], index, array) => {
         code += `
             '${name}': {
-                color: '${data.color}'
+                color: '${data.color}',
+                aliases: [\"${data.aliases.join('\", \"')}\"]
             }${index < array.length - 1 ? "," : ""}`;
     });
 
@@ -1350,16 +1357,16 @@ function generateCode() {
             image: ${scene.image === null ? "null" : `'${scene.image}'`},
             speaker: '${scene.speaker}',
             line1: "${scene.line1 ? scene.line1.replace(/"/g, '\\"') : ""}",
-                  line2: "${scene.line2 ? scene.line2.replace(/"/g, '\\"') : ""}",
-                  censorSpeaker: ${scene.censorSpeaker},
-                  dialogFadeInTime: ${scene.dialogFadeInTime},
-                  dialogFadeOutTime: ${scene.dialogFadeOutTime},
-                  imageFadeInTime: ${scene.imageFadeInTime},
-                  imageFadeOutTime: ${scene.imageFadeOutTime},
-                  dialogDelayIn: ${scene.dialogDelayIn},
-                  dialogDelayOut: ${scene.dialogDelayOut},
-                  imageDelayIn: ${scene.imageDelayIn},
-                  imageDelayOut: ${scene.imageDelayOut}`;
+            line2: "${scene.line2 ? scene.line2.replace(/"/g, '\\"') : ""}",
+            censorSpeaker: ${scene.censorSpeaker},
+            dialogFadeInTime: ${scene.dialogFadeInTime},
+            dialogFadeOutTime: ${scene.dialogFadeOutTime},
+            imageFadeInTime: ${scene.imageFadeInTime},
+            imageFadeOutTime: ${scene.imageFadeOutTime},
+            dialogDelayIn: ${scene.dialogDelayIn},
+            dialogDelayOut: ${scene.dialogDelayOut},
+            imageDelayIn: ${scene.imageDelayIn},
+            imageDelayOut: ${scene.imageDelayOut}`;
 
         if (scene.sound !== null) {
             code += `,
@@ -1654,7 +1661,7 @@ function updateGalleryContent() {
     const contentContainer = document.getElementById("galleryContent");
     if (!contentContainer || !window.gameImporterAssets || !currentGalleryCategory) return;
 
-    const modalGallery =  document.getElementById("galleryModal");
+    const modalGallery = document.getElementById("galleryModal");
     const downloadAllButton = document.getElementById("download-all-button");
 
     if (!modalGallery && downloadAllButton) {
@@ -1806,7 +1813,7 @@ async function cropAllImages() {
     if (!imagesByCategory) return;
     const toCrop = [];
     for (const [category, assets] of Object.entries(imagesByCategory)) {
-        if (category === "Portraits") continue;
+        if (category === "Portraits" || category === "Misc") continue;
         for (const [name, asset] of Object.entries(assets)) {
             if (!asset.isSprite) {
                 toCrop.push({ name, asset });
@@ -1858,6 +1865,8 @@ async function cropAllImages() {
                         if (blob) {
                             const url = URL.createObjectURL(blob);
                             asset.croppedUrl = url;
+                            asset.croppedBlob = blob;
+                            asset.cropped = true;
                             const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
                             if (thumbImg) {
                                 thumbImg.src = url;
