@@ -17,6 +17,9 @@
  */
 
 const filenamesMapped = {
+    // Game icon
+    "icon": "game_icon",
+
     // Sprites
     // Format: spritessheet_COLSxROWS_description
     "05a60f9a9844fd78": "spritessheet_12x8_characters_1",
@@ -61,6 +64,9 @@ const filenamesMapped = {
     "f9248bf25001c910": "spritessheet_1x1_system_22",
     "30f14a2c7734a492": "spritessheet_1x1_system_23",
     "f8410e597b074776": "spritessheet_8x15_system_24",
+
+    // Tilesets
+    "c2ccf2930ff9deb6": "spritessheet_8x16_tilesets_1",
 
     // Parallaxes
     "1005053800c2a284": "backgrounds_1",
@@ -1399,7 +1405,7 @@ const filenamesMapped = {
     "efbb528a5d3f4246": "neon_lights_buzz",
     "926c1f1ca58f0c1f": "sheep_sway",
     "bfe1f2ddce1fa1a8": "the_clock_is_ticking",
-    "ecef72663ba32460": "jesters_pity",
+    "ecef72663ba32460": "jester's_pity",
     "5adf3c7054e7a170": "phone_ringing_2",
     "2e9eb391c7d1e1d3": "neon_lights_buzz_2",
     "e8d807029008351e": "clock_ticking_2",
@@ -1486,9 +1492,6 @@ const filenamesMapped = {
     "dbe371e3fdd67bf4": "se_74",
     "c9d55115b9d0b6f9": "se_75",
     "e7ba7d67c89feb44": "se_76",
-
-    // Tilesets
-    "c2ccf2930ff9deb6": "spritessheet_8x16_tilesets_1",
 
     // Data json
     "00d652e9341d5d14": "data_1",

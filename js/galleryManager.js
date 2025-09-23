@@ -382,8 +382,6 @@ class GalleryManager {
         const base = rawName.replace(/\.[^/.]+$/, "");
         const lower = base.toLowerCase();
 
-        if (lower === "jesters_pity") return "Jester's Pity";
-
         const toSentenceCase = (s) => {
             const parts = s.replace(/[_-]+/g, " ").split(" ").filter(Boolean);
             if (parts.length === 0) return "";
@@ -399,7 +397,7 @@ class GalleryManager {
                     rows = m[2],
                     group = m[3],
                     num = m[4];
-                return `Spritesheet ${group} #${num} (${cols}x${rows})`;
+                return `Sprites sheet ${group} #${num} (${cols}x${rows})`;
             }
         }
 
@@ -442,10 +440,6 @@ class GalleryManager {
                     return `${toSentenceCase(head)} #${num}`;
                 }
             }
-        }
-
-        if (type === "audio") {
-            return toSentenceCase(base);
         }
 
         const words = base

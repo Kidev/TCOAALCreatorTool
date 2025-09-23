@@ -122,7 +122,8 @@ class GameImporter {
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                const originalPath = folderInfo.path.replace("www/", "") + "/" + fileName + "." + folderInfo.type;
+                const basePathNoExtension = folderInfo.path.replace("www/", "") + "/" + fileName;
+                const originalPath = basePathNoExtension + "." + folderInfo.type;
                 const decrypted = await this.decryptFile(
                     new Uint8Array(arrayBuffer),
                     folderInfo.path.replace("www/", "") + "/" + fileName,
@@ -142,14 +143,42 @@ class GameImporter {
                         if (!this.importedAssets.images[folderInfo.category]) {
                             this.importedAssets.images[folderInfo.category] = {};
                         }
+                        if (mappedName === "spritessheet_16x16_system_12") {
+                            this.importedAssets.images[folderInfo.category]["spritessheet_2x2_system_12.png"] = {
+                                url: url,
+                                blob: blob,
+                                name: "spritessheet_2x2_system_12.png",
+                                originalName: fileName,
+                                baseFileName: originalPath,
+                                isSprite: true,
+                            };
+                            this.importedAssets.images[folderInfo.category]["spritessheet_4x4_system_12.png"] = {
+                                url: url,
+                                blob: blob,
+                                name: "spritessheet_4x4_system_12.png",
+                                originalName: fileName,
+                                baseFileName: originalPath,
+                                isSprite: true,
+                            };
+                            this.importedAssets.images[folderInfo.category]["spritessheet_8x8_system_12.png"] = {
+                                url: url,
+                                blob: blob,
+                                name: "spritessheet_4x4_system_12.png",
+                                originalName: fileName,
+                                baseFileName: originalPath,
+                                isSprite: true,
+                            };
+                        }
                         this.importedAssets.images[folderInfo.category][assetName] = {
                             url: url,
                             blob: blob,
                             name: assetName,
                             originalName: fileName,
-                            baseFileName: originalPath,
+                            baseFileName: folderInfo.path === "www/icon" ? basePathNoExtension : originalPath,
                             isSprite:
-                                folderInfo.category === "Game sprites" || folderInfo.category === "System sprites",
+                                folderInfo.category === "Game sprites" ||
+                                folderInfo.category === "System sprites" ||
+                                (folderInfo.category === "Misc" && folderInfo.path === "www/img/tilesets"),
                         };
                     } else if (folderInfo.type === "ogg") {
                         if (!this.importedAssets.audio[folderInfo.category]) {

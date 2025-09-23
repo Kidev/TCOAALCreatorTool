@@ -1681,7 +1681,19 @@ function updateGalleryContent() {
     const isGalleryOnly = urlParams === "gallery" || urlParams === null || urlParams === undefined;
 
     const assetEntries = Object.entries(assets);
-    assetEntries.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: "base" }));
+    assetEntries.sort((a, b) => {
+        const normalize = (name) => {
+            return name.replace(
+                /^spritessheet_(\d+)x(\d+)_([^.]*)\.png$/,
+                (m, w, h, rest) => `spritesheet_${rest}_${w}x${h}.png`,
+            );
+        };
+
+        return normalize(a[0]).localeCompare(normalize(b[0]), undefined, {
+            numeric: true,
+            sensitivity: "base",
+        });
+    });
 
     let bustFilterValue = "All";
     if (currentGalleryTab === "images" && currentGalleryCategory === "Portraits") {
