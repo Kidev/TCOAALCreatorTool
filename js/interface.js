@@ -339,7 +339,7 @@ function setupGalleryOnlyMode() {
                     <button id="button-open-gallery-mode" class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:35vmax;">
                         Gallery
                     </button>
-                    <button class="tcoaal-button" onclick="reopenWithMode('editor')" style="width:35vmax;margin-top:0.5vmax;">
+                    <button class="tcoaal-button" onclick="reopenWithMode('viewer')" style="width:35vmax;margin-top:0.5vmax;">
                     Dialog creator
                     </button>
                     </div>
