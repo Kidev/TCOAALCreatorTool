@@ -93,7 +93,7 @@ function setupScene() {
         imageDelayOut: 0
     })
     .addScene({
-        image: 'https://i.imgur.com/xGAMTx1.png',
+        image: 'https://i.imgur.com/pwgYsYz.png',
         speaker: 'Leyley',
         line1: "Well, I do.",
         line2: "",
@@ -108,7 +108,7 @@ function setupScene() {
         imageDelayOut: 0
     })
     .addScene({
-        image: 'https://i.imgur.com/xGAMTx1.png',
+        image: 'https://i.imgur.com/pwgYsYz.png',
         speaker: 'Leyley',
         line1: "Just go over and  __k  _e_  to  ____  __th  you.",
         line2: "",
@@ -123,7 +123,7 @@ function setupScene() {
         imageDelayOut: 0
     })
     .addScene({
-        image: 'https://i.imgur.com/xGAMTx1.png',
+        image: 'https://i.imgur.com/pwgYsYz.png',
         speaker: 'Andy',
         line1: "I thought she's your friend?",
         line2: "",
@@ -138,7 +138,7 @@ function setupScene() {
         imageDelayOut: 0
     })
     .addScene({
-        image: 'https://i.imgur.com/xGAMTx1.png',
+        image: 'https://i.imgur.com/pwgYsYz.png',
         speaker: 'Leyley',
         line1: "Mom said you'd help me with anything!",
         line2: "",
