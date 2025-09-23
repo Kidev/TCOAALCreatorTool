@@ -465,6 +465,14 @@ function handleGalleryOnlyImport() {
     folderInput.onchange = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length > 0) {
+            if (!window.gameImporter) {
+                window.gameImporter = new GameImporter();
+            }
+
+            if (!(await gameImporter.importGame(files))) {
+                return;
+            }
+
             const editorOverlay = document.getElementById("editorOverlay");
             if (editorOverlay) {
                 editorOverlay.classList.add("importing");
@@ -472,12 +480,6 @@ function handleGalleryOnlyImport() {
             }
             document.getElementById("popup-buy-frame").style.display = "none";
             document.getElementById("popup-buy-frame").style.zindex = "-1";
-
-            if (!window.gameImporter) {
-                window.gameImporter = new GameImporter();
-            }
-
-            await gameImporter.importGame(files);
 
             setTimeout(() => {
                 const initialPrompt = document.getElementById("galleryInitialPrompt");

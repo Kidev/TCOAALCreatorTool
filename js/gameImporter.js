@@ -23,6 +23,9 @@ class GameImporter {
             audio: {},
         };
         this.signature = "TCOAAL";
+        this.hash = atob(
+            "VGhlIENvZmZpbiBvZiBBbmR5IGFuZCBMZXlsZXkvd3d3L0NvcHlyaWdodHMgLSBDb2ZmaW4gb2YgQW5keSBhbmQgTGV5bGV5LnR4dA==",
+        );
         this.fileCounter = 0;
         this.totalFiles = 0;
         this.filenameMap = filenamesMapped;
@@ -33,39 +36,6 @@ class GameImporter {
 
         const filesByPath = {};
         const relevantFiles = [];
-
-        const validPaths = [
-            //"www/data/",
-            "www/audio/bgm/",
-            "www/audio/bgs/",
-            "www/audio/me/",
-            "www/audio/se/",
-            "www/img/characters/",
-            "www/img/faces/",
-            "www/img/parallaxes/",
-            "www/img/pictures/",
-            "www/img/system/",
-            "www/img/tilesets/",
-            "www/img/titles1/",
-            "www/icon/",
-        ];
-
-        for (const file of files) {
-            const path = file.webkitRelativePath || file.name;
-            filesByPath[path] = file;
-
-            for (const validPath of validPaths) {
-                if (path.includes(validPath)) {
-                    relevantFiles.push(file);
-                    break;
-                }
-            }
-        }
-
-        this.totalFiles = relevantFiles.length;
-        //console.log(`Found relevant game assets to process...`);
-
-        this.showProgress(true);
 
         const folders = [
             //{ path: "www/data", type: "json", category: "data" },
@@ -82,6 +52,34 @@ class GameImporter {
             { path: "www/img/titles1", type: "png", category: "Misc" },
             { path: "www/icon", type: "png", category: "Misc" },
         ];
+
+        let validFolders = [];
+        for (const folder of folders) {
+            validFolders.push(folder.path);
+        }
+
+        let gameFolder = false;
+        for (const file of files) {
+            const path = file.webkitRelativePath || file.name;
+            filesByPath[path] = file;
+
+            gameFolder ||= path === this.hash;
+
+            for (const validPath of validFolders) {
+                if (path.includes(validPath)) {
+                    relevantFiles.push(file);
+                    break;
+                }
+            }
+        }
+        if (!gameFolder) {
+            alert("Invalid game folder");
+            return false;
+        }
+
+        this.totalFiles = relevantFiles.length;
+
+        this.showProgress(true);
 
         for (const folder of folders) {
             await this.processFolder(filesByPath, folder);
@@ -109,6 +107,7 @@ class GameImporter {
                 openGallery();
             }
         }
+        return true;
     }
 
     async processFolder(filesByPath, folderInfo) {

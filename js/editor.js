@@ -1518,7 +1518,9 @@ function handleGameImport() {
     folderInput.onchange = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length > 0) {
-            await gameImporter.importGame(files);
+            if (!(await gameImporter.importGame(files))) {
+                return;
+            }
 
             const importButtons = document.querySelectorAll(".game-import");
             importButtons.forEach((btn) => {
