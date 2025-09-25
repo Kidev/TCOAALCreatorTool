@@ -272,18 +272,54 @@ body {
     z-index: 100;
     background: url("https://i.imgur.com/cH6ms0h.png");
     background-size: 100% 100%;
-    padding: 2vmax 2vmax;
+    padding: 3vh 1vw;
     border-radius: 12px;
     transition: all 0.3s ease;
     min-width: 280px;
     font-family: "Faustina", serif;
+    /*width: 24vw;
+    height: 8vh;*/
 }
+
+.nav-controls > .tcoaal-button-small-header {
+    height: 3vh;
+    width: 5vw;
+    padding: 0;
+}
+
+
+/*
+.editor-btn {
+    grid-column: span 2;
+}
+*/
+#debugInfo {
+    align-content: center;
+}
+
 
 .controls.hidden {
     opacity: 0;
     pointer-events: none;
     transform: translateY(-10px);
 }
+
+.scene-jump-select {
+    background: rgba(0,0,0,0.9);
+    border: 1px solid #4a90e2;
+    color: var(--default);
+    font-size: 0.7vmax;
+    width: 1vw; height: 1vh;
+}
+
+.scene-jump-select::before {
+    background: rgba(0,0,0,0.9);
+    border: 1px solid #4a90e2;
+    color: var(--default);
+    font-size: 1vmax;
+    width: 2.5vw; height: 1.8vh;
+}
+
 /*
 .controls button {
     background: #4a90e2;
@@ -341,23 +377,22 @@ body {
     font-family: "Faustina", serif;
     opacity: 0.9;
 }
-
+/*
 .controls-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
     align-items: center;
-}
-
-.editor-btn {
-    grid-column: span 2;
+}*/
+.controls-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .nav-controls {
-    display: grid;
-    grid-template-columns: auto auto auto auto;
-    gap: 4px;
-    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
 }
 
 .debug-area {
@@ -427,7 +462,7 @@ body {
     background-size: 100% 100%;
     font-family: "Faustina", serif;
     text-align: center;
-    font-size: 1.5vmax;
+    font-size: 1vmax;
     color: var(--white);
     text-shadow:
         0 0 1px #000000,
@@ -501,7 +536,6 @@ body {
     background-size: 100% 100%;
     color: var(--white);
     text-align: center;
-    padding: 0.5vmax 1vmax;
     font-family: "Faustina", serif;
     pointer-events: auto;
 }
@@ -856,4 +890,19 @@ body {
 #popup-buy-frame.show {
     top: 20px;
     opacity: 1;
+}
+
+#github-logo-icon {
+    height: var(--header-height);
+    position: absolute;
+    top:0;
+    right:0;
+    z-index: 10;
+    align-content: center;
+}
+
+#github-logo-icon img {
+    height: 60%;
+    width: auto;
+    margin: 1vh 1vw;
 }

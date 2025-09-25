@@ -152,7 +152,8 @@ function updateCharactersList() {
         ${aliasesDisplay ? `<span class="character-aliases">(${aliasesDisplay})</span>` : ""}
         </div>
         <div class="header-action-buttons">
-            <input type="color" value="${data.color}" onchange="updateCharacterColor('${name}', this.value)">
+            <label for="inputCharacterColor${name}" style="display:none;"></label>
+            <input id="inputCharacterColor${name}" type="color" value="${data.color}" onchange="updateCharacterColor('${name}', this.value)">
             <button onclick="editCharacterAliases('${name}')">Set aliases</button>
             <button class="danger" onclick="deleteCharacter('${name}')">✕</button>
         </div>
@@ -200,22 +201,30 @@ function deleteCharacter(name) {
 function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) {
     const fieldId = isSound ? "sound" : field;
     const isUrl = currentValue && (currentValue.startsWith("http://") || currentValue.startsWith("https://"));
+    const isGallery = currentValue && currentValue.startsWith("gallery:");
     const hasFile = isSound ? soundMap.has(sceneIndex) : imageMap.has(`${sceneIndex}-${field}`);
+    const isNull = currentValue === null;
 
-    let selectValue = "local";
+    let selectValue = "gallery";
     if (isUrl) selectValue = "url";
+    if (hasFile && !isGallery) selectValue = "local";
+    if (isGallery) selectValue = "gallery";
 
     const fileId = `file-${fieldId}-${sceneIndex}`;
     const selectId = `select-${fieldId}-${sceneIndex}`;
 
+    const selectDisplay = isNull ? "display: none;" : "";
+    const containerDisplay = isNull ? "display: none;" : "";
+
     let html = `
         <div class="file-select-wrapper">
-            <select id="${selectId}" class="file-type-select" onchange="handleFileTypeChange(${sceneIndex}, '${field}', this.value, ${isSound})">
-                <option value="local" ${selectValue === "local" ? "selected" : ""}>Local</option>
+            <label for="${selectId}" style="display: none;"></label>
+            <select id="${selectId}" class="file-type-select" style="${selectDisplay}" onchange="handleFileTypeChange(${sceneIndex}, '${field}', this.value, ${isSound})">
+                <option value="gallery" ${selectValue === "gallery" ? "selected" : ""}>Gallery</option>
                 <option value="url" ${selectValue === "url" ? "selected" : ""}>URL</option>
-                <option value="gallery">Gallery</option>
+                <option value="local" ${selectValue === "local" ? "selected" : ""}>Local</option>
             </select>
-            <div id="${selectId}-container" style="flex: 1;">
+            <div id="${selectId}-container" class="file-select-with-button-container" style="${containerDisplay}">
     `;
 
     if (selectValue === "local") {
@@ -228,29 +237,46 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) 
         const tooltip = fileName ? `title="${fileName}"` : "";
 
         html += `
+            <label for="${fileId}" style="display: none;"></label>
             <input type="file" id="${fileId}" accept="${isSound ? "audio/*" : "image/*"}"
                    onchange="handle${isSound ? "Sound" : "Image"}Upload(${sceneIndex}, ${isSound ? "" : `'${field}', `}this)">
-            <button class="file-select-button ${fileName ? "has-file" : ""}" 
+            <button class="file-select-button ${fileName ? "has-file" : ""}"
                     onclick="document.getElementById('${fileId}').click()"
                     ${tooltip}>
                 <span class="filename">${buttonText}</span>
-                ${fileName ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound})">×</button>` : ""}
+                ${fileName ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound})">☓</button>` : ""}
             </button>
         `;
     } else if (selectValue === "url") {
         html += `
-            <input type="text" class="url-input" placeholder="Enter URL"
+            <label for="${fileId}" style="display: none;"></label>
+            <input type="text" id="${fileId}" class="url-input" placeholder="Enter URL"
                    value="${isUrl ? currentValue : ""}"
                    onchange="handle${isSound ? "Sound" : "Image"}Url(${sceneIndex}, ${isSound ? "" : `'${field}', `}this.value)">
+        `;
+    } else if (selectValue === "gallery") {
+        let displayName = "Select from gallery";
+        if (isGallery) {
+            const match = currentValue.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match) {
+                displayName = match[2]; // Just the filename
+            }
+        }
+        html += `
+            <label for="${fileId}" style="display: none;"></label>
+            <button id="${fileId}" class="gallery-button ${isGallery ? 'has-file' : ''}" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound})">
+                <span class="filename">${displayName}</span>
+                ${isGallery ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound})">☓</button>` : ""}
+            </button>
         `;
     }
 
     if (isSound) {
         html += `
             ${
-                currentValue !== null
+                currentValue !== null && currentValue !== ""
                     ? `
-                    <button class="play-button" id="sound-button-${sceneIndex}" onclick="toggleSound(${sceneIndex})">▶ Play</button>
+                    <button class="play-button" id="sound-button-${sceneIndex}" onclick="toggleSound(${sceneIndex})">▶</button>
                     `
                     : ""
             }
@@ -283,7 +309,7 @@ function handleFileTypeChange(sceneIndex, field, type, isSound = false) {
         container.innerHTML = `
             <input type="file" id="${fileId}" accept="${isSound ? "audio/*" : "image/*"}"
                    onchange="handle${isSound ? "Sound" : "Image"}Upload(${sceneIndex}, ${isSound ? "" : `'${field}', `}this)">
-            <button class="file-select-button ${fileName ? "has-file" : ""}" 
+            <button class="file-select-button ${fileName ? "has-file" : ""}"
                     onclick="document.getElementById('${fileId}').click()"
                     ${tooltip}>
                 <span class="filename">${buttonText}</span>
@@ -297,39 +323,58 @@ function handleFileTypeChange(sceneIndex, field, type, isSound = false) {
         `;
     } else if (type === "gallery") {
         container.innerHTML = `
-            <button class="gallery-button" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound})">Open Gallery</button>
+            <button class="gallery-button" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound})">Select from gallery</button>
         `;
     }
 }
 
 function openGalleryForField(sceneIndex, field, isSound) {
-    window.gallerySelectionCallback = (name, category, type) => {
-        const assets =
-            type === "images" ? window.gameImporterAssets.images[category] : window.gameImporterAssets.audio[category];
+    let currentAssetRef = null;
+    const currentValue = projectData.scenes[sceneIndex][field];
+    if (currentValue && currentValue.startsWith('gallery:')) {
+        currentAssetRef = currentValue;
+    }
 
-        const asset = assets[name];
-        if (asset) {
-            if (isSound) {
-                projectData.scenes[sceneIndex].sound = asset.url;
-                soundMap.set(sceneIndex, { name: name, blob: asset.blob });
-            } else {
-                projectData.scenes[sceneIndex][field] = asset.url;
-                imageMap.set(`${sceneIndex}-${field}`, { name: name, blob: asset.blob });
-            }
-            updateScenesList();
-        }
+    galleryContext = {
+        mode: 'select',
+        sceneIndex: sceneIndex,
+        field: field,
+        isSound: isSound,
+        assetType: isSound ? 'audio' : 'images',
+        currentAssetRef: currentAssetRef
     };
 
     openGallery();
 }
 
 function useGalleryAsset(name, category) {
-    closeGallery();
-
-    if (window.gallerySelectionCallback) {
-        window.gallerySelectionCallback(name, category, currentGalleryTab);
-        window.gallerySelectionCallback = null;
+    if (!galleryContext || galleryContext.mode !== 'select') {
+        //console.warn('useGalleryAsset called without selection context');
+        return;
     }
+
+    const { sceneIndex, field, isSound } = galleryContext;
+
+    // Create portable reference: gallery:category/filename
+    const galleryRef = `gallery:${category}/${name}`;
+
+    projectData.scenes[sceneIndex][field] = galleryRef;
+
+    const assets = currentGalleryTab === "images"
+        ? window.gameImporterAssets.images[category]
+        : window.gameImporterAssets.audio[category];
+    const asset = assets[name];
+
+    if (asset) {
+        if (isSound) {
+            soundMap.set(sceneIndex, { name: name, blob: asset.blob, galleryRef: galleryRef });
+        } else {
+            imageMap.set(`${sceneIndex}-${field}`, { name: name, blob: asset.blob, galleryRef: galleryRef });
+        }
+    }
+
+    updateScenesList();
+    closeGallery();
 }
 
 function clearFile(sceneIndex, field, isSound = false) {
@@ -432,17 +477,19 @@ function createSceneElement(index) {
     const item = document.createElement("div");
     item.className = "scene-item";
 
-    let speakerOptions = '<option value="">Narrator</option>';
+    let speakerOptions = '<option style="color: var(--txt-color)" value="">Narrator</option>';
 
     Object.keys(projectData.characters).forEach((charName) => {
         const char = projectData.characters[charName];
         const isSelected = scene.speaker === charName;
-        speakerOptions += `<option value="${charName}" ${isSelected ? "selected" : ""}>${charName}</option>`;
+        speakerOptions += `<option style="color: ${char.color}" value="${charName}" ${isSelected ? "selected" : ""}>${charName}</option>`;
 
         if (char.aliases && char.aliases.length > 0) {
             char.aliases.forEach((alias) => {
-                const isAliasSelected = scene.speaker === alias;
-                speakerOptions += `<option value="${alias}" ${isAliasSelected ? "selected" : ""}>  → ${alias}</option>`;
+                if (alias.length > 0) {
+                    const isAliasSelected = scene.speaker === alias;
+                    speakerOptions += `<option style="color: ${char.color}" value="${alias}" ${isAliasSelected ? "selected" : ""}>  → ${alias}</option>`;
+                }
             });
         }
     });
@@ -515,7 +562,7 @@ function createSceneElement(index) {
             <button title="${index + 1}/${nbScenes}" class="collapsible ${isExpanded ? "active" : ""}" onclick="toggleScene(${index})">
                 <div class="scene-header-main">
                     <span class="scene-speaker">${scene.speaker || "Narrator"}</span>
-                    <span class="scene-preview-lines">${preview1}<br/>${preview2}</span>
+                    <span class="scene-preview-lines">${preview1}&nbsp;<br/>${preview2}&nbsp;</span>
                 </div>
             </button>
         <div class="header-action-buttons">
@@ -609,7 +656,7 @@ function createSceneElement(index) {
 
                 <div class="scene-group audio-assets-group">
                     <h4>Audio</h4>
-                    <div class="form-group audio audio-form-group">
+                    <div class="form-group audio">
                         <input type="checkbox" class="null-checkbox" id="sound-checkbox-${index}"
                             ${isValidData(scene.sound) ? "checked" : ""}
                             onchange="toggleNull(${index}, 'sound', !this.checked)"
@@ -807,12 +854,24 @@ function updateSceneValue(index, field, value) {
 function getImageSrc(sceneIndex, field) {
     const key = `${sceneIndex}-${field}`;
     const file = imageMap.get(key);
-    if (file) {
-        return URL.createObjectURL(file);
+    if (file && file.blob) {
+        return URL.createObjectURL(file.blob);
     }
 
     const imagePath = projectData.scenes[sceneIndex][field];
     if (!imagePath) return "";
+
+    if (imagePath.startsWith("gallery:")) {
+        const match = imagePath.match(/^gallery:([^/]+)\/(.+)$/);
+        if (match && window.gameImporterAssets) {
+            const [, category, name] = match;
+            const asset = window.gameImporterAssets.images[category]?.[name];
+            if (asset) {
+                return asset.croppedUrl || asset.url;
+            }
+        }
+        return "";
+    }
 
     if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
         return imagePath;
@@ -847,7 +906,7 @@ function toggleSound(sceneIndex) {
         currentlyPlayingAudio = null;
 
         document.querySelectorAll(".play-button").forEach((btn) => {
-            btn.textContent = "▶ Play";
+            btn.textContent = "▶ PLAY";
             btn.classList.remove("stop-button");
         });
         return;
@@ -856,9 +915,22 @@ function toggleSound(sceneIndex) {
     const file = soundMap.get(sceneIndex);
     const soundPath = projectData.scenes[sceneIndex].sound;
 
-    if (file) {
-        const url = URL.createObjectURL(file);
+    if (file && file.blob) {
+        const url = URL.createObjectURL(file.blob);
         currentlyPlayingAudio = new Audio(url);
+    } else if (soundPath && soundPath.startsWith("gallery:")) {
+        const match = soundPath.match(/^gallery:([^/]+)\/(.+)$/);
+        if (match && window.gameImporterAssets) {
+            const [, category, name] = match;
+            const asset = window.gameImporterAssets.audio[category]?.[name];
+            if (asset) {
+                currentlyPlayingAudio = new Audio(asset.url);
+            } else {
+                return;
+            }
+        } else {
+            return;
+        }
     } else if (soundPath && (soundPath.startsWith("http://") || soundPath.startsWith("https://"))) {
         currentlyPlayingAudio = new Audio(soundPath);
     } else if (soundPath) {
@@ -869,13 +941,13 @@ function toggleSound(sceneIndex) {
 
     currentlyPlayingAudio.volume = projectData.scenes[sceneIndex].soundVolume;
 
-    button.textContent = "⬛ Stop";
+    button.textContent = "⬛ STOP";
     button.classList.add("stop-button");
 
     currentlyPlayingAudio.play();
 
     currentlyPlayingAudio.addEventListener("ended", () => {
-        button.textContent = "▶ Play";
+        button.textContent = "▶ PLAY";
         button.classList.remove("stop-button");
         currentlyPlayingAudio = null;
     });
@@ -904,9 +976,15 @@ function toggleNull(sceneIndex, field, isNull) {
 }
 
 function updateNullCheckboxVisibility(sceneIndex, field, isNull) {
-    const containerId =
-        field === "sound" ? `select-sound-${sceneIndex}-container` : `select-${field}-${sceneIndex}-container`;
+    const selectId = field === "sound" ? `select-sound-${sceneIndex}` : `select-${field}-${sceneIndex}`;
+    const containerId = `${selectId}-container`;
+
+    const selectElement = document.getElementById(selectId);
     const container = document.getElementById(containerId);
+
+    if (selectElement) {
+        selectElement.style.display = isNull ? "none" : "block";
+    }
 
     if (container) {
         container.style.display = isNull ? "none" : "flex";
@@ -1204,7 +1282,7 @@ function handleBackgroundMusicTypeChange(type) {
         playButton.style.display = currentUrl ? "inline-block" : "none";
     } else if (type === "gallery") {
         container.innerHTML = `
-            <button class="gallery-button" onclick="alert('WIP')" ${!enabled ? "disabled" : ""}>Open Gallery</button>
+            <button class="gallery-button" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound})">Select from gallery</button>
         `;
         container.appendChild(playButton);
         playButton.style.display = "none";
@@ -1359,6 +1437,7 @@ function generateCode() {
             line1: "${scene.line1 ? scene.line1.replace(/"/g, '\\"') : ""}",
             line2: "${scene.line2 ? scene.line2.replace(/"/g, '\\"') : ""}",
             censorSpeaker: ${scene.censorSpeaker},
+            demonSpeaker: ${scene.demonSpeaker || false},
             dialogFadeInTime: ${scene.dialogFadeInTime},
             dialogFadeOutTime: ${scene.dialogFadeOutTime},
             imageFadeInTime: ${scene.imageFadeInTime},
@@ -1512,6 +1591,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 let currentGalleryTab = "images";
 let currentGalleryCategory = null;
+let galleryContext = null; // { mode: 'browse' | 'select', sceneIndex, field, isSound, currentAssetRef }
 
 function handleGameImport() {
     const folderInput = document.getElementById("folderInput");
@@ -1525,21 +1605,105 @@ function handleGameImport() {
             const importButtons = document.querySelectorAll(".game-import");
             importButtons.forEach((btn) => {
                 btn.textContent = "Gallery";
-                btn.onclick = () => openGallery();
+                btn.onclick = () => {
+                    galleryContext = null; // Reset to browse mode
+                    openGallery();
+                };
                 btn.classList.add("gallery-button");
                 btn.classList.remove("game-import");
             });
+
+            // Refresh scene previews to show newly imported assets
+            setTimeout(() => {
+                if (typeof updateScenesList === "function") {
+                    updateScenesList();
+                }
+            }, 200);
         }
     };
     folderInput.click();
 }
 
-function openGallery() {
+async function openGallery() {
     const modal = document.getElementById("galleryModal");
-    if (modal) {
-        modal.style.display = "flex";
-        //switchGalleryTab("images");
-        updateGalleryCategories();
+    if (!modal) return;
+
+    // If we don't have assets loaded, check for saved data first
+    if (!window.gameImporterAssets && window.memoryManager) {
+        try {
+            const storageState = await window.memoryManager.getStorageState();
+            if (storageState !== "none") {
+                // Load from saved data
+                const savedAssets = await window.memoryManager.loadSavedAssets();
+                window.gameImporterAssets = savedAssets;
+
+                // Handle smart loading for cropping
+                if (window.imagesCroppingStarted === false) {
+                    cropAllImages().then(() => window.imagesCroppingStarted = false);
+                }
+            }
+        } catch (error) {
+            //console.warn("Failed to check/load saved data for gallery:", error);
+        }
+    }
+
+    if (!galleryContext) {
+        galleryContext = { mode: 'browse' };
+    }
+
+    if (galleryContext.mode === 'select' && galleryContext.assetType) {
+        currentGalleryTab = galleryContext.assetType;
+    }
+
+    // Update USE button visibility
+    const useButton = document.getElementById("previewDownloadBtn");
+    if (useButton) {
+        if (galleryContext.mode === 'select') {
+            useButton.style.display = 'block';
+            useButton.onclick = () => {
+                if (window.galleryManager && window.galleryManager.currentAsset) {
+                    const { name, category } = window.galleryManager.currentAsset;
+                    useGalleryAsset(name, category);
+                }
+            };
+        } else {
+            useButton.style.display = 'none';
+        }
+    }
+
+    modal.style.display = "flex";
+    updateGalleryCategories();
+}
+
+async function handleSmartLoadingForEditor(storageState, savedAssets) {
+    if (!window.galleryManager) return;
+
+    try {
+        if (storageState === "partial" || storageState === "base") {
+            const assetsNeedingCrop = await window.memoryManager.getAssetsNeedingCrop();
+
+            if (assetsNeedingCrop.length > 0) {
+                for (const assetRecord of assetsNeedingCrop) {
+                    const asset = {
+                        blob: assetRecord.blob,
+                        baseFileName: assetRecord.baseFileName,
+                        name: assetRecord.name,
+                        url: URL.createObjectURL(assetRecord.blob),
+                    };
+
+                    if (!savedAssets.images[assetRecord.category]) {
+                        savedAssets.images[assetRecord.category] = {};
+                    }
+                    if (!savedAssets.images[assetRecord.category][assetRecord.name]) {
+                        savedAssets.images[assetRecord.category][assetRecord.name] = asset;
+                    }
+
+                    window.galleryManager.enqueueCropImage(asset, assetRecord.name, assetRecord.category);
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Error in smart loading for editor gallery:", error);
     }
 }
 
@@ -1552,9 +1716,17 @@ function closeGallery() {
     if (modal) {
         modal.style.display = "none";
     }
+
+    galleryContext = null;
 }
 
 function switchGalleryTab(tab) {
+    if (galleryContext && galleryContext.mode === 'select') {
+        if (tab !== galleryContext.assetType) {
+            return;
+        }
+    }
+
     currentGalleryTab = tab;
 
     if (window.galleryManager) {
@@ -1565,6 +1737,20 @@ function switchGalleryTab(tab) {
         btn.classList.remove("active");
         if (btn.textContent.toLowerCase().includes(tab)) {
             btn.classList.add("active");
+        }
+
+        if (galleryContext && galleryContext.mode === 'select') {
+            const btnTab = btn.textContent.toLowerCase().includes('images') ? 'images' : 'audio';
+            if (btnTab !== galleryContext.assetType) {
+                btn.classList.add('disabled');
+                btn.disabled = true;
+            } else {
+                btn.classList.remove('disabled');
+                btn.disabled = false;
+            }
+        } else {
+            btn.classList.remove('disabled');
+            btn.disabled = false;
         }
     });
 
@@ -1625,10 +1811,8 @@ function updateGalleryCategories() {
 
         selectGalleryCategory(targetCategory);
     }
-    // Start cropping after gallery is loaded
     if (!window.imagesCroppingStarted) {
-        window.imagesCroppingStarted = true;
-        cropAllImages();
+        cropAllImages().then(() => window.imagesCroppingStarted = false);
     }
 }
 
@@ -1678,9 +1862,17 @@ function updateGalleryContent() {
             : window.gameImporterAssets.audio[currentGalleryCategory];
     if (!assets) return;
 
-    const urlParams = new URLSearchParams(window.location.search).get("mode");
+    const isSelectionMode = galleryContext && galleryContext.mode === 'select';
 
-    const isGalleryOnly = urlParams === "gallery" || urlParams === null || urlParams === undefined;
+    let currentAssetName = null;
+    let currentAssetCategory = null;
+    if (isSelectionMode && galleryContext.currentAssetRef) {
+        const match = galleryContext.currentAssetRef.match(/^gallery:([^/]+)\/(.+)$/);
+        if (match) {
+            currentAssetCategory = match[1];
+            currentAssetName = match[2];
+        }
+    }
 
     const assetEntries = Object.entries(assets);
     assetEntries.sort((a, b) => {
@@ -1775,43 +1967,38 @@ function updateGalleryContent() {
             window.galleryManager.previewAsset(name, currentGalleryCategory, currentGalleryTab);
         };
         if (currentGalleryTab === "images") {
-            const thumbSrc =
-                galleryManager.globalImageViewMode === "cropped" && asset.croppedUrl ? asset.croppedUrl : asset.url;
             item.innerHTML = `
                 <img src="${asset.croppedUrl || asset.url}" alt="${name}" loading="lazy">
-                <div class="gallery-item-name">${formatName}</div>
-                <div class="gallery-item-actions">
-                ${!isGalleryOnly ? `<button class="gallery-item-action" onclick="event.stopPropagation(); useGalleryAsset('${name}', '${currentGalleryCategory}')">Use</button>` : ""}
-                </div>`;
+                <div class="gallery-item-name">${formatName}</div>`;
         } else {
             item.innerHTML = `
                 <div class="gallery-item-audio compact">
                 <div class="audio-icon">🎵</div>
                 <div class="gallery-item-name">${formatName}</div>
-                </div>
-                <div class="gallery-item-actions">
-                ${!isGalleryOnly ? `<button class="gallery-item-action" onclick="event.stopPropagation(); useGalleryAsset('${name}', '${currentGalleryCategory}')">Use</button>` : ""}
                 </div>`;
         }
         contentContainer.appendChild(item);
     });
-    galleryManager.unselectCurrent();
-    galleryManager.selectFirstElement();
-}
 
-function useGalleryAsset(name, category) {
-    closeGallery();
-
-    window.selectedGalleryAsset = {
-        name: name,
-        category: category,
-        type: currentGalleryTab,
-    };
-
-    //console.log("Selected asset:", name, "from", category);
+    if (isSelectionMode && currentAssetName && currentAssetCategory === currentGalleryCategory) {
+        setTimeout(() => {
+            const matchingItem = contentContainer.querySelector(`[data-filename="${currentAssetName}"]`);
+            if (matchingItem) {
+                matchingItem.click();
+            } else {
+                galleryManager.unselectCurrent();
+                galleryManager.selectFirstElement();
+            }
+        }, 50);
+    } else {
+        galleryManager.unselectCurrent();
+        galleryManager.selectFirstElement();
+    }
 }
 
 async function cropAllImages() {
+
+    window.imagesCroppingStarted = true;
     const imagesByCategory = window.gameImporterAssets.images;
     const downloadAllButton = document.getElementById("download-all-button");
     const updateDownloadButton = (percent, done = false) => {
@@ -1829,18 +2016,25 @@ async function cropAllImages() {
     for (const [category, assets] of Object.entries(imagesByCategory)) {
         if (category === "Portraits" || category === "Misc") continue;
         for (const [name, asset] of Object.entries(assets)) {
-            if (!asset.isSprite) {
-                toCrop.push({ name, asset });
+            if (!asset.isSprite && !asset.cropped && asset.blob && !asset.croppedBlob) {
+                toCrop.push({ name, asset, category });
             }
         }
     }
     toCrop.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
     const total = toCrop.length;
-    const indicator = document.getElementById("croppingProgressIndicator");
-    indicator.style.display = "flex";
 
-    let count = 0;
-    for (const { name, asset } of toCrop) {
+    for (const [count, { name, asset, category }] of toCrop.entries()) {
+
+        const pct = Math.round((count / total) * 100);
+        updateLoadingBar(pct, name);
+        updateDownloadButton(pct);
+
+        if (!asset.blob || asset.croppedBlob?.size > 0 || asset.cropped === true) {
+            asset.cropping = false;
+            continue;
+        }
+
         await new Promise((resolve) => {
             const img = new Image();
             img.onload = () => {
@@ -1875,41 +2069,49 @@ async function cropAllImages() {
                     cropCanvas.width = cropW;
                     cropCanvas.height = cropH;
                     cropCanvas.getContext("2d").drawImage(img, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
-                    cropCanvas.toBlob((blob) => {
+                    cropCanvas.toBlob(async (blob) => {
                         if (blob) {
                             const url = URL.createObjectURL(blob);
                             asset.croppedUrl = url;
                             asset.croppedBlob = blob;
                             asset.cropped = true;
+
+                            // Save cropped asset to persistent memory
+                            if (window.memoryManager && asset.baseFileName) {
+                                try {
+                                    const assetId = window.memoryManager.generateAssetId(asset.baseFileName, name);
+                                    await window.memoryManager.saveCompleteAsset(assetId, blob);
+                                } catch (error) {
+                                    //console.warn("Failed to save cropped asset to memory:", name, error);
+                                }
+                            }
+
                             const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
                             if (thumbImg) {
                                 thumbImg.src = url;
                             }
+
+                            window.gameImporterAssets.images[category][name] = asset;
                         }
-                        count++;
-                        const pct = Math.round((count / total) * 100);
-                        indicator.textContent = `Cropping ${name} (${pct}%)`;
-                        updateDownloadButton(pct);
                         resolve();
                     });
                 } else {
-                    count++;
-                    const pct = Math.round((count / total) * 100);
-                    indicator.textContent = `Cropping ${name} (${pct}%)`;
-                    updateDownloadButton(pct);
                     resolve();
                 }
             };
             img.src = asset.url;
         });
     }
-    //indicator.remove();
-    indicator.style.display = "none";
+    updateLoadingBar();
     updateDownloadButton(100, true);
 }
 
 window.handleGameImportClick = function () {
-    if (window.gameImporterAssets && Object.keys(window.gameImporterAssets.images).length > 0) {
+    if (
+        window.memoryManager?.haveDataStored ||
+        (window.gameImporterAssets && Object.keys(window.gameImporterAssets.images).length > 0)
+    ) {
+        galleryContext = null;
         openGallery();
     } else {
         handleGameImport();

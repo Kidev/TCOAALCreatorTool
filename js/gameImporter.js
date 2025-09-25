@@ -142,54 +142,73 @@ class GameImporter {
                         if (!this.importedAssets.images[folderInfo.category]) {
                             this.importedAssets.images[folderInfo.category] = {};
                         }
-                        if (mappedName === "spritessheet_16x16_system_12") {
-                            this.importedAssets.images[folderInfo.category]["spritessheet_2x2_system_12.png"] = {
-                                url: url,
-                                blob: blob,
-                                name: "spritessheet_2x2_system_12.png",
-                                originalName: fileName,
-                                baseFileName: originalPath,
-                                isSprite: true,
-                            };
-                            this.importedAssets.images[folderInfo.category]["spritessheet_4x4_system_12.png"] = {
-                                url: url,
-                                blob: blob,
-                                name: "spritessheet_4x4_system_12.png",
-                                originalName: fileName,
-                                baseFileName: originalPath,
-                                isSprite: true,
-                            };
-                            this.importedAssets.images[folderInfo.category]["spritessheet_8x8_system_12.png"] = {
-                                url: url,
-                                blob: blob,
-                                name: "spritessheet_4x4_system_12.png",
-                                originalName: fileName,
-                                baseFileName: originalPath,
-                                isSprite: true,
-                            };
+
+                        const isSprite =
+                            folderInfo.category === "Game sprites" ||
+                            folderInfo.category === "System sprites" ||
+                            (folderInfo.category === "Misc" && folderInfo.path === "www/img/tilesets");
+
+                        let assetVariants = null;
+
+                        if (assetName in spritesSheetsVariants) {
+                            assetVariants = spritesSheetsVariants[assetName].sizes;
                         }
-                        this.importedAssets.images[folderInfo.category][assetName] = {
+
+                        const assetData = {
                             url: url,
                             blob: blob,
                             name: assetName,
                             originalName: fileName,
                             baseFileName: folderInfo.path === "www/icon" ? basePathNoExtension : originalPath,
-                            isSprite:
-                                folderInfo.category === "Game sprites" ||
-                                folderInfo.category === "System sprites" ||
-                                (folderInfo.category === "Misc" && folderInfo.path === "www/img/tilesets"),
+                            isSprite: isSprite,
+                            variants: assetVariants,
+                            cropped: false,
+                            cropping: false,
+                            croppedUrl: undefined,
+                            croppedBlob: undefined,
                         };
+
+                        this.importedAssets.images[folderInfo.category][assetName] = assetData;
+
+                        if (window.memoryManager) {
+                            try {
+                                await window.memoryManager.savePartialAsset(
+                                    assetData,
+                                    assetData.baseFileName,
+                                    folderInfo.category,
+                                    "images",
+                                );
+                            } catch (error) {
+                                console.warn("Failed to save image to memory:", assetName, error);
+                            }
+                        }
                     } else if (folderInfo.type === "ogg") {
                         if (!this.importedAssets.audio[folderInfo.category]) {
                             this.importedAssets.audio[folderInfo.category] = {};
                         }
-                        this.importedAssets.audio[folderInfo.category][assetName] = {
+
+                        const assetData = {
                             url: url,
                             blob: blob,
                             name: assetName,
                             originalName: fileName,
                             baseFileName: originalPath,
                         };
+
+                        this.importedAssets.audio[folderInfo.category][assetName] = assetData;
+
+                        if (window.memoryManager) {
+                            try {
+                                await window.memoryManager.savePartialAsset(
+                                    assetData,
+                                    originalPath,
+                                    folderInfo.category,
+                                    "audio",
+                                );
+                            } catch (error) {
+                                console.warn("Failed to save audio to memory:", assetName, error);
+                            }
+                        }
                     }
                 }
 

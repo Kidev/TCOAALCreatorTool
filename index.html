@@ -30,7 +30,7 @@
     <body>
         <div id="importProgressModal" class="import-modal" style="display: none">
             <div class="import-modal-content">
-                <h2>Importing Game Assets</h2>
+                <h2>Processing game assets</h2>
                 <div class="import-progress-bar">
                     <div id="importProgressFill" class="import-progress-fill"></div>
                 </div>
@@ -40,7 +40,11 @@
         <div id="galleryModal" class="gallery-modal" style="display: none">
             <div class="gallery-modal-content">
                 <div class="gallery-header" style="display:flex;flex-direction:row;justify-content:space-between;align-items:center;padding:1vmin;">
-                    <h2>Assets Gallery<div id="croppingProgressIndicator" style="font-size:auto;width:auto;height:auto;">Cropping (0%)</div></h2>
+                    <div class="h2">Assets Gallery</div>
+                    <div id="croppingProgressIndicatorModal" style="display: none;">
+                        <div class="bar" id="croppingProgressBarModal"></div>
+                        <span class="label" id="croppingProgressSpanModal">Cropping...</span>
+                    </div>
                     <button class="gallery-close-btn" onclick="closeGallery()">✕</button>
                 </div>
                 <div class="gallery-main-container">
@@ -58,17 +62,17 @@
                             <button
                                 class="preview-download-btn"
                                 id="previewDownloadBtn"
-                                onclick="downloadPreviewAsset()"
+                                style="display: none;"
                             >
-                                ⬇ Download
+                                Use
                             </button>
                         </div>
                         <div class="preview-panel-content" id="previewPanelContent">
                             <div class="preview-placeholder">Select an item to preview</div>
                         </div>
                         <div class="preview-controls" id="previewControls"></div>
+                        </div>
                     </div>
-                </div>
             </div>
         </div>
         <input type="file" id="folderInput" style="display: none" webkitdirectory directory multiple />
@@ -81,25 +85,23 @@
                 </div>
             </div>
             <div class="controls" id="controlsContainer">
-                <div class="controls-grid">
-                    <button class="editor-btn tcoaal-button" onclick="openEditor()" title="Edit the dialog">
-                        Editor
-                    </button>
-                </div>
 
                 <div class="nav-controls" id="navControls">
+                    <button class="tcoaal-button-small tcoaal-button-small-header" onclick="openEditor()" title="Edit the dialog">
+                        Editor
+                    </button>
                     <button
                         id="prevButton"
-                        class="tcoaal-button-small"
+                        class="tcoaal-button-small tcoaal-button-small-header"
                         onclick="dialogFramework.previous()"
                         title="Previous (left arrow)"
                     >
                         ⬅
                     </button>
-                    <div class="debug-info tcoaal-button-small" id="debugInfo">0 / 0</div>
+                    <div class="debug-info tcoaal-button-small tcoaal-button-small-header" id="debugInfo">0 / 0</div>
                     <button
                         id="nextButton"
-                        class="tcoaal-button-small"
+                        class="tcoaal-button-small tcoaal-button-small-header"
                         onclick="dialogFramework.next()"
                         title="Next (right arrow, click or space)"
                     >
@@ -107,7 +109,7 @@
                     </button>
                     <button
                         id="resetButton"
-                        class="tcoaal-button-small"
+                        class="tcoaal-button-small tcoaal-button-small-header"
                         onclick="dialogFramework.reset()"
                         title="Reset"
                     >
@@ -125,25 +127,49 @@
                 <div class="editor-zone left" id="editorHeaderZoneLeft">
                     <div class="header-buttons">
                         <button
-                            class="game-import"
+                            class="tcoaal-button-small tcoaal-button-small-header game-import"
                             onclick="handleGameImportClick()"
                             title="Import all the assets from your game folder"
+                            id="import-game-assets-button"
                         >
-                            Import game ⊞
+                            Game assets
                         </button>
                         <button
-                            class="overlay-close"
-                            onclick="closeEditor()"
-                            title="Cancel changes and return to the animation screen'"
+                                class="tcoaal-button-small tcoaal-button-small-header js-download"
+                                onclick="downloadSequence()"
+                                title="Export the current dialog"
                         >
-                            Cancel ✘
+                            Export
+                        </button>
+                        <button
+                                class="tcoaal-button-small tcoaal-button-small-header js-upload"
+                                onclick="importSequence()"
+                                title="Import a dialog from file, will replace the current one"
+                        >
+                            Import
+                        </button>
+                        <button
+                                class="tcoaal-button-small tcoaal-button-small-header js-save"
+                                onclick="saveSequence()"
+                                title="Save the current dialog to browser storage"
+                        >
+                            Save
+                        </button>
+                        <button
+                                class="tcoaal-button-small tcoaal-button-small-header js-clear danger"
+                                onclick="clearSavedSequence()"
+                                title="Clear saved dialog from browser storage"
+                                style="display: none;"
+                                id="clearSavedBtn"
+                        >
+                            Clear Saved
                         </button>
                     </div>
                 </div>
                 <div class="editor-zone center">
                     <div class="editor-header-content">
                         <div class="editor-header-content">
-                            <a href="https://github.com/Kidev/TCOAALCreatorTool" title="See on GitHub" target="_blank"
+                            <a href="." title="Back to home screen"
                                 ><img alt="Dialog Creator" class="editor-title-image" src="img/tcoaal-title.webp"
                             /></a>
                         </div>
@@ -152,18 +178,18 @@
                 <div class="editor-zone right">
                     <div class="header-buttons">
                         <button
-                            class="save-button"
+                                class="tcoaal-button-small tcoaal-button-small-header overlay-close"
+                                onclick="closeEditor(true)"
+                                title="Cancel changes and return to the animation screen"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            class="tcoaal-button-small tcoaal-button-small-header save-button"
                             onclick="runSequence()"
                             title="Apply the changes made and return to the animation screen"
                         >
-                            ✓ Apply
-                        </button>
-                        <button
-                            class="js-download"
-                            onclick="downloadSequence()"
-                            title="Export the generated sequence.js (for advanced users)"
-                        >
-                            ✉ Export JS
+                            Play
                         </button>
                     </div>
                 </div>
@@ -184,7 +210,7 @@
                                 <input checked id="configShowControls" type="checkbox" />
                             </div>
                             <div class="form-group no-checkbox" style="display: none">
-                                <label for="configShowDebug">Show scene count and GitHub link:</label>
+                                <label for="configShowDebug">Show scene count:</label>
                                 <input checked id="configShowDebug" type="checkbox" />
                             </div>
                             <div class="form-group">
@@ -196,6 +222,7 @@
                                     type="checkbox"
                                 />
                                 <label for="backgroundMusicEnabled">Background music:</label>
+                                <label for="select-bgmusic" style="display:none;"></label>
                                 <div class="file-select-wrapper" id="bgmusic-wrapper" style="display: none">
                                     <select
                                         class="file-type-select"
@@ -292,7 +319,9 @@
                         <button class="reset-default" onclick="resetCharactersToDefault()">Reset all characters</button>
                         <div id="charactersList"></div>
                         <div class="form-group add-character">
+                            <label for="newCharacterName" style="display:none"></label>
                             <input id="newCharacterName" placeholder="Character name" type="text" />
+                            <label for="newCharacterColor" style="display:none"></label>
                             <input id="newCharacterColor" type="color" />
                             <button class="success" onclick="addCharacter()">Add character</button>
                         </div>
@@ -308,8 +337,10 @@
                 </div>
             </div>
         </div>
+        <label for="fileInput" style="display: none"></label>
         <input accept=".json" id="fileInput" style="display: none" type="file" />
         <script src="js/filenameMapper.js"></script>
+        <script src="js/memoryManager.js"></script>
         <script src="js/dialog.js"></script>
         <script src="js/gameImporter.js"></script>
         <script src="js/interface.js"></script>

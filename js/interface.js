@@ -86,10 +86,31 @@ function openEditor() {
         loadProjectData(window.lastProjectData);
     }
 
+    const importBtn = document.getElementById("import-game-assets-button");
+
+    if (window.gameImporterAssets && Object.keys(window.gameImporterAssets.images || {}).length > 0) {
+        importBtn.textContent = "Gallery";
+        importBtn.classList.add("gallery-button");
+        importBtn.classList.remove("game-import");
+    } else {
+        window.memoryManager?.getStorageState().then((state) => {
+            if (state === "partial" || state === "complete" || state === "base") {
+                importBtn.textContent = "Gallery";
+                importBtn.classList.add("gallery-button");
+                importBtn.classList.remove("game-import");
+            } else {
+                importBtn.textContent = "Import assets";
+            }
+        });
+    }
+
     updateStickyPositions();
 }
 
-function closeEditor() {
+function closeEditor(ask_confirm = false) {
+    if (ask_confirm && !confirm("Modifications not applied will be lost. Are you sure?")) {
+        return;
+    }
     document.getElementById("editorOverlay").classList.remove("active");
 
     const blocker = document.getElementById("interactionBlocker");
@@ -116,16 +137,55 @@ async function runSequence() {
         const sceneWithBlobUrls = { ...scene };
 
         ["image", "bustLeft", "bustRight"].forEach((field) => {
+            const fieldValue = scene[field];
+            if (!fieldValue) return;
+
+            if (fieldValue.startsWith("http")) {
+                return;
+            }
+
+            if (fieldValue.startsWith("gallery:")) {
+                const match = fieldValue.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match && window.gameImporterAssets) {
+                    const [, category, name] = match;
+                    const asset = window.gameImporterAssets.images[category]?.[name];
+                    if (asset) {
+                        sceneWithBlobUrls[field + "BlobUrl"] = asset.croppedUrl || asset.url;
+                    }
+                }
+                return;
+            }
+
+            // Handle local files
             const key = `${index}-${field}`;
             const file = imageMap.get(key);
-            if (file && scene[field] && !scene[field].startsWith("http")) {
-                sceneWithBlobUrls[field + "BlobUrl"] = URL.createObjectURL(file);
+            if (file) {
+                // Check if it's an object with blob property or a File directly
+                const blob = file.blob || file;
+                sceneWithBlobUrls[field + "BlobUrl"] = URL.createObjectURL(blob);
             }
         });
 
-        const soundFile = soundMap.get(index);
-        if (soundFile && scene.sound && !scene.sound.startsWith("http")) {
-            sceneWithBlobUrls.soundBlobUrl = URL.createObjectURL(soundFile);
+        const soundValue = scene.sound;
+        if (soundValue && !soundValue.startsWith("http")) {
+            // Handle gallery references for sounds
+            if (soundValue.startsWith("gallery:")) {
+                const match = soundValue.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match && window.gameImporterAssets) {
+                    const [, category, name] = match;
+                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                    if (asset) {
+                        sceneWithBlobUrls.soundBlobUrl = asset.url;
+                    }
+                }
+            } else {
+                // Handle local files
+                const soundFile = soundMap.get(index);
+                if (soundFile) {
+                    const blob = soundFile.blob || soundFile;
+                    sceneWithBlobUrls.soundBlobUrl = URL.createObjectURL(blob);
+                }
+            }
         }
 
         dialogFramework.addScene(sceneWithBlobUrls);
@@ -156,6 +216,258 @@ function downloadSequence() {
     a.click();
 
     URL.revokeObjectURL(url);
+}
+
+function saveSequence() {
+    try {
+        generateCode();
+        const code = document.getElementById("outputCode").value;
+
+        localStorage.setItem("tcoaal_saved_sequence", code);
+        localStorage.setItem("tcoaal_saved_sequence_timestamp", Date.now().toString());
+
+        const clearBtn = document.getElementById("clearSavedBtn");
+        if (clearBtn) {
+            clearBtn.style.display = "inline-block";
+        }
+
+        alert("Sequence saved successfully!");
+    } catch (error) {
+        console.error("Error saving sequence:", error);
+        alert("Error saving sequence: " + error.message);
+    }
+}
+
+function loadSavedSequence() {
+    try {
+        const savedCode = localStorage.getItem("tcoaal_saved_sequence");
+
+        if (!savedCode) {
+            return false;
+        }
+
+        if (!savedCode.includes("function setupScene()")) {
+            console.warn("Invalid saved sequence found, ignoring");
+            return false;
+        }
+
+        try {
+            const setupFunc = new Function(savedCode + "\nreturn setupScene;")();
+            if (typeof setupFunc === "function") {
+                setupFunc();
+            }
+        } catch (execError) {
+            console.error("Error executing saved sequence:", execError);
+            return false;
+        }
+
+        const parsedData = parseSequenceFile(savedCode);
+
+        if (!parsedData) {
+            console.warn("Failed to parse saved sequence");
+            return false;
+        }
+
+        loadProjectData(parsedData);
+
+        setTimeout(() => {
+            updateScenesList();
+        }, 100);
+
+        //console.log("Loaded saved sequence from localStorage");
+        return true;
+
+    } catch (error) {
+        console.error("Error loading saved sequence:", error);
+        return false;
+    }
+}
+
+function clearSavedSequence() {
+    if (confirm("This will delete your saved sequence. Continue?")) {
+        localStorage.removeItem("tcoaal_saved_sequence");
+        localStorage.removeItem("tcoaal_saved_sequence_timestamp");
+        alert("Saved sequence cleared!");
+        window.location.reload();
+    }
+}
+
+function importSequence() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".js,application/javascript,text/javascript";
+
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+
+            if (!text.includes("function setupScene()")) {
+                alert("Invalid sequence file: Must contain 'function setupScene()'");
+                return;
+            }
+
+            const hasGalleryRefs = text.includes("gallery:");
+            const hasGameAssets = window.gameImporterAssets &&
+                                  (Object.keys(window.gameImporterAssets.images || {}).length > 0 ||
+                                   Object.keys(window.gameImporterAssets.audio || {}).length > 0);
+
+            if (hasGalleryRefs && !hasGameAssets) {
+                alert(
+                    "This sequence file uses gallery assets, but no game has been imported yet.\n\n" +
+                    "Please click 'Import assets' button first, then try importing this sequence file again."
+                );
+                return;
+            }
+
+            const parsedData = parseSequenceFile(text);
+
+            if (!parsedData) {
+                alert("Failed to parse sequence file");
+                return;
+            }
+
+            if (projectData.scenes.length > 0 || Object.keys(projectData.characters).length > 0) {
+                if (!confirm("This will replace your current project. Continue?")) {
+                    return;
+                }
+            }
+
+            imageMap.clear();
+            soundMap.clear();
+            expandedScenes.clear();
+            if (currentlyPlayingAudio) {
+                currentlyPlayingAudio.pause();
+                currentlyPlayingAudio = null;
+            }
+
+            loadProjectData(parsedData);
+
+            setTimeout(() => {
+                updateScenesList();
+            }, 100);
+
+            alert("Sequence imported successfully!");
+
+        } catch (error) {
+            console.error("Error importing sequence:", error);
+            alert("Error importing sequence file: " + error.message);
+        }
+    };
+
+    input.click();
+}
+
+function parseSequenceFile(code) {
+    try {
+        const mockFramework = {
+            config: null,
+            characters: null,
+            glitchConfig: null,
+            scenes: [],
+
+            setConfig(config) {
+                this.config = config;
+                return this;
+            },
+
+            setCharacters(characters) {
+                this.characters = characters;
+                return this;
+            },
+
+            setGlitchConfig(config) {
+                this.glitchConfig = config;
+                return this;
+            },
+
+            addScene(scene) {
+                this.scenes.push(scene);
+                return this;
+            }
+        };
+
+        const safeContext = {
+            dialogFramework: mockFramework,
+            Color: window.Color || {}
+        };
+
+        const wrappedCode = `
+            (function() {
+                ${code}
+                setupScene();
+            })();
+        `;
+
+        const func = new Function('dialogFramework', 'Color', wrappedCode);
+        func(mockFramework, safeContext.Color);
+
+        const parsedData = {
+            config: mockFramework.config || {
+                showControls: true,
+                showDebug: true,
+                backgroundMusic: null
+            },
+            characters: {},
+            glitchConfig: mockFramework.glitchConfig || {
+                scrambledColor: Color.BLACK,
+                realColor: Color.DEFAULT,
+                changeSpeed: 50,
+                realProbability: 5,
+                autoStart: true,
+                charsAllowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+            },
+            scenes: []
+        };
+
+        if (mockFramework.characters) {
+            Object.entries(mockFramework.characters).forEach(([name, data]) => {
+                parsedData.characters[name] = {
+                    color: data.color,
+                    aliases: data.aliases || []
+                };
+            });
+        }
+
+        mockFramework.scenes.forEach(scene => {
+            const editorScene = {
+                image: scene.image === undefined ? null : scene.image,
+                speaker: scene.speaker || "",
+                line1: scene.line1 || "",
+                line2: scene.line2 || "",
+                dialogFadeInTime: scene.dialogFadeInTime !== undefined ? scene.dialogFadeInTime : 200,
+                dialogFadeOutTime: scene.dialogFadeOutTime !== undefined ? scene.dialogFadeOutTime : 200,
+                imageFadeInTime: scene.imageFadeInTime !== undefined ? scene.imageFadeInTime : 200,
+                imageFadeOutTime: scene.imageFadeOutTime !== undefined ? scene.imageFadeOutTime : 200,
+                dialogDelayIn: scene.dialogDelayIn !== undefined ? scene.dialogDelayIn : 500,
+                dialogDelayOut: scene.dialogDelayOut !== undefined ? scene.dialogDelayOut : 0,
+                imageDelayIn: scene.imageDelayIn !== undefined ? scene.imageDelayIn : 0,
+                imageDelayOut: scene.imageDelayOut !== undefined ? scene.imageDelayOut : 0,
+                sound: scene.sound === undefined ? null : scene.sound,
+                soundVolume: scene.soundVolume !== undefined ? scene.soundVolume : 1.0,
+                soundDelay: scene.soundDelay !== undefined ? scene.soundDelay : 0,
+                censorSpeaker: scene.censorSpeaker || false,
+                demonSpeaker: scene.demonSpeaker || false,
+                bustLeft: scene.bustLeft === undefined ? null : scene.bustLeft,
+                bustRight: scene.bustRight === undefined ? null : scene.bustRight,
+                bustFade: scene.bustFade !== undefined ? scene.bustFade : 0,
+                shake: scene.shake || false,
+                shakeDelay: scene.shakeDelay !== undefined ? scene.shakeDelay : 0,
+                shakeIntensity: scene.shakeIntensity !== undefined ? scene.shakeIntensity : 1,
+                shakeDuration: scene.shakeDuration !== undefined ? scene.shakeDuration : 500
+            };
+
+            parsedData.scenes.push(editorScene);
+        });
+
+        return parsedData;
+
+    } catch (error) {
+        console.error("Error parsing sequence file:", error);
+        return null;
+    }
 }
 
 function createLoadingIndicator() {
@@ -313,7 +625,7 @@ function setupGalleryOnlyMode() {
 
     document.body.innerHTML = `
         <div class="editor-overlay gallery-only-mode initial active" id="editorOverlay">
-            <div class="editor-header" id="editorHeader">
+            <div class="editor-header" id="editorHeader" >
                 <div class="editor-zone left">
                     <div class="header-buttons">
                         <button id="scrollToTopBtn" style="display: none;" onclick="document.getElementById('editorOverlay').scrollTo({ top: 0, behavior: 'smooth' })" title="Scroll to top">⇮</button>
@@ -321,26 +633,48 @@ function setupGalleryOnlyMode() {
                 </div>
                 <div class="editor-zone center">
                     <div class="editor-header-content">
-                        <a href="https://github.com/Kidev/TCOAALCreatorTool" title="See on GitHub" target="_blank">
+                        <a href="." title="Back to home screen">
                             <img alt="Dialog Creator" class="editor-title-image" src="img/tcoaal-title.webp">
                         </a>
                     </div>
                 </div>
                 <div class="editor-zone right">
                     <div class="header-buttons" style="display: flex;flex-direction: column;width:25vmin;gap:0.1vmin;font-size:1vmax;justify-content: center;align-items: center;border-radius: 4px;">
-                    <button id="download-all-button" class="download-all disabled" onclick="downloadAllAssets()" title="Download all imported assets">Download All</button>
-                    <div id="croppingProgressIndicator">Cropping (0%)</div>
+                        <button id="download-all-button" class="tcoaal-button-small tcoaal-button-small-header download-all disabled" onclick="downloadAllAssets()" title="Download all imported assets">Download All</button>
+                        <div id="croppingProgressIndicator" style="display: none;">
+                          <div class="bar" id="croppingProgressBar"></div>
+                          <span class="label" id="croppingProgressSpan">Cropping...</span>
+                        </div>
                     </div>
+                </div>
+                <div id="github-logo-icon">
+                    <a href="https://github.com/Kidev/TCOAALCreatorTool" target="_blank" title="Star me on GitHub">
+                        <img src="img/github.png" alt="Star me on GitHub"/>
+                    </a>
                 </div>
             </div>
             <div class="editor-container">
                 <div id="galleryInitialPrompt" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <div id="menu-buttons" style="width:35vmax;height:10vmax;font-size: 2vmax;position:fixed;left:50%;top:60%;transform:translate(-50%,-60%);">
-                    <button id="button-open-gallery-mode" class="tcoaal-button" onclick="handleGalleryOnlyImport()" style="width:35vmax;">
-                        Gallery
+                    <button id="button-open-gallery-mode" class="tcoaal-button" title="Browse easily through the game assets and create your own scenes" onclick="handleGalleryOnlyImport()" style="width:35vmax;">
+                        Assets explorer
                     </button>
-                    <button class="tcoaal-button" onclick="reopenWithMode('viewer')" style="width:35vmax;margin-top:0.5vmax;">
-                    Dialog creator
+                    <div style="display:flex; flex-direction: row;">
+                        <button class="tcoaal-button" onclick="reopenWithMode('editor')" style="width:35vmax;margin-top:0.5vmax;" title="Create in-game like dialogs using a simple yet powerful tool">
+                        Dialog editor
+                        </button>
+                        <button class="tcoaal-button" onclick="reopenWithMode('viewer')" style="width:35vmax;margin-top:0.5vmax;" title="Watch a dialog">
+                        Dialog viewer
+                        </button>
+                    </div>
+                    <button
+                        id="clearSavedDataBtn"
+                        class="clear-data-btn tcoaal-button"
+                        onclick="clearSavedData()"
+                        title="Clear saved assets from browser memory"
+                        style="display: none;width:35vmax;margin-top:0.5vmax;"
+                    >
+                        Clear saved data
                     </button>
                     </div>
                     <div id="dialog-container-box" class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
@@ -382,7 +716,7 @@ function setupGalleryOnlyMode() {
         <div id="importProgressModal" class="import-modal" style="display: none;">
             <div class="import-modal-content">
                 <img src="https://i.imgur.com/E0E2oCJ.png" style="margin: 0 auto 1.5vmax; display: block;">
-                <h2>Importing Game Assets</h2>
+                <h2>Processing game assets</h2>
                 <div class="import-progress-bar">
                     <div id="importProgressFill" class="import-progress-fill"></div>
                 </div>
@@ -400,6 +734,17 @@ function setupGalleryOnlyMode() {
             }
         };
         document.head.appendChild(script);
+    }
+
+    if (!window.memoryManager) {
+        const memoryScript = document.createElement("script");
+        memoryScript.src = "js/memoryManager.js";
+        memoryScript.onload = function () {
+            if (!window.memoryManager) {
+                window.memoryManager = new MemoryManager();
+            }
+        };
+        document.head.appendChild(memoryScript);
     }
 
     if (!window.updateGalleryCategories) {
@@ -420,27 +765,44 @@ function setupGalleryOnlyMode() {
     downloadButton.style.display = "none";
 
     const btn = document.getElementById("button-open-gallery-mode");
-
-    btn.addEventListener("mouseenter", () => {
-        btn.textContent = "Select game folder...";
-    });
-
-    btn.addEventListener("mouseleave", () => {
-        btn.textContent = "Gallery";
-    });
+    btn.onmouseover = function () {
+        btn.textContent = window.memoryManager?.haveDataStored ? "Open saved assets" : "Select your game folder...";
+    };
+    btn.onmouseout = function () {
+        btn.textContent = "Assets explorer";
+    };
 
     initGalleryScrollHandler();
     updateStickyPositions();
 }
 
+function updateLoadingBar(percent = -1, nameFile = undefined) {
+    let indicator = document.getElementById("croppingProgressIndicator");
+    let indicator2 = document.getElementById("croppingProgressIndicatorModal");
+    let bar = document.getElementById("croppingProgressBar");
+    let bar2 = document.getElementById("croppingProgressBarModal");
+    let label = document.getElementById("croppingProgressSpan");
+    let label2 = document.getElementById("croppingProgressSpanModal");
+    let hide = percent === -1 || nameFile === undefined;
+
+    //console.trace(`LOADING... ${percent} ${nameFile}`);
+
+    if (indicator) indicator.style.display = hide ? "none" : "flex";
+    if (indicator2) indicator2.style.display = hide ? "none" : "flex";
+    if (label) label.textContent = hide ? "" : `Cropping ${nameFile}`;
+    if (label2) label2.textContent = hide ? "" : `Cropping ${nameFile}`;
+    if (bar) bar.style.width = hide ? "0%" : percent + "%";
+    if (bar2) bar2.style.width = hide ? "0%" : percent + "%";
+}
+
 function reopenWithMode(mode) {
     const url = new URL(window.location.href);
     if (url.searchParams.get("mode") === mode) {
-        window.location.reload();
+        window.location.href = url.toString();
         return;
     }
     url.searchParams.set("mode", mode);
-    window.location.replace(url.toString());
+    window.location.href = url.toString();
 }
 
 function initGalleryScrollHandler() {
@@ -460,7 +822,19 @@ function initGalleryScrollHandler() {
     }
 }
 
-function handleGalleryOnlyImport() {
+async function handleGalleryOnlyImport() {
+    if (window.memoryManager) {
+        try {
+            const storageState = await window.memoryManager.getStorageState();
+            if (storageState !== "none") {
+                await loadGalleryFromSavedData(storageState);
+                return;
+            }
+        } catch (error) {
+            console.warn("Failed to check saved data, falling back to folder selection:", error);
+        }
+    }
+
     const folderInput = document.getElementById("folderInput");
     folderInput.onchange = async (e) => {
         const files = Array.from(e.target.files);
@@ -481,12 +855,14 @@ function handleGalleryOnlyImport() {
             document.getElementById("popup-buy-frame").style.display = "none";
             document.getElementById("popup-buy-frame").style.zindex = "-1";
 
+            document.getElementById("github-logo-icon").style.display = "none";
+            document.getElementById("github-logo-icon").style.zindex = "-1";
+
             setTimeout(() => {
                 const initialPrompt = document.getElementById("galleryInitialPrompt");
                 if (initialPrompt) {
                     initialPrompt.style.display = "none";
                 }
-
                 document.getElementById("gallerySection").style.display = "block";
 
                 if (editorOverlay) {
@@ -508,10 +884,6 @@ function handleGalleryOnlyImport() {
         }
     };
     folderInput.click();
-}
-
-function switchToEditorMode() {
-    window.location.href = window.location.pathname;
 }
 
 async function downloadAllAssets() {
@@ -610,6 +982,23 @@ document.addEventListener("DOMContentLoaded", async function () {
     updateStickyPositions();
     window.addEventListener("resize", updateStickyPositions);
 
+    window.imagesCroppingStarted = false;
+
+    setTimeout(checkSavedDataOnLoad, 100);
+
+    if (window.memoryManager && !window.gameImporterAssets) {
+        try {
+            const storageState = await window.memoryManager.getStorageState();
+            if (storageState !== "none") {
+                const savedAssets = await window.memoryManager.loadSavedAssets();
+                window.gameImporterAssets = savedAssets;
+                //console.log("Loaded saved game assets on page load");
+            }
+        } catch (error) {
+            console.warn("Failed to load saved assets on page load:", error);
+        }
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     let mode = urlParams.get("mode");
 
@@ -623,15 +1012,23 @@ document.addEventListener("DOMContentLoaded", async function () {
         createMobileControls();
         enhanceGameActions();
 
-        if (typeof setupScene === "function") {
+        const loadedSaved = loadSavedSequence();
+
+        if (!loadedSaved && typeof setupScene === "function") {
             setupScene();
             await dialogFramework.preloadAssets();
             dialogFramework.updateDebugInfo();
         }
 
-        setTimeout(() => {
-            openEditor();
-        }, 100);
+        const hasSaved = localStorage.getItem("tcoaal_saved_sequence");
+        const clearBtn = document.getElementById("clearSavedBtn");
+        if (clearBtn && hasSaved) {
+            clearBtn.style.display = "inline-block";
+        }
+
+        //setTimeout(() => {
+        openEditor();
+        //}, 100);
     } else {
         createMobileControls();
         enhanceGameActions();
@@ -660,7 +1057,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 });
 
 let lastKeyPress = 0;
-const keyPressCooldown = 200;
+const keyPressCooldown = 100;
 
 document.addEventListener("keydown", (e) => {
     const gallery = document.getElementById("gallerySection");
@@ -767,6 +1164,177 @@ document.addEventListener("keydown", (e) => {
         }
     }
 });
+
+async function checkSavedDataOnLoad() {
+    if (!window.memoryManager) return;
+
+    try {
+        const storageState = await window.memoryManager.getStorageState();
+        const clearBtn = document.getElementById("clearSavedDataBtn");
+
+        if (clearBtn) {
+            if (storageState !== "none") {
+                // Show the button and update its text with storage info
+                const size = await window.memoryManager.getDatabaseSize();
+                const sizeText = window.memoryManager.formatSize(size);
+
+                let stateText = "";
+                switch (storageState) {
+                    case "partial":
+                        stateText = "Base and some cropped assets";
+                        break;
+                    case "complete":
+                        stateText = "Base and cropped assets";
+                        break;
+                    case "base":
+                        stateText = "Base assets (not cropped)";
+                        break;
+                }
+
+                clearBtn.textContent = `Clear saved data (${sizeText})`;
+                clearBtn.title = stateText;
+                clearBtn.style.display = "block";
+            } else {
+                clearBtn.style.display = "none";
+            }
+        }
+    } catch (error) {
+        console.warn("Failed to check saved data status:", error);
+    }
+}
+
+async function clearSavedData() {
+    if (!window.memoryManager) return;
+
+    try {
+        const size = await window.memoryManager.getDatabaseSize();
+        const sizeText = window.memoryManager.formatSize(size);
+
+        if (
+            confirm(
+                `Are you sure you want to clear all saved asset data? This will free up ${sizeText} of storage and cannot be undone.`,
+            )
+        ) {
+            await window.memoryManager.clearAllData();
+
+            // Hide the button
+            const clearBtn = document.getElementById("clearSavedDataBtn");
+            if (clearBtn) {
+                clearBtn.style.display = "none";
+            }
+        }
+    } catch (error) {
+        console.error("Failed to clear saved data:", error);
+        alert("Failed to clear saved data. Please try again.");
+    }
+}
+
+async function loadGalleryFromSavedData(storageState) {
+    try {
+        const editorOverlay = document.getElementById("editorOverlay");
+        if (editorOverlay) {
+            editorOverlay.classList.add("importing");
+            editorOverlay.classList.remove("initial");
+        }
+
+        const modal = document.getElementById("importProgressModal");
+        const fill = document.getElementById("importProgressFill");
+        const text = document.getElementById("importProgressText");
+
+        if (modal) {
+            modal.style.display = "flex";
+            if (fill) fill.style.width = "0%";
+            if (text) text.textContent = "Loading saved assets...";
+        }
+
+        const savedAssets = await window.memoryManager.loadSavedAssets();
+        window.gameImporterAssets = savedAssets;
+
+        Object.keys(savedAssets.images || {}).forEach((category) => {
+            Object.keys(savedAssets.images[category] || {}).forEach((name) => {
+                const asset = savedAssets.images[category][name];
+                if (asset.croppedBlob && asset.croppedUrl) {
+                    asset.cropped = true;
+                    asset.cropping = false;
+                }
+            });
+        });
+
+        if (fill) fill.style.width = "50%";
+        if (text) text.textContent = "Setting up gallery...";
+
+        document.getElementById("popup-buy-frame").style.display = "none";
+        document.getElementById("popup-buy-frame").style.zindex = "-1";
+        document.getElementById("github-logo-icon").style.display = "none";
+        document.getElementById("github-logo-icon").style.zindex = "-1";
+
+        const initialPrompt = document.getElementById("galleryInitialPrompt");
+        if (initialPrompt) {
+            initialPrompt.style.display = "none";
+        }
+
+        document.getElementById("gallerySection").style.display = "block";
+        document.getElementById("download-all-button").style.display = "block";
+
+        const importBtn = document.getElementById("import-game-assets-button");
+        if (importBtn) {
+            importBtn.textContent = "Game assets";
+        }
+
+        if (editorOverlay) {
+            editorOverlay.classList.remove("importing");
+            editorOverlay.classList.add("gallery-loaded");
+        }
+
+        if (fill) fill.style.width = "75%";
+        if (text) text.textContent = "Initializing gallery interface...";
+
+        if (typeof updateGalleryCategories === "function") {
+            updateGalleryCategories();
+        } else {
+            const script = document.createElement("script");
+            script.src = "js/editor.js";
+            script.onload = function () {
+                updateGalleryCategories();
+            };
+            document.body.appendChild(script);
+        }
+
+        if (modal) {
+            modal.style.display = "none";
+        }
+
+        //await handleSmartLoading(storageState, savedAssets);
+    } catch (error) {
+        console.error("Failed to load gallery from saved data:", error);
+
+        const modal = document.getElementById("importProgressModal");
+        if (modal) {
+            modal.style.display = "none";
+        }
+
+        alert("Failed to load saved assets. Please try importing your game folder again.");
+    }
+}
+
+/*
+async function handleSmartLoading(storageState, savedAssets) {
+    if (!window.galleryManager) return;
+
+    try {
+        if (storageState === "partial" || storageState === "base") {
+            //const assetsNeedingCrop = await window.memoryManager.getAssetsNeedingCrop();
+            //await window.galleryManager.enqueueBatch(assetsNeedingCrop);
+        } else if (storageState === "complete") {
+            updateLoadingBar();
+        } else if (storageState === "none") {
+            //console.log("No data stored");
+            updateLoadingBar();
+        }
+    } catch (error) {
+        console.error("Error in smart loading:", error);
+    }
+}*/
 
 function enhanceGameActions() {
     const originalNext = dialogFramework.next;

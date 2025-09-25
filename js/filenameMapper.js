@@ -2085,5 +2085,40 @@ const filenamesMapped = {
     "bf306e27c40aef4f[BUST]": "douglas-past_4",
     "f031204dce7d2bc8[BUST]": "douglas-past_5",
     "012da39538261341[BUST]": "nurse_1",
-    "b7b5fcc6243285fc[BUST]": "nurse_2"
+    "b7b5fcc6243285fc[BUST]": "nurse_2",
+};
+
+const assetTypeOrder = {
+    "images": 0,
+    "sounds": 1,
+};
+
+const assetCategoryOrder = {
+    "Portraits": 0,
+    "Game sprites": 1,
+    "Backgrounds": 2,
+    "Pictures": 3,
+    "System sprites": 4,
+    "Misc": 5,
+
+    "Background songs": 0,
+    "Background sounds": 1,
+    "Event sounds": 2,
+    "Sound effects": 3,
+};
+
+const numberOfPictures = 1009;
+const numberOfBackgrounds = 285;
+const numberOfData = 234;
+
+const spritesSheetsVariants = {
+    "spritessheet_16x16_system_12.png": {
+        sizes: [
+            { cols: 2, rows: 2 },
+            { cols: 4, rows: 4 },
+            { cols: 8, rows: 8 },
+            { cols: 16, rows: 16 },
+        ],
+        default: 2,
+    },
 };

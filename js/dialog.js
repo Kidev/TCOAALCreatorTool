@@ -1910,15 +1910,7 @@ class DialogFramework {
 
         const currentSceneNum = this.currentScene + 1;
 
-        let selectHTML = '<select class="scene-jump-select" style="';
-        selectHTML += "background: rgba(0,0,0,0.9);";
-        selectHTML += "border: 1px solid #4a90e2;";
-        selectHTML += "color: var(--default);";
-        selectHTML += "padding: 5px;";
-        selectHTML += "border-radius: 3px;";
-        selectHTML += "font-size: 0.9em;";
-        selectHTML += "min-width: 100px;";
-        selectHTML += '">';
+        let selectHTML = '<select class="scene-jump-select">';
 
         selectHTML += `<option value="-1" ${this.currentScene === -1 ? "selected" : ""}>Scene 0 (Reset)</option>`;
 

@@ -51,6 +51,17 @@ class GalleryManager {
     init() {}
 
     detectSpriteSheetFromName(filename) {
+
+        if (filename in spritesSheetsVariants) {
+            const variant = spritesSheetsVariants[filename];
+            const size = variant.sizes[variant.default];
+            return {
+                cols: size.cols,
+                rows: size.rows,
+                isSprite: true,
+            };
+        }
+
         // Check if filename matches pattern: spritessheet_COLSxROWS_description.png
         const match = filename.match(/spritessheet_(\d+)x(\d+)_/);
         if (match) {
@@ -83,7 +94,7 @@ class GalleryManager {
         }
     }
 
-    previewAsset(name, category, type) {
+    previewAsset(name, category, type, variant = null) {
         this.clearPreview();
 
         document.querySelectorAll(".gallery-item").forEach((item) => {
@@ -100,8 +111,16 @@ class GalleryManager {
         if (!asset) return;
 
         this.currentAsset = { name, category, type, asset };
-        // If this is an image (non-portrait) and not a sprite sheet, enqueue it
-        if (type === "images" && category !== "Portraits" && !asset.isSprite) {
+        // If this is an image (non-portrait) and not a sprite sheet, enqueue it for cropping
+        // Only crop if not already cropped or currently being cropped
+        if (
+            type === "images" &&
+            category !== "Portraits" &&
+            !asset.isSprite &&
+            !asset.croppedBlob &&
+            !asset.cropped &&
+            !asset.cropping
+        ) {
             this.enqueueCropImage(asset, name, category);
         }
 
@@ -112,8 +131,14 @@ class GalleryManager {
         const controlsDiv = document.getElementById("previewControls");
 
         if (type === "images") {
-            const spriteInfo = this.detectSpriteSheetFromName(name);
-            if (spriteInfo || asset.isSprite) {
+            let spriteInfo = null;
+            if (name in spritesSheetsVariants) {
+                const variants = spritesSheetsVariants[name];
+                spriteInfo = variant === null ? variants.sizes[variants.default] : variant;
+            } else {
+                spriteInfo = this.detectSpriteSheetFromName(name);
+            }
+            if (spriteInfo && asset.isSprite) {
                 this.previewSpriteSheet(asset, name, contentDiv, controlsDiv, spriteInfo);
             } else {
                 this.previewImage(asset, name, contentDiv, controlsDiv);
@@ -254,22 +279,61 @@ class GalleryManager {
                 }
             }
 
-            contentDiv.innerHTML = `
-                <div class="sprite-sheet-preview">
-                    <h4>Sprite Sheet: ${cols}x${rows}</h4>
-                    <div class="sprite-grid" style="grid-template-columns: repeat(${Math.min(cols, 8)}, 1fr);">
-                        ${this.extractedSprites
-                            .map(
-                                (sprite, i) => `
-                                    <div class="sprite-cell-preview"
-                                    data-index="${i}"
-                                    onclick="galleryManager.toggleSpriteSelection(${i})">
-                                        <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
-                                    </div>`,
-                            )
-                            .join("")}
-                    </div>
-                </div>`;
+            if (asset.variants !== null && asset.variants.length > 0) {
+                const selectId = `variantSelect-${Math.random().toString(36).slice(2)}`;
+                contentDiv.innerHTML = `
+                    <div class="sprite-sheet-preview">
+                        <h4>
+                            Sprite Sheet:
+                            <select id="${selectId}" class="preview-control-input inline compact">
+                                ${asset.variants
+                                    .map(
+                                        (v, idx) =>
+                                            `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
+                                                ${v.rows}x${v.cols}
+                                            </option>`,
+                                    )
+                                    .join("")}
+                            </select>
+                        </h4>
+                        <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
+                            ${this.extractedSprites
+                                .map(
+                                    (sprite, i) => `
+                                        <div class="sprite-cell-preview"
+                                            data-index="${i}"
+                                            onclick="galleryManager.toggleSpriteSelection(${i})">
+                                            <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
+                                        </div>`,
+                                )
+                                .join("")}
+                        </div>
+                    </div>`;
+
+                const select = contentDiv.querySelector(`#${selectId}`);
+                select.addEventListener("change", (e) => {
+                    const idx = parseInt(e.target.value, 10);
+                    const variant = asset.variants[idx];
+                    this.previewAsset(name, "System sprites", "images", variant);
+                });
+            } else {
+                contentDiv.innerHTML = `
+                    <div class="sprite-sheet-preview">
+                        <h4>Sprite Sheet: ${cols}x${rows}</h4>
+                        <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
+                            ${this.extractedSprites
+                                .map(
+                                    (sprite, i) => `
+                                        <div class="sprite-cell-preview"
+                                            data-index="${i}"
+                                            onclick="galleryManager.toggleSpriteSelection(${i})">
+                                            <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
+                                        </div>`,
+                                )
+                                .join("")}
+                        </div>
+                    </div>`;
+            }
 
             setTimeout(() => {
                 this.extractedSprites.forEach((sprite, i) => {
@@ -287,7 +351,7 @@ class GalleryManager {
                     <button class="preview-control-btn" onclick="galleryManager.clearSpriteSelection()">Clear</button>
                     <button class="preview-control-btn" onclick="galleryManager.exportAsGif()">GIF</button>
                     <button class="preview-control-btn" onclick="galleryManager.exportAsPng()">PNG(s)</button>
-                    <span class="divider">|</span>
+                    <br>
                     <label class="preview-control-label inline" style="display: inline;">Speed (ms): <input type="number" id="animationSpeed" style="display: inline; width: auto;" class="preview-control-input inline compact" value="250" min="10" max="5000" step="10" oninput="galleryManager.updateAnimationSpeed()"></label>
                 </div>
                 <div class="preview-control-group" style="display: flex; justify-content: center;">
@@ -675,6 +739,14 @@ class GalleryManager {
         }
     }
 
+    async enqueueBatch(assets) {
+        if (assets.length <= 0) return;
+        if (!this.isCropping) {
+            this.cropQueue.concat(assets);
+            await this.processCropQueue();
+        }
+    }
+
     unselectCurrent() {
         const current = document.querySelector(".gallery-item.selected");
         if (current?.classList?.contains("selected")) {
@@ -698,9 +770,14 @@ class GalleryManager {
     async processCropQueue() {
         if (this.isCropping) return;
         this.isCropping = true;
+
+        const lenQueue = this.cropQueue.length;
+        let count = 0;
+
         while (this.cropQueue.length > 0) {
+            count++;
             const { asset, name, category } = this.cropQueue.shift();
-            if (!asset.blob) {
+            if (!asset.blob || asset.cropped === true || asset.croppedBlob?.size > 0) {
                 asset.cropping = false;
                 continue;
             }
@@ -748,12 +825,26 @@ class GalleryManager {
                         asset.croppedUrl = URL.createObjectURL(blob);
                         asset.cropped = true;
 
+                        // Save cropped asset to persistent memory
+                        if (window.memoryManager && asset.baseFileName) {
+                            try {
+                                const assetId = window.memoryManager.generateAssetId(asset.baseFileName, name);
+                                await window.memoryManager.saveCompleteAsset(assetId, blob);
+                            } catch (error) {
+                                console.warn("Failed to save cropped asset to memory:", name, error);
+                            }
+                        }
+
+                        updateLoadingBar((100 * (count + 1)) / lenQueue, name);
+
                         const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
                         if (thumbImg) {
                             thumbImg.src = asset.croppedUrl;
                             //thumbImg.loading = "lazy";
                             thumbImg.click();
                         }
+                        asset.cropping = false;
+                        window.gameImporterAssets.images[category][name] = asset;
                     }
                 }
             } catch (err) {
@@ -762,6 +853,7 @@ class GalleryManager {
             asset.cropping = false;
         }
         this.isCropping = false;
+        updateLoadingBar();
     }
 }
 
