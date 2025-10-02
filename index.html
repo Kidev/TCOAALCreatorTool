@@ -197,7 +197,7 @@
             <div class="editor-container" onclick="event.stopPropagation()">
                 <div class="section">
                     <button class="section-header collapsible" onclick="toggleSection(this)">
-                        Configuration & glitch settings
+                        Configuration
                     </button>
                     <div class="section-content">
                         <div class="subsection">
@@ -213,7 +213,8 @@
                                 <label for="configShowDebug">Show scene count:</label>
                                 <input checked id="configShowDebug" type="checkbox" />
                             </div>
-                            <div class="form-group">
+
+                            <div class="form-group" style="display: none">
                                 <input
                                     class="null-checkbox"
                                     id="backgroundMusicEnabled"
@@ -263,6 +264,7 @@
                                     </div>
                                 </div>
                             </div>
+                            
                             <div class="form-group" id="backgroundMusicVolumeGroup" style="display: none">
                                 <label for="backgroundMusicVolume" style="grid-column: 2">Music volume:</label>
                                 <input
