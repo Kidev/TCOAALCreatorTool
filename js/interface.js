@@ -807,14 +807,17 @@ function reopenWithMode(mode) {
 
 function initGalleryScrollHandler() {
     const editorOverlay = document.getElementById("editorOverlay");
+    const editorHeader = document.getElementById("editorHeader");
     if (editorOverlay && editorOverlay.classList.contains("gallery-only-mode")) {
         editorOverlay.addEventListener("scroll", function () {
             if (editorOverlay.scrollTop > 20) {
                 editorOverlay.classList.add("scrolled");
+                if (editorHeader) editorHeader.classList.add("scrolled");
                 const scrollBtn = document.getElementById("scrollToTopBtn");
                 if (scrollBtn) scrollBtn.style.display = "inline-block";
             } else {
                 editorOverlay.classList.remove("scrolled");
+                if (editorHeader) editorHeader.classList.remove("scrolled");
                 const scrollBtn = document.getElementById("scrollToTopBtn");
                 if (scrollBtn) scrollBtn.style.display = "none";
             }
