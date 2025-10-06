@@ -335,7 +335,7 @@ class GalleryManager {
                     </div>`;
             }
 
-            setTimeout(() => {
+       //     setTimeout(() => {
                 this.extractedSprites.forEach((sprite, i) => {
                     const targetCanvas = document.getElementById(`sprite-preview-${i}`);
                     if (targetCanvas) {
@@ -343,7 +343,7 @@ class GalleryManager {
                         ctx.drawImage(sprite.canvas, 0, 0);
                     }
                 });
-            }, 10);
+           // }, 10);
 
             controlsDiv.innerHTML = `
                 <div class="asset-filename-title">${this.formatAssetTitle(name, "images")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>

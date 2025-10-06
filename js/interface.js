@@ -270,9 +270,9 @@ function loadSavedSequence() {
 
         loadProjectData(parsedData);
 
-        setTimeout(() => {
+        //setTimeout(() => {
             updateScenesList();
-        }, 100);
+        //}, 100);
 
         //console.log("Loaded saved sequence from localStorage");
         return true;
@@ -345,9 +345,9 @@ function importSequence() {
 
             loadProjectData(parsedData);
 
-            setTimeout(() => {
+            //setTimeout(() => {
                 updateScenesList();
-            }, 100);
+            //}, 100);
 
             alert("Sequence imported successfully!");
 
@@ -883,7 +883,7 @@ async function handleGalleryOnlyImport() {
                     };
                     document.body.appendChild(script);
                 }
-            }, 300);
+            }, 30);
         }
     };
     folderInput.click();
@@ -979,6 +979,43 @@ function updateStickyPositions() {
     }
 }
 
+async function checkSavedDataOnLoad() {
+    await window.memoryManager.ensureReady();
+    try {
+        const storageState = await window.memoryManager.getStorageState();
+        const clearBtn = document.getElementById("clearSavedDataBtn");
+
+        if (clearBtn) {
+            if (storageState !== "none") {
+                // Show the button and update its text with storage info
+                const size = await window.memoryManager.getDatabaseSize();
+                const sizeText = window.memoryManager.formatSize(size);
+
+                let stateText = "";
+                switch (storageState) {
+                    case "partial":
+                        stateText = "Base and some cropped assets";
+                        break;
+                    case "complete":
+                        stateText = "Base and cropped assets";
+                        break;
+                    case "base":
+                        stateText = "Base assets (not cropped)";
+                        break;
+                }
+
+                clearBtn.textContent = `Clear saved data (${sizeText})`;
+                clearBtn.title = stateText;
+                clearBtn.style.display = "block";
+            } else {
+                clearBtn.style.display = "none";
+            }
+        }
+    } catch (error) {
+        console.warn("Failed to check saved data status:", error);
+    }
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
     createLoadingIndicator();
 
@@ -987,8 +1024,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     window.imagesCroppingStarted = false;
 
-    setTimeout(checkSavedDataOnLoad, 100);
-
+    //setTimeout(checkSavedDataOnLoad, 10);
+/*
     if (window.memoryManager && !window.gameImporterAssets) {
         try {
             const storageState = await window.memoryManager.getStorageState();
@@ -1000,7 +1037,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         } catch (error) {
             console.warn("Failed to load saved assets on page load:", error);
         }
-    }
+    }*/
 
     const urlParams = new URLSearchParams(window.location.search);
     let mode = urlParams.get("mode");
@@ -1057,14 +1094,22 @@ document.addEventListener("DOMContentLoaded", async function () {
         updateMobileButtonStates();
         updateMobileDebugInfo();
     }
+
+    await checkSavedDataOnLoad();
 });
 
 let lastKeyPress = 0;
 const keyPressCooldown = 100;
 
-document.addEventListener("keydown", (e) => {
-    const gallery = document.getElementById("gallerySection");
-    if (!gallery || gallery.style.display === "none") return;
+function handleGalleryKeydown(e) {
+
+    let gallery = document.getElementById("gallerySection");
+    let isModalGallery = false;
+    if (!gallery || gallery.style.display === "none") {
+        gallery = document.getElementById("galleryModalContent");
+        if (!gallery || gallery.style.display === "none") return;
+        isModalGallery = true;
+    }
 
     const activeItems = Array.from(document.querySelectorAll(".gallery-item")).filter(
         (el) => getComputedStyle(el).display !== "none",
@@ -1091,12 +1136,20 @@ document.addEventListener("keydown", (e) => {
     // ENTER: Download selected
     if (e.key === "Enter") {
         e.preventDefault();
-        galleryManager.downloadAsset();
+        const actButton = document.getElementById("previewDownloadBtn");
+        const currentSelected = document.querySelector(".gallery-item.selected");
+        if (actButton && actButton.style.display !== "none" && currentSelected) {
+            actButton.click();
+        }
     }
 
     // ESC: Unselect
     if (e.key === "Escape") {
         e.preventDefault();
+        if (isModalGallery) {
+            closeGallery();
+            return;
+        }
         galleryManager.clearSpriteSelection();
         galleryManager.clearPreview();
         galleryManager.unselectCurrent();
@@ -1155,7 +1208,7 @@ document.addEventListener("keydown", (e) => {
         const current = galleryManager.currentAsset;
         if (!current) return;
 
-        if (current.type === "images" && current.category !== "Portraits") {
+        if (current.type === "images" && current.category !== "Portraits" && !current.asset.isSprite) {
             galleryManager.globalImageViewMode =
                 galleryManager.globalImageViewMode === "cropped" ? "original" : "cropped";
 
@@ -1166,45 +1219,10 @@ document.addEventListener("keydown", (e) => {
             galleryManager.toggleAudioPlay();
         }
     }
-});
-
-async function checkSavedDataOnLoad() {
-    if (!window.memoryManager) return;
-
-    try {
-        const storageState = await window.memoryManager.getStorageState();
-        const clearBtn = document.getElementById("clearSavedDataBtn");
-
-        if (clearBtn) {
-            if (storageState !== "none") {
-                // Show the button and update its text with storage info
-                const size = await window.memoryManager.getDatabaseSize();
-                const sizeText = window.memoryManager.formatSize(size);
-
-                let stateText = "";
-                switch (storageState) {
-                    case "partial":
-                        stateText = "Base and some cropped assets";
-                        break;
-                    case "complete":
-                        stateText = "Base and cropped assets";
-                        break;
-                    case "base":
-                        stateText = "Base assets (not cropped)";
-                        break;
-                }
-
-                clearBtn.textContent = `Clear saved data (${sizeText})`;
-                clearBtn.title = stateText;
-                clearBtn.style.display = "block";
-            } else {
-                clearBtn.style.display = "none";
-            }
-        }
-    } catch (error) {
-        console.warn("Failed to check saved data status:", error);
-    }
 }
+
+// Attach to document for gallery-only mode
+document.addEventListener("keydown", handleGalleryKeydown);
 
 async function clearSavedData() {
     if (!window.memoryManager) return;

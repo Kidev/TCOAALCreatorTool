@@ -276,7 +276,7 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) 
             ${
                 currentValue !== null && currentValue !== ""
                     ? `
-                    <button class="play-button" id="sound-button-${sceneIndex}" onclick="toggleSound(${sceneIndex})">▶</button>
+                    <button class="play-button" id="sound-button-${sceneIndex}" onclick="toggleSound(${sceneIndex})">▶ Play</button>
                     `
                     : ""
             }
@@ -906,7 +906,7 @@ function toggleSound(sceneIndex) {
         currentlyPlayingAudio = null;
 
         document.querySelectorAll(".play-button").forEach((btn) => {
-            btn.textContent = "▶ PLAY";
+            btn.textContent = "▶ Play";
             btn.classList.remove("stop-button");
         });
         return;
@@ -941,13 +941,13 @@ function toggleSound(sceneIndex) {
 
     currentlyPlayingAudio.volume = projectData.scenes[sceneIndex].soundVolume;
 
-    button.textContent = "⬛ STOP";
+    button.textContent = "⬛ Stop";
     button.classList.add("stop-button");
 
     currentlyPlayingAudio.play();
 
     currentlyPlayingAudio.addEventListener("ended", () => {
-        button.textContent = "▶ PLAY";
+        button.textContent = "▶ Play";
         button.classList.remove("stop-button");
         currentlyPlayingAudio = null;
     });
@@ -1618,7 +1618,7 @@ function handleGameImport() {
                 if (typeof updateScenesList === "function") {
                     updateScenesList();
                 }
-            }, 200);
+            }, 0);
         }
     };
     folderInput.click();
@@ -1672,6 +1672,7 @@ async function openGallery() {
     }
 
     modal.style.display = "flex";
+
     updateGalleryCategories();
 }
 
