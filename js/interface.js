@@ -1096,6 +1096,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     await checkSavedDataOnLoad();
+    preloadSavedDataAssets();
 });
 
 let lastKeyPress = 0;

@@ -20,7 +20,7 @@ class MemoryManager {
     constructor() {
         this.db = null;
         this.dbName = "TCOAALAssets";
-        this.dbVersion = 1;
+        this.dbVersion = 2;
         this.isReady = false;
         this.initPromise = this.initDB();
         this.haveDataStored = false;
@@ -55,6 +55,12 @@ class MemoryManager {
                 // Metadata store: stores session info and completion state
                 if (!db.objectStoreNames.contains("metadata")) {
                     const metaStore = db.createObjectStore("metadata", { keyPath: "key" });
+                }
+
+                // Local files store: stores user-uploaded local files
+                if (!db.objectStoreNames.contains("localFiles")) {
+                    const localFilesStore = db.createObjectStore("localFiles", { keyPath: "filename" });
+                    localFilesStore.createIndex("type", "type", { unique: false });
                 }
             };
         });
@@ -378,6 +384,55 @@ class MemoryManager {
 
         const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
         return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i];
+    }
+
+    async saveLocalFile(filename, blob, type) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["localFiles"], "readwrite");
+        const store = transaction.objectStore("localFiles");
+
+        const fileRecord = {
+            filename: filename,
+            blob: blob,
+            type: type, // "image" or "audio"
+            timestamp: Date.now(),
+        };
+
+        return new Promise((resolve, reject) => {
+            const request = store.put(fileRecord);
+            request.onsuccess = () => resolve(fileRecord);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getLocalFile(filename) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["localFiles"], "readonly");
+        const store = transaction.objectStore("localFiles");
+
+        return new Promise((resolve, reject) => {
+            const request = store.get(filename);
+            request.onsuccess = () => {
+                const result = request.result;
+                resolve(result || null);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getAllLocalFiles() {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["localFiles"], "readonly");
+        const store = transaction.objectStore("localFiles");
+
+        return new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
     }
 }
 

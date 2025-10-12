@@ -231,17 +231,22 @@ Use `null` to explicitly disable features:
 
 ```
 project/
-├── index.html           # Main application
-├── viewer.css          # Game viewer styles
-├── editor.css          # Editor interface styles
+├── index.html              # Main application
+├── colors.css              # General color styles
+├── viewer.css              # Game viewer styles
+├── editor.css              # Editor interface styles
 ├── js/
-│   ├── dialog.js       # Core framework
-│   ├── editor.js       # Visual editor logic
-│   ├── interface.js    # UI management
-│   └── sequence.js     # Your scene definitions
-├── img/                # Image assets
-├── sounds/             # Audio files
-└── fonts/      # Fonts assets
+│   ├── dialog.js           # Dialog viewer framework
+│   ├── editor.js           # Visual dialog editor logic
+│   ├── filenameMapper.js   # Map encrypted files to readble names
+│   ├── galleryManager.js   # Handles gallery display logic
+│   ├── gameImporter.js     # Import game files
+│   ├── interface.js        # UI management
+│   ├── memoryManager.js    # Stores data in browser memory
+│   └── sequence.js         # Your scene definitions
+├── img/                    # Image assets
+├── sounds/                 # Audio files
+└── fonts/                  # Fonts assets
 ```
 
 ## Keyboard Shortcuts

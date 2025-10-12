@@ -49,7 +49,106 @@ if (!document.getElementById("outputCode")) {
     document.body.appendChild(hiddenTextarea);
 }
 
-function loadProjectData(data) {
+async function loadLocalFilesForScenes() {
+    if (!window.memoryManager) return;
+
+    const imageFields = ['image', 'bustLeft', 'bustRight'];
+
+    for (let sceneIndex = 0; sceneIndex < projectData.scenes.length; sceneIndex++) {
+        const scene = projectData.scenes[sceneIndex];
+
+        for (const field of imageFields) {
+            const path = scene[field];
+            if (!path) continue;
+
+            // Skip if it's a URL or gallery reference (those are handled elsewhere)
+            if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('gallery:')) {
+                continue;
+            }
+
+            let loaded = false;
+
+            const filename = path.split('/').pop();
+
+            try {
+                const localFile = await window.memoryManager.getLocalFile(filename);
+                if (localFile && localFile.blob) {
+                    imageMap.set(`${sceneIndex}-${field}`, localFile.blob);
+                    loaded = true;
+                }
+            } catch (error) {
+            }
+
+
+            if (!loaded) {
+                try {
+                    const fetchPath = `img/${filename}`;
+                    const response = await fetch(fetchPath);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const file = new File([blob], filename, { type: blob.type });
+                        imageMap.set(`${sceneIndex}-${field}`, file);
+                        // Save to IndexedDB for future use
+                        await window.memoryManager.saveLocalFile(filename, file, 'image');
+                        loaded = true;
+                    }
+
+                } catch (error) {
+                }
+
+            }
+
+            // If still not loaded, disable the parameter
+            if (!loaded) {
+                projectData.scenes[sceneIndex][field] = null;
+            }
+        }
+
+        const soundPath = scene.sound;
+        if (soundPath) {
+            // Skip if it's a URL or gallery reference
+            if (soundPath.startsWith('http://') || soundPath.startsWith('https://') || soundPath.startsWith('gallery:')) {
+                continue;
+            }
+
+            let loaded = false;
+
+            const filename = soundPath.split('/').pop();
+
+            try {
+                const localFile = await window.memoryManager.getLocalFile(filename);
+                if (localFile && localFile.blob) {
+                    soundMap.set(sceneIndex, localFile.blob);
+                    loaded = true;
+                }
+            } catch (error) {
+            }
+
+            if (!loaded) {
+                try {
+                    const fetchPath = `sounds/${filename}`;
+                    const response = await fetch(fetchPath);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const file = new File([blob], filename, { type: blob.type });
+                        soundMap.set(sceneIndex, file);
+                        // Save to IndexedDB for future use
+                        await window.memoryManager.saveLocalFile(filename, file, 'audio');
+                        loaded = true;
+                    }
+                } catch (error) {
+                }
+            }
+
+            // If still not loaded, disable the parameter
+            if (!loaded) {
+                projectData.scenes[sceneIndex].sound = null;
+            }
+        }
+    }
+}
+
+async function loadProjectData(data) {
     projectData = JSON.parse(JSON.stringify(data));
 
     document.getElementById("configShowControls").checked = projectData.config.showControls;
@@ -103,6 +202,28 @@ function loadProjectData(data) {
     document.getElementById("newCharacterColor").value = Color.DEFAULT;
 
     updateCharactersList();
+
+    const hasGalleryRefs = projectData.scenes.some(scene =>
+        (scene.image && scene.image.startsWith('gallery:')) ||
+        (scene.bustLeft && scene.bustLeft.startsWith('gallery:')) ||
+        (scene.bustRight && scene.bustRight.startsWith('gallery:')) ||
+        (scene.sound && scene.sound.startsWith('gallery:'))
+    );
+
+    if (hasGalleryRefs && !window.gameImporterAssets && window.memoryManager) {
+        try {
+            const storageState = await window.memoryManager.getStorageState();
+            if (storageState !== "none") {
+                const savedAssets = await window.memoryManager.loadSavedAssets();
+                window.gameImporterAssets = savedAssets;
+            }
+        } catch (error) {
+            //console.warn("Failed to load gallery assets for project:", error);
+        }
+    }
+
+    await loadLocalFilesForScenes();
+
     updateScenesList();
 }
 
@@ -206,9 +327,13 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) 
     const isNull = currentValue === null;
 
     let selectValue = "gallery";
-    if (isUrl) selectValue = "url";
-    if (hasFile && !isGallery) selectValue = "local";
-    if (isGallery) selectValue = "gallery";
+    if (isUrl) {
+        selectValue = "url";
+    } else if (isGallery) {
+        selectValue = "gallery";
+    } else if (currentValue && currentValue !== "") {
+        selectValue = "local";
+    }
 
     const fileId = `file-${fieldId}-${sceneIndex}`;
     const selectId = `select-${fieldId}-${sceneIndex}`;
@@ -854,8 +979,13 @@ function updateSceneValue(index, field, value) {
 function getImageSrc(sceneIndex, field) {
     const key = `${sceneIndex}-${field}`;
     const file = imageMap.get(key);
-    if (file && file.blob) {
-        return URL.createObjectURL(file.blob);
+    if (file) {
+        if (file instanceof Blob) {
+            return URL.createObjectURL(file);
+        }
+        if (file.blob) {
+            return URL.createObjectURL(file.blob);
+        }
     }
 
     const imagePath = projectData.scenes[sceneIndex][field];
@@ -880,20 +1010,38 @@ function getImageSrc(sceneIndex, field) {
     return "img/" + imagePath;
 }
 
-function handleImageUpload(sceneIndex, field, input) {
+async function handleImageUpload(sceneIndex, field, input) {
     const file = input.files[0];
     if (file) {
         projectData.scenes[sceneIndex][field] = file.name;
         imageMap.set(`${sceneIndex}-${field}`, file);
+
+        if (window.memoryManager) {
+            try {
+                await window.memoryManager.saveLocalFile(file.name, file, 'image');
+            } catch (error) {
+                //console.error('Failed to save local file to IndexedDB:', error);
+            }
+        }
+
         updateScenesList();
     }
 }
 
-function handleSoundUpload(sceneIndex, input) {
+async function handleSoundUpload(sceneIndex, input) {
     const file = input.files[0];
     if (file) {
         projectData.scenes[sceneIndex].sound = file.name;
         soundMap.set(sceneIndex, file);
+
+        if (window.memoryManager) {
+            try {
+                await window.memoryManager.saveLocalFile(file.name, file, 'audio');
+            } catch (error) {
+                //console.error('Failed to save local file to IndexedDB:', error);
+            }
+        }
+
         updateScenesList();
     }
 }
@@ -915,28 +1063,42 @@ function toggleSound(sceneIndex) {
     const file = soundMap.get(sceneIndex);
     const soundPath = projectData.scenes[sceneIndex].sound;
 
-    if (file && file.blob) {
-        const url = URL.createObjectURL(file.blob);
-        currentlyPlayingAudio = new Audio(url);
-    } else if (soundPath && soundPath.startsWith("gallery:")) {
-        const match = soundPath.match(/^gallery:([^/]+)\/(.+)$/);
-        if (match && window.gameImporterAssets) {
-            const [, category, name] = match;
-            const asset = window.gameImporterAssets.audio[category]?.[name];
-            if (asset) {
-                currentlyPlayingAudio = new Audio(asset.url);
+    let audioCreated = false;
+
+    if (file) {
+        if (file instanceof Blob) {
+            const url = URL.createObjectURL(file);
+            currentlyPlayingAudio = new Audio(url);
+            audioCreated = true;
+        }
+        else if (file.blob) {
+            const url = URL.createObjectURL(file.blob);
+            currentlyPlayingAudio = new Audio(url);
+            audioCreated = true;
+        }
+    }
+
+    if (!audioCreated) {
+        if (soundPath && soundPath.startsWith("gallery:")) {
+            const match = soundPath.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.audio[category]?.[name];
+                if (asset) {
+                    currentlyPlayingAudio = new Audio(asset.url);
+                } else {
+                    return;
+                }
             } else {
                 return;
             }
+        } else if (soundPath && (soundPath.startsWith("http://") || soundPath.startsWith("https://"))) {
+            currentlyPlayingAudio = new Audio(soundPath);
+        } else if (soundPath) {
+            currentlyPlayingAudio = new Audio("sounds/" + soundPath);
         } else {
             return;
         }
-    } else if (soundPath && (soundPath.startsWith("http://") || soundPath.startsWith("https://"))) {
-        currentlyPlayingAudio = new Audio(soundPath);
-    } else if (soundPath) {
-        currentlyPlayingAudio = new Audio("sounds/" + soundPath);
-    } else {
-        return;
     }
 
     currentlyPlayingAudio.volume = projectData.scenes[sceneIndex].soundVolume;
@@ -1624,20 +1786,14 @@ function handleGameImport() {
     folderInput.click();
 }
 
-async function openGallery() {
-    const modal = document.getElementById("galleryModal");
-    if (!modal) return;
-
-    // If we don't have assets loaded, check for saved data first
+async function preloadSavedDataAssets() {
     if (!window.gameImporterAssets && window.memoryManager) {
         try {
             const storageState = await window.memoryManager.getStorageState();
             if (storageState !== "none") {
-                // Load from saved data
                 const savedAssets = await window.memoryManager.loadSavedAssets();
                 window.gameImporterAssets = savedAssets;
 
-                // Handle smart loading for cropping
                 if (window.imagesCroppingStarted === false) {
                     cropAllImages().then(() => window.imagesCroppingStarted = false);
                 }
@@ -1646,6 +1802,13 @@ async function openGallery() {
             //console.warn("Failed to check/load saved data for gallery:", error);
         }
     }
+}
+
+async function openGallery() {
+    const modal = document.getElementById("galleryModal");
+    if (!modal) return;
+
+    await preloadSavedDataAssets();
 
     if (!galleryContext) {
         galleryContext = { mode: 'browse' };
@@ -1655,7 +1818,6 @@ async function openGallery() {
         currentGalleryTab = galleryContext.assetType;
     }
 
-    // Update USE button visibility
     const useButton = document.getElementById("previewDownloadBtn");
     if (useButton) {
         if (galleryContext.mode === 'select') {
@@ -1704,7 +1866,7 @@ async function handleSmartLoadingForEditor(storageState, savedAssets) {
             }
         }
     } catch (error) {
-        console.error("Error in smart loading for editor gallery:", error);
+        //console.error("Error in smart loading for editor gallery:", error);
     }
 }
 
