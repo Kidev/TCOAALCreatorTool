@@ -61,7 +61,14 @@ function openEditor() {
     }
     document.getElementById("editorHeaderZoneLeft").style.justifyContent = "center";
 
-    if (typeof dialogFramework !== "undefined" && dialogFramework.scenes.length > 0) {
+    const hasScenes =
+        typeof dialogFramework !== "undefined" && dialogFramework.scenes && dialogFramework.scenes.length > 0;
+    const hasCharacters =
+        typeof dialogFramework !== "undefined" &&
+        dialogFramework.characters &&
+        Object.keys(dialogFramework.characters).length > 0;
+
+    if (hasScenes || hasCharacters) {
         const extractedData = {
             config: {
                 showControls: dialogFramework.config ? dialogFramework.config.showControls : false,
@@ -150,17 +157,15 @@ async function runSequence() {
                     const [, category, name] = match;
                     const asset = window.gameImporterAssets.images[category]?.[name];
                     if (asset) {
-                        sceneWithBlobUrls[field + "BlobUrl"] = asset.croppedUrl || asset.url;
+                        sceneWithBlobUrls[field + "BlobUrl"] = asset.url;
                     }
                 }
                 return;
             }
 
-            // Handle local files
             const key = `${index}-${field}`;
             const file = imageMap.get(key);
             if (file) {
-                // Check if it's an object with blob property or a File directly
                 const blob = file.blob || file;
                 sceneWithBlobUrls[field + "BlobUrl"] = URL.createObjectURL(blob);
             }
@@ -168,7 +173,6 @@ async function runSequence() {
 
         const soundValue = scene.sound;
         if (soundValue && !soundValue.startsWith("http")) {
-            // Handle gallery references for sounds
             if (soundValue.startsWith("gallery:")) {
                 const match = soundValue.match(/^gallery:([^/]+)\/(.+)$/);
                 if (match && window.gameImporterAssets) {
@@ -179,11 +183,30 @@ async function runSequence() {
                     }
                 }
             } else {
-                // Handle local files
                 const soundFile = soundMap.get(index);
                 if (soundFile) {
                     const blob = soundFile.blob || soundFile;
                     sceneWithBlobUrls.soundBlobUrl = URL.createObjectURL(blob);
+                }
+            }
+        }
+
+        const bgMusicValue = scene.backgroundMusic;
+        if (bgMusicValue && !bgMusicValue.startsWith("http")) {
+            if (bgMusicValue.startsWith("gallery:")) {
+                const match = bgMusicValue.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match && window.gameImporterAssets) {
+                    const [, category, name] = match;
+                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                    if (asset) {
+                        sceneWithBlobUrls.backgroundMusicBlobUrl = asset.url;
+                    }
+                }
+            } else {
+                const bgMusicFile = backgroundMusicMap.get(index);
+                if (bgMusicFile) {
+                    const blob = bgMusicFile.blob || bgMusicFile;
+                    sceneWithBlobUrls.backgroundMusicBlobUrl = URL.createObjectURL(blob);
                 }
             }
         }
@@ -201,6 +224,410 @@ async function runSequence() {
     updateMobileControlsDebugVisibility();
     updateMobileButtonStates();
     updateMobileDebugInfo();
+}
+
+// Key mapping for compression (long key -> short key)
+const KEY_MAP = {
+    // Top level
+    "config": "0",
+    "characters": "1",
+    "glitchConfig": "2",
+    "scenes": "3",
+
+    // Config keys
+    "showControls": "4",
+    "showDebug": "5",
+    "backgroundMusic": "6",
+    "backgroundMusicVolume": "7",
+
+    // Character property keys (NOT character names)
+    "color": "8",
+    "aliases": "9",
+
+    // GlitchConfig keys
+    "scrambledColor": "a",
+    "realColor": "b",
+    "changeSpeed": "c",
+    "realProbability": "d",
+    "autoStart": "e",
+    "charsAllowed": "f",
+
+    // Scene keys
+    "image": "g",
+    "speaker": "h",
+    "line1": "i",
+    "line2": "j",
+    "dialogFadeInTime": "k",
+    "dialogFadeOutTime": "l",
+    "imageFadeInTime": "m",
+    "imageFadeOutTime": "n",
+    "dialogDelayIn": "o",
+    "dialogDelayOut": "p",
+    "imageDelayIn": "q",
+    "imageDelayOut": "r",
+    "sound": "s",
+    "soundVolume": "t",
+    "soundDelay": "u",
+    "censorSpeaker": "v",
+    "demonSpeaker": "w",
+    "bustLeft": "x",
+    "bustRight": "y",
+    "bustFade": "z",
+    "shake": "A",
+    "shakeDelay": "B",
+    "shakeIntensity": "C",
+    "shakeDuration": "D",
+};
+
+// Reverse mapping for decompression (short key -> long key)
+const REVERSE_KEY_MAP = Object.fromEntries(Object.entries(KEY_MAP).map(([k, v]) => [v, k]));
+
+function compressKeys(obj, isUnderCharacters = false) {
+    if (Array.isArray(obj)) {
+        return obj.map((item) => compressKeys(item, false));
+    }
+
+    if (obj !== null && typeof obj === "object") {
+        const compressed = {};
+
+        for (const [key, value] of Object.entries(obj)) {
+            if (isUnderCharacters) {
+                compressed[key] = compressKeys(value, false);
+            } else {
+                const newKey = KEY_MAP[key] || key;
+
+                const nextLevelIsCharacters = key === "characters";
+                compressed[newKey] = compressKeys(value, nextLevelIsCharacters);
+            }
+        }
+
+        return compressed;
+    }
+
+    return obj;
+}
+
+function decompressKeys(obj, isUnderCharacters = false) {
+    if (Array.isArray(obj)) {
+        return obj.map((item) => decompressKeys(item, false));
+    }
+
+    if (obj !== null && typeof obj === "object") {
+        const decompressed = {};
+
+        for (const [key, value] of Object.entries(obj)) {
+            if (isUnderCharacters) {
+                decompressed[key] = decompressKeys(value, false);
+            } else {
+                const originalKey = REVERSE_KEY_MAP[key] || key;
+
+                const nextLevelIsCharacters = originalKey === "characters";
+                decompressed[originalKey] = decompressKeys(value, nextLevelIsCharacters);
+            }
+        }
+
+        return decompressed;
+    }
+
+    return obj;
+}
+
+function removeKeyQuotes(jsonString) {
+    // Remove quotes around single-character keys (our compressed keys: 0-9, a-z, A-Z)
+    // Pattern: "X": where X is a single alphanumeric character
+    // Replace with: X:
+    return jsonString.replace(/"([0-9a-zA-Z])":/g, "$1:");
+}
+
+function addKeyQuotes(jsonString) {
+    // Add quotes back around single-character keys before parsing
+    // Pattern: X: where X is a single alphanumeric character (not inside a string)
+    // This regex ensures we only match keys, not values
+    // It looks for alphanumeric char followed by colon, but not inside quotes
+    return jsonString.replace(/([{,])([0-9a-zA-Z]):/g, '$1"$2":');
+}
+
+function encodeSequenceToURL(projectData) {
+    try {
+        const compressedData = compressKeys(projectData);
+
+        let jsonData = JSON.stringify(compressedData);
+
+        //console.log("Original size:", JSON.stringify(projectData).length);
+        //console.log("Compressed keys size:", jsonData.length);
+
+        jsonData = removeKeyQuotes(jsonData);
+
+        //console.log("After removing key quotes:", jsonData.length);
+
+        const compressed = LZString.compressToEncodedURIComponent(jsonData);
+
+        //console.log("Final encoded size:", compressed.length);
+
+        return compressed;
+    } catch (error) {
+        console.error("Error encoding sequence:", error);
+        return null;
+    }
+}
+
+function decodeSequenceFromURL(encodedString) {
+    try {
+        let decompressed = LZString.decompressFromEncodedURIComponent(encodedString);
+
+        if (!decompressed) {
+            throw new Error("Failed to decompress data");
+        }
+
+        decompressed = addKeyQuotes(decompressed);
+
+        const compressedData = JSON.parse(decompressed);
+
+        return decompressKeys(compressedData);
+    } catch (error) {
+        console.error("Error decoding sequence:", error);
+        return null;
+    }
+}
+
+function generateShareLink() {
+    const encodedData = encodeSequenceToURL(projectData);
+
+    if (!encodedData) {
+        alert("Failed to generate share link");
+        return;
+    }
+
+    const baseUrl = window.location.origin + window.location.pathname;
+    const shareUrl = `${baseUrl}?mode=viewer&use=${encodedData}`;
+
+    console.log("Generated URL: " + shareUrl);
+
+    navigator.clipboard
+        .writeText(shareUrl)
+        .then(() => {
+            const linkDisplay = alert("Share link copied to your clipboard!");
+        })
+        .catch(() => {
+            alert("Share link available in your console.");
+        });
+    /*navigator.clipboard
+        .writeText(shareUrl)
+        .then(() => {
+            const linkDisplay = prompt("Share link copied to clipboard! You can also copy it from here:", shareUrl);
+        })
+        .catch(() => {
+            prompt("Share link generated! Copy it from here:", shareUrl);
+        });
+    prompt("Share link generated:", shareUrl);*/
+}
+
+function showGalleryAssetsModal(mode = "viewer") {
+    return new Promise((resolve) => {
+        const modal = document.createElement("div");
+        modal.id = "galleryAssetsWarningModal";
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(4px);
+        `;
+
+        const modalContent = document.createElement("div");
+        modalContent.style.cssText = `
+            background: var(--bg-color);
+            border-radius: 8px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+        `;
+
+        const title = document.createElement("h2");
+        title.textContent = "Gallery Assets Missing";
+        title.style.cssText = `
+            margin: 0 0 1rem 0;
+            color: var(--txt-color);
+            font-size: 1.5rem;
+        `;
+
+        const message = document.createElement("p");
+        message.innerHTML = `
+            This ${mode === "viewer" ? "shared link" : "sequence"} uses gallery assets, but no game assets have been imported yet.<br><br>
+            <strong>Gallery assets (backgrounds, busts, sounds) will not be displayed.</strong><br><br>
+            You can import your game assets now or continue without them.
+        `;
+        message.style.cssText = `
+            margin: 0 0 1.5rem 0;
+            color: var(--text-color, #cccccc);
+            line-height: 1.6;
+        `;
+
+        const buttonsContainer = document.createElement("div");
+        buttonsContainer.style.cssText = `
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        `;
+
+        const cancelButton = document.createElement("button");
+        cancelButton.textContent = "Continue without assets";
+        cancelButton.className = "tcoaal-button";
+        cancelButton.style.cssText = `
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-size: 1vmax;
+        `;
+
+        const importButton = document.createElement("button");
+        importButton.textContent = "Import game assets";
+        importButton.className = "tcoaal-button success";
+        importButton.style.cssText = `
+            padding: 0.5rem 1rem;
+            font-size: 1vmax;
+            cursor: pointer;
+        `;
+
+        const closeModal = (shouldImport) => {
+            modal.remove();
+            document.removeEventListener("keydown", escHandler);
+            resolve(shouldImport);
+        };
+
+        cancelButton.onclick = () => closeModal(false);
+        importButton.onclick = () => {
+            let folderInput = document.getElementById("folderInput");
+            if (!folderInput) {
+                folderInput = document.createElement("input");
+                folderInput.type = "file";
+                folderInput.id = "folderInput";
+                folderInput.style.display = "none";
+                folderInput.setAttribute("webkitdirectory", "");
+                folderInput.setAttribute("directory", "");
+                folderInput.setAttribute("multiple", "");
+                document.body.appendChild(folderInput);
+            }
+
+            folderInput.onchange = null;
+
+            folderInput.onchange = async (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length > 0) {
+                    closeModal(true);
+
+                    const progressModal = document.getElementById("importProgressModal");
+                    const fill = document.getElementById("importProgressFill");
+                    const text = document.getElementById("importProgressText");
+
+                    if (progressModal) {
+                        progressModal.style.display = "flex";
+                        if (fill) fill.style.width = "0%";
+                        if (text) text.textContent = "Processing game files...";
+                    }
+
+                    if (!window.gameImporter) {
+                        window.gameImporter = new GameImporter();
+                    }
+
+                    const success = await window.gameImporter.importGame(files);
+
+                    if (progressModal) {
+                        progressModal.style.display = "none";
+                    }
+
+                    if (success) {
+                        window.location.reload();
+                    }
+                }
+            };
+
+            folderInput.click();
+        };
+
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                closeModal(false);
+            }
+        };
+
+        const escHandler = (e) => {
+            if (e.key === "Escape") {
+                document.removeEventListener("keydown", escHandler);
+                closeModal(false);
+            }
+        };
+        document.addEventListener("keydown", escHandler);
+
+        buttonsContainer.appendChild(cancelButton);
+        buttonsContainer.appendChild(importButton);
+
+        modalContent.appendChild(title);
+        modalContent.appendChild(message);
+        modalContent.appendChild(buttonsContainer);
+
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+    });
+}
+
+function processSceneWithGalleryReferences(scene) {
+    const processedScene = { ...scene };
+
+    ["image", "bustLeft", "bustRight"].forEach((field) => {
+        const fieldValue = scene[field];
+        if (!fieldValue) return;
+
+        if (fieldValue.startsWith("http")) {
+            return;
+        }
+
+        if (fieldValue.startsWith("gallery:")) {
+            const match = fieldValue.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.images[category]?.[name];
+                if (asset) {
+                    processedScene[field + "BlobUrl"] = asset.url;
+                }
+            }
+        }
+    });
+
+    const soundValue = scene.sound;
+    if (soundValue && !soundValue.startsWith("http")) {
+        if (soundValue.startsWith("gallery:")) {
+            const match = soundValue.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.audio[category]?.[name];
+                if (asset) {
+                    processedScene.soundBlobUrl = asset.url;
+                }
+            }
+        }
+    }
+
+    const bgMusicValue = scene.backgroundMusic;
+    if (bgMusicValue && !bgMusicValue.startsWith("http")) {
+        if (bgMusicValue.startsWith("gallery:")) {
+            const match = bgMusicValue.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.audio[category]?.[name];
+                if (asset) {
+                    processedScene.backgroundMusicBlobUrl = asset.url;
+                }
+            }
+        }
+    }
+
+    return processedScene;
 }
 
 function downloadSequence() {
@@ -291,6 +718,78 @@ function clearSavedSequence() {
     }
 }
 
+async function importFromLink() {
+    //await preloadSavedDataAssets();
+
+    const input = prompt(
+        "Paste a share link or code:\n\n" +
+            "You can paste either:\n" +
+            "- A full URL (https://...?use=XXXXX)\n" +
+            "- Just the code part (XXXXX)",
+        "",
+    );
+
+    if (!input || input.trim() === "") {
+        return;
+    }
+
+    try {
+        let encodedData = input.trim();
+
+        if (encodedData.includes("?use=")) {
+            const url = new URL(encodedData);
+            encodedData = url.searchParams.get("use");
+            if (!encodedData) {
+                alert("Invalid link: No 'use' parameter found");
+                return;
+            }
+        }
+
+        const decodedData = decodeSequenceFromURL(encodedData);
+
+        if (!decodedData) {
+            alert("Failed to decode the link or code. Please check that it's correct.");
+            return;
+        }
+
+        if (projectData.scenes.length > 0 || Object.keys(projectData.characters).length > 0) {
+            if (!confirm("This will replace your current project. Continue?")) {
+                return;
+            }
+        }
+
+        const hasGalleryRefs = JSON.stringify(decodedData).includes("gallery:");
+        const hasGameAssets =
+            window.gameImporterAssets &&
+            (Object.keys(window.gameImporterAssets.images || {}).length > 0 ||
+                Object.keys(window.gameImporterAssets.audio || {}).length > 0);
+
+        if (hasGalleryRefs && !hasGameAssets) {
+            const shouldImport = await showGalleryAssetsModal("editor");
+            if (shouldImport) {
+                return;
+            }
+        }
+
+        imageMap.clear();
+        soundMap.clear();
+        backgroundMusicMap.clear();
+        expandedScenes.clear();
+        if (currentlyPlayingAudio) {
+            currentlyPlayingAudio.pause();
+            currentlyPlayingAudio = null;
+        }
+
+        loadProjectData(decodedData);
+        updateScenesList();
+
+        alert("Sequence imported successfully from link!");
+    } catch (error) {
+        console.error("Error importing from link:", error);
+        alert("Error importing from link: " + error.message);
+    }
+}
+
 function importSequence() {
     const input = document.createElement("input");
     input.type = "file";
@@ -337,6 +836,7 @@ function importSequence() {
 
             imageMap.clear();
             soundMap.clear();
+            backgroundMusicMap.clear();
             expandedScenes.clear();
             if (currentlyPlayingAudio) {
                 currentlyPlayingAudio.pause();
@@ -447,6 +947,8 @@ function parseSequenceFile(code) {
                 sound: scene.sound === undefined ? null : scene.sound,
                 soundVolume: scene.soundVolume !== undefined ? scene.soundVolume : 1.0,
                 soundDelay: scene.soundDelay !== undefined ? scene.soundDelay : 0,
+                backgroundMusic: scene.backgroundMusic === undefined ? null : scene.backgroundMusic,
+                backgroundMusicVolume: scene.backgroundMusicVolume !== undefined ? scene.backgroundMusicVolume : 1.0,
                 censorSpeaker: scene.censorSpeaker || false,
                 demonSpeaker: scene.demonSpeaker || false,
                 bustLeft: scene.bustLeft === undefined ? null : scene.bustLeft,
@@ -1016,7 +1518,6 @@ async function checkSavedDataOnLoad() {
 
 document.addEventListener("DOMContentLoaded", async function () {
     createLoadingIndicator();
-
     updateStickyPositions();
     window.addEventListener("resize", updateStickyPositions);
 
@@ -1039,6 +1540,58 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     const urlParams = new URLSearchParams(window.location.search);
     let mode = urlParams.get("mode");
+    const useParam = urlParams.get("use");
+
+    //console.log("mode=" + mode);
+    //console.log("useParam=" + useParam);
+
+    if (useParam) {
+        try {
+            await preloadSavedDataAssets();
+            const decodedData = decodeSequenceFromURL(useParam);
+
+            //console.log("decoded data: ", decodedData);
+
+            if (decodedData) {
+                const hasGalleryRefs = JSON.stringify(decodedData).includes("gallery:");
+                const hasGameAssets =
+                    window.gameImporterAssets &&
+                    (Object.keys(window.gameImporterAssets.images || {}).length > 0 ||
+                        Object.keys(window.gameImporterAssets.audio || {}).length > 0);
+
+                if (hasGalleryRefs && !hasGameAssets) {
+                    const shouldImport = await showGalleryAssetsModal("viewer");
+
+                    if (shouldImport) {
+                        return;
+                    }
+                }
+
+                dialogFramework.setConfig(decodedData.config);
+                dialogFramework.setCharacters(decodedData.characters);
+                dialogFramework.setGlitchConfig(decodedData.glitchConfig);
+
+                decodedData.scenes.forEach((scene) => {
+                    const processedScene = processSceneWithGalleryReferences(scene);
+                    dialogFramework.addScene(processedScene);
+                });
+
+                if (mode === null || mode === undefined) {
+                    mode = "viewer";
+                }
+
+                if (mode === "editor") {
+                    window.lastProjectData = decodedData;
+                }
+
+                //console.log("Loaded sequence from share link");
+            } else {
+                console.error("Failed to decode share link");
+            }
+        } catch (error) {
+            console.error("Error loading share link:", error);
+        }
+    }
 
     if (mode === null || mode === undefined) {
         mode = "gallery";
@@ -1050,9 +1603,9 @@ document.addEventListener("DOMContentLoaded", async function () {
         createMobileControls();
         enhanceGameActions();
 
-        const loadedSaved = loadSavedSequence();
+        const loadedSaved = useParam ? false : loadSavedSequence();
 
-        if (!loadedSaved && typeof setupScene === "function") {
+        if (!loadedSaved && !useParam && typeof setupScene === "function") {
             setupScene();
             await dialogFramework.preloadAssets();
             dialogFramework.updateDebugInfo();
@@ -1071,7 +1624,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         createMobileControls();
         enhanceGameActions();
 
-        if (typeof setupScene === "function") {
+        if (!useParam && typeof setupScene === "function") {
             setupScene();
 
             showLoadingIndicator("Preloading assets");
@@ -1080,6 +1633,11 @@ document.addEventListener("DOMContentLoaded", async function () {
             hideLoadingIndicator();
             //console.log("Ready to play!");
 
+            dialogFramework.updateDebugInfo();
+        } else if (useParam) {
+            showLoadingIndicator("Preloading assets");
+            await dialogFramework.preloadAssets();
+            hideLoadingIndicator();
             dialogFramework.updateDebugInfo();
         } else {
             //console.warn("No setup function found in sequence.js. Please define setupScene()");
@@ -1107,6 +1665,12 @@ function handleGalleryKeydown(e) {
         gallery = document.getElementById("galleryModalContent");
         if (!gallery || gallery.style.display === "none") return;
         isModalGallery = true;
+    }
+
+    const editorOverlays = Array.from(document.querySelectorAll("#editorOverlay.spa-mode.active"));
+    const galleryModalElement = document.getElementById("galleryModal");
+    if (galleryModalElement && galleryModalElement.style.display === "none" && editorOverlays.length > 0) {
+        return;
     }
 
     const activeItems = Array.from(document.querySelectorAll(".gallery-item")).filter(

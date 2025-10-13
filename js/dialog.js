@@ -330,6 +330,20 @@ class DialogFramework {
             // Check if we have a blob URL from the editor
             if (this.config.backgroundMusicBlobUrl) {
                 audioSrc = this.config.backgroundMusicBlobUrl;
+            } else if (this.config.backgroundMusic.startsWith("gallery:")) {
+                // Handle gallery references as fallback
+                const match = this.config.backgroundMusic.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match && window.gameImporterAssets) {
+                    const [, category, name] = match;
+                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                    if (asset) {
+                        audioSrc = asset.url;
+                    } else {
+                        audioSrc = "sounds/" + this.config.backgroundMusic; // Fallback
+                    }
+                } else {
+                    audioSrc = "sounds/" + this.config.backgroundMusic; // Fallback
+                }
             } else if (
                 this.config.backgroundMusic.startsWith("http://") ||
                 this.config.backgroundMusic.startsWith("https://")
@@ -359,6 +373,51 @@ class DialogFramework {
             this.backgroundMusicAudio.pause();
             this.backgroundMusicAudio.currentTime = 0;
             this.backgroundMusicAudio = null;
+        }
+    }
+
+    async playSceneBackgroundMusic(musicPath, volume = 1.0, blobUrl = null) {
+        if (!musicPath) return;
+
+        try {
+            this.stopBackgroundMusic();
+
+            let audioSrc;
+
+            if (blobUrl) {
+                audioSrc = blobUrl;
+            } else if (musicPath.startsWith("gallery:")) {
+                // Handle gallery references as fallback
+                const match = musicPath.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match && window.gameImporterAssets) {
+                    const [, category, name] = match;
+                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                    if (asset) {
+                        audioSrc = asset.url;
+                    } else {
+                        audioSrc = "sounds/" + musicPath; // Fallback
+                    }
+                } else {
+                    audioSrc = "sounds/" + musicPath; // Fallback
+                }
+            } else if (musicPath.startsWith("http://") || musicPath.startsWith("https://")) {
+                audioSrc = musicPath;
+            } else {
+                audioSrc = "sounds/" + musicPath;
+            }
+
+            this.backgroundMusicAudio = new Audio(audioSrc);
+            this.backgroundMusicAudio.loop = true;
+            this.backgroundMusicAudio.volume = Math.max(0, Math.min(1, volume));
+
+            const playPromise = this.backgroundMusicAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch((error) => {
+                    //console.warn(`Failed to play scene background music: ${musicPath}`, error);
+                });
+            }
+        } catch (error) {
+            //console.warn(`Error playing scene background music: ${musicPath}`, error);
         }
     }
 
@@ -478,8 +537,27 @@ class DialogFramework {
         }
 
         try {
-            const audioSrc =
-                soundPath.startsWith("http://") || soundPath.startsWith("https://") ? soundPath : "sounds/" + soundPath;
+            let audioSrc;
+
+            // Handle gallery references as fallback
+            if (soundPath.startsWith("gallery:")) {
+                const match = soundPath.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match && window.gameImporterAssets) {
+                    const [, category, name] = match;
+                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                    if (asset) {
+                        audioSrc = asset.url;
+                    } else {
+                        audioSrc = "sounds/" + soundPath;
+                    }
+                } else {
+                    audioSrc = "sounds/" + soundPath;
+                }
+            } else if (soundPath.startsWith("http://") || soundPath.startsWith("https://")) {
+                audioSrc = soundPath;
+            } else {
+                audioSrc = "sounds/" + soundPath;
+            }
 
             const audio = new Audio(audioSrc);
 
@@ -622,6 +700,11 @@ class DialogFramework {
             soundVolume: options.soundVolume || 1.0,
             soundDelay: options.soundDelay || 0,
             soundBlobUrl: options.soundBlobUrl || null,
+
+            backgroundMusic: options.backgroundMusic || null,
+            backgroundMusicVolume: options.backgroundMusicVolume !== undefined ? options.backgroundMusicVolume : 1.0,
+            backgroundMusicBlobUrl: options.backgroundMusicBlobUrl || null,
+
             censorSpeaker: options.censorSpeaker !== undefined ? options.censorSpeaker : false,
 
             bustLeft: options.bustLeft !== undefined ? options.bustLeft : null,
@@ -786,6 +869,25 @@ class DialogFramework {
             }
         }
 
+        const currentBgMusic = scene.backgroundMusic;
+        const previousBgMusic = previousScene ? previousScene.backgroundMusic : null;
+
+        // Check if background music has changed or needs to be stopped
+        if (currentBgMusic !== previousBgMusic) {
+            // If current scene has no background music (null or empty), stop any playing music
+            if (!currentBgMusic) {
+                this.stopBackgroundMusic();
+            } else {
+                // Background music has changed, play the new one
+                this.playSceneBackgroundMusic(
+                    currentBgMusic,
+                    scene.backgroundMusicVolume,
+                    scene.backgroundMusicBlobUrl,
+                );
+            }
+        }
+        // If currentBgMusic === previousBgMusic and both are not null, continue playing (do nothing)
+
         if (scene.shake) {
             if (scene.shakeDelay > 0) {
                 setTimeout(() => {
@@ -814,7 +916,13 @@ class DialogFramework {
 
                 setTimeout(() => {
                     if (this.sceneVersion !== currentVersion) return;
-                    this.crossfadeImages(previousScene.image, scene.image, fadeOutDuration, fadeInDuration);
+                    this.crossfadeImages(
+                        previousScene.image,
+                        scene.image,
+                        fadeOutDuration,
+                        fadeInDuration,
+                        scene.imageBlobUrl,
+                    );
                 }, crossfadeDelay);
             } else {
                 // Normal fade timeline
@@ -1028,9 +1136,21 @@ class DialogFramework {
 
         const img = document.createElement("img");
 
-        // Use blob URL if available
         if (blobUrl) {
             img.src = blobUrl;
+        } else if (imageSrc.startsWith("gallery:")) {
+            const match = imageSrc.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.images[category]?.[name];
+                if (asset) {
+                    img.src = asset.url;
+                } else {
+                    img.src = "img/" + imageSrc;
+                }
+            } else {
+                img.src = "img/" + imageSrc;
+            }
         } else if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
             img.src = imageSrc;
         } else {
@@ -1106,9 +1226,21 @@ class DialogFramework {
             return;
         }
 
-        // Use blob URL if available
         if (blobUrl) {
             img.src = blobUrl;
+        } else if (imageSrc.startsWith("gallery:")) {
+            const match = imageSrc.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.images[category]?.[name];
+                if (asset) {
+                    img.src = asset.url;
+                } else {
+                    img.src = "img/" + imageSrc;
+                }
+            } else {
+                img.src = "img/" + imageSrc;
+            }
         } else if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
             img.src = imageSrc;
         } else {
@@ -1149,14 +1281,29 @@ class DialogFramework {
         }
     }
 
-    crossfadeImages(fromImageSrc, toImageSrc, fadeOutDuration = 1000, fadeInDuration = 1000) {
+    crossfadeImages(fromImageSrc, toImageSrc, fadeOutDuration = 1000, fadeInDuration = 1000, toBlobUrl = null) {
         this.currentBackgroundImage = toImageSrc;
 
         const existingImages = document.querySelectorAll(".background-image.active");
 
         const newImg = document.createElement("img");
 
-        if (toImageSrc.startsWith("http://") || toImageSrc.startsWith("https://")) {
+        if (toBlobUrl) {
+            newImg.src = toBlobUrl;
+        } else if (toImageSrc.startsWith("gallery:")) {
+            const match = toImageSrc.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.images[category]?.[name];
+                if (asset) {
+                    newImg.src = asset.url;
+                } else {
+                    newImg.src = "img/" + toImageSrc;
+                }
+            } else {
+                newImg.src = "img/" + toImageSrc;
+            }
+        } else if (toImageSrc.startsWith("http://") || toImageSrc.startsWith("https://")) {
             newImg.src = toImageSrc;
         } else {
             newImg.src = "img/" + toImageSrc;
@@ -1213,9 +1360,21 @@ class DialogFramework {
 
         const img = document.createElement("img");
 
-        // Use blob URL if available
         if (blobUrl) {
             img.src = blobUrl;
+        } else if (imageSrc.startsWith("gallery:")) {
+            const match = imageSrc.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.images[category]?.[name];
+                if (asset) {
+                    img.src = asset.url;
+                } else {
+                    img.src = "img/" + imageSrc;
+                }
+            } else {
+                img.src = "img/" + imageSrc;
+            }
         } else if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
             img.src = imageSrc;
         } else {

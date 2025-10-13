@@ -747,7 +747,7 @@ body {
 }
 
 .glitch-char {
-    color: var(--text-color, var(--black));
+    color: var(--txt-color, var(--black));
     transition: color 0s;
     display: inline-block;
     width: 1ch;

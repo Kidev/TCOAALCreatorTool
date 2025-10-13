@@ -145,9 +145,16 @@
                         <button
                             class="tcoaal-button-small tcoaal-button-small-header js-download"
                             onclick="downloadSequence()"
-                            title="Export the current dialog"
+                            title="Export the current dialog as a .js file"
                         >
                             Export
+                        </button>
+                        <button
+                            class="tcoaal-button-small tcoaal-button-small-header js-download"
+                            onclick="generateShareLink()"
+                            title="Generate a shareable link with the current dialog encoded in the URL"
+                        >
+                            Share Link
                         </button>
                         <button
                             class="tcoaal-button-small tcoaal-button-small-header js-upload"
@@ -156,6 +163,13 @@
                         >
                             Import
                         </button>
+                        <!--<button
+                            class="tcoaal-button-small tcoaal-button-small-header js-upload"
+                            onclick="importFromLink()"
+                            title="Import a dialog from a share link or code"
+                        >
+                            Import Link
+                        </button>-->
                         <button
                             class="tcoaal-button-small tcoaal-button-small-header js-save"
                             onclick="saveSequence()"
@@ -345,6 +359,7 @@
         </div>
         <label for="fileInput" style="display: none"></label>
         <input accept=".json" id="fileInput" style="display: none" type="file" />
+        <script src="js/libs/lz-string.min.js"></script>
         <script src="js/filenameMapper.js"></script>
         <script src="js/memoryManager.js"></script>
         <script src="js/dialog.js"></script>

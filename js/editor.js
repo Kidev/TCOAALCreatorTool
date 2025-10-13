@@ -36,6 +36,7 @@ let projectData = {
 
 let imageMap = new Map();
 let soundMap = new Map();
+let backgroundMusicMap = new Map();
 let expandedScenes = new Set();
 let currentlyPlayingAudio = null;
 let backgroundMusicFile = null;
@@ -130,6 +131,47 @@ async function loadLocalFilesForScenes() {
                         const blob = await response.blob();
                         const file = new File([blob], filename, { type: blob.type });
                         soundMap.set(sceneIndex, file);
+                        await window.memoryManager.saveLocalFile(filename, file, "audio");
+                        loaded = true;
+                    }
+                } catch (error) {}
+            }
+
+            if (!loaded) {
+                projectData.scenes[sceneIndex].sound = null;
+            }
+        }
+
+        const bgMusicPath = scene.backgroundMusic;
+        if (bgMusicPath) {
+            if (
+                bgMusicPath.startsWith("http://") ||
+                bgMusicPath.startsWith("https://") ||
+                bgMusicPath.startsWith("gallery:")
+            ) {
+                continue;
+            }
+
+            let loaded = false;
+
+            const filename = bgMusicPath.split("/").pop();
+
+            try {
+                const localFile = await window.memoryManager.getLocalFile(filename);
+                if (localFile && localFile.blob) {
+                    backgroundMusicMap.set(sceneIndex, localFile.blob);
+                    loaded = true;
+                }
+            } catch (error) {}
+
+            if (!loaded) {
+                try {
+                    const fetchPath = `sounds/${filename}`;
+                    const response = await fetch(fetchPath);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const file = new File([blob], filename, { type: blob.type });
+                        backgroundMusicMap.set(sceneIndex, file);
                         // Save to IndexedDB for future use
                         await window.memoryManager.saveLocalFile(filename, file, "audio");
                         loaded = true;
@@ -139,7 +181,7 @@ async function loadLocalFilesForScenes() {
 
             // If still not loaded, disable the parameter
             if (!loaded) {
-                projectData.scenes[sceneIndex].sound = null;
+                projectData.scenes[sceneIndex].backgroundMusic = null;
             }
         }
     }
@@ -205,7 +247,8 @@ async function loadProjectData(data) {
             (scene.image && scene.image.startsWith("gallery:")) ||
             (scene.bustLeft && scene.bustLeft.startsWith("gallery:")) ||
             (scene.bustRight && scene.bustRight.startsWith("gallery:")) ||
-            (scene.sound && scene.sound.startsWith("gallery:")),
+            (scene.sound && scene.sound.startsWith("gallery:")) ||
+            (scene.backgroundMusic && scene.backgroundMusic.startsWith("gallery:")),
     );
 
     if (hasGalleryRefs && !window.gameImporterAssets && window.memoryManager) {
@@ -317,11 +360,15 @@ function deleteCharacter(name) {
     }
 }
 
-function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) {
-    const fieldId = isSound ? "sound" : field;
+function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, isBackgroundMusic = false) {
+    const fieldId = isSound ? "sound" : isBackgroundMusic ? "backgroundMusic" : field;
     const isUrl = currentValue && (currentValue.startsWith("http://") || currentValue.startsWith("https://"));
     const isGallery = currentValue && currentValue.startsWith("gallery:");
-    const hasFile = isSound ? soundMap.has(sceneIndex) : imageMap.has(`${sceneIndex}-${field}`);
+    const hasFile = isBackgroundMusic
+        ? backgroundMusicMap.has(sceneIndex)
+        : isSound
+          ? soundMap.has(sceneIndex)
+          : imageMap.has(`${sceneIndex}-${field}`);
     const isNull = currentValue === null;
 
     let selectValue = "gallery";
@@ -352,30 +399,39 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) 
 
     if (selectValue === "local") {
         const fileName = hasFile
-            ? isSound
-                ? soundMap.get(sceneIndex).name
-                : imageMap.get(`${sceneIndex}-${field}`).name
+            ? isBackgroundMusic
+                ? backgroundMusicMap.get(sceneIndex).name
+                : isSound
+                  ? soundMap.get(sceneIndex).name
+                  : imageMap.get(`${sceneIndex}-${field}`).name
             : "";
         const buttonText = fileName || "Select file";
         const tooltip = fileName ? `title="${fileName}"` : "";
 
+        const acceptType = isBackgroundMusic || isSound ? "audio/*" : "image/*";
+        const uploadHandler = isBackgroundMusic ? "BackgroundMusic" : isSound ? "Sound" : "Image";
+        const uploadParams = isBackgroundMusic || isSound ? sceneIndex : `${sceneIndex}, '${field}'`;
+
         html += `
             <label for="${fileId}" style="display: none;"></label>
-            <input type="file" id="${fileId}" accept="${isSound ? "audio/*" : "image/*"}"
-                   onchange="handle${isSound ? "Sound" : "Image"}Upload(${sceneIndex}, ${isSound ? "" : `'${field}', `}this)">
+            <input type="file" id="${fileId}" accept="${acceptType}"
+                   onchange="handle${uploadHandler}Upload(${uploadParams}, this)">
             <button class="file-select-button ${fileName ? "has-file" : ""}"
                     onclick="document.getElementById('${fileId}').click()"
                     ${tooltip}>
                 <span class="filename">${buttonText}</span>
-                ${fileName ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound})">☓</button>` : ""}
+                ${fileName ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound}, ${isBackgroundMusic})">☓</button>` : ""}
             </button>
         `;
     } else if (selectValue === "url") {
+        const urlHandler = isBackgroundMusic ? "BackgroundMusic" : isSound ? "Sound" : "Image";
+        const urlParams = isBackgroundMusic || isSound ? sceneIndex : `${sceneIndex}, '${field}'`;
+
         html += `
             <label for="${fileId}" style="display: none;"></label>
             <input type="text" id="${fileId}" class="url-input" placeholder="Enter URL"
                    value="${isUrl ? currentValue : ""}"
-                   onchange="handle${isSound ? "Sound" : "Image"}Url(${sceneIndex}, ${isSound ? "" : `'${field}', `}this.value)">
+                   onchange="handle${urlHandler}Url(${urlParams}, this.value)">
         `;
     } else if (selectValue === "gallery") {
         let displayName = "Select from gallery";
@@ -387,14 +443,24 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) 
         }
         html += `
             <label for="${fileId}" style="display: none;"></label>
-            <button id="${fileId}" class="gallery-button ${isGallery ? "has-file" : ""}" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound})">
+            <button id="${fileId}" class="gallery-button ${isGallery ? "has-file" : ""}" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound || isBackgroundMusic})">
                 <span class="filename">${displayName}</span>
-                ${isGallery ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound})">☓</button>` : ""}
+                ${isGallery ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound}, ${isBackgroundMusic})">☓</button>` : ""}
             </button>
         `;
     }
 
-    if (isSound) {
+    if (isBackgroundMusic) {
+        html += `
+            ${
+                currentValue !== null && currentValue !== ""
+                    ? `
+                    <button class="play-button" id="bgmusic-button-${sceneIndex}" onclick="toggleBackgroundMusicScene(${sceneIndex})">▶ Play</button>
+                    `
+                    : ""
+            }
+        `;
+    } else if (isSound) {
         html += `
             ${
                 currentValue !== null && currentValue !== ""
@@ -414,39 +480,53 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) 
     return html;
 }
 
-function handleFileTypeChange(sceneIndex, field, type, isSound = false) {
-    const selectId = `select-${isSound ? "sound" : field}-${sceneIndex}`;
+function handleFileTypeChange(sceneIndex, field, type, isSound = false, isBackgroundMusic = false) {
+    const fieldId = isSound ? "sound" : isBackgroundMusic ? "backgroundMusic" : field;
+    const selectId = `select-${fieldId}-${sceneIndex}`;
     const container = document.getElementById(`${selectId}-container`);
-    const fileId = `file-${isSound ? "sound" : field}-${sceneIndex}`;
+    const fileId = `file-${fieldId}-${sceneIndex}`;
 
     if (type === "local") {
-        const hasFile = isSound ? soundMap.has(sceneIndex) : imageMap.has(`${sceneIndex}-${field}`);
+        const hasFile = isBackgroundMusic
+            ? backgroundMusicMap.has(sceneIndex)
+            : isSound
+              ? soundMap.has(sceneIndex)
+              : imageMap.has(`${sceneIndex}-${field}`);
         const fileName = hasFile
-            ? isSound
-                ? soundMap.get(sceneIndex).name
-                : imageMap.get(`${sceneIndex}-${field}`).name
+            ? isBackgroundMusic
+                ? backgroundMusicMap.get(sceneIndex).name
+                : isSound
+                  ? soundMap.get(sceneIndex).name
+                  : imageMap.get(`${sceneIndex}-${field}`).name
             : "";
         const buttonText = fileName || "Select file";
         const tooltip = fileName ? `title="${fileName}"` : "";
 
+        const acceptType = isBackgroundMusic || isSound ? "audio/*" : "image/*";
+        const uploadHandler = isBackgroundMusic ? "BackgroundMusic" : isSound ? "Sound" : "Image";
+        const uploadParams = isBackgroundMusic || isSound ? sceneIndex : `${sceneIndex}, '${field}'`;
+
         container.innerHTML = `
-            <input type="file" id="${fileId}" accept="${isSound ? "audio/*" : "image/*"}"
-                   onchange="handle${isSound ? "Sound" : "Image"}Upload(${sceneIndex}, ${isSound ? "" : `'${field}', `}this)">
+            <input type="file" id="${fileId}" accept="${acceptType}"
+                   onchange="handle${uploadHandler}Upload(${uploadParams}, this)">
             <button class="file-select-button ${fileName ? "has-file" : ""}"
                     onclick="document.getElementById('${fileId}').click()"
                     ${tooltip}>
                 <span class="filename">${buttonText}</span>
-                ${fileName ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound})">×</button>` : ""}
+                ${fileName ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound}, ${isBackgroundMusic})">×</button>` : ""}
             </button>
         `;
     } else if (type === "url") {
+        const urlHandler = isBackgroundMusic ? "BackgroundMusic" : isSound ? "Sound" : "Image";
+        const urlParams = isBackgroundMusic || isSound ? sceneIndex : `${sceneIndex}, '${field}'`;
+
         container.innerHTML = `
             <input type="text" class="url-input" placeholder="Enter URL"
-                   onchange="handle${isSound ? "Sound" : "Image"}Url(${sceneIndex}, ${isSound ? "" : `'${field}', `}this.value)">
+                   onchange="handle${urlHandler}Url(${urlParams}, this.value)">
         `;
     } else if (type === "gallery") {
         container.innerHTML = `
-            <button class="gallery-button" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound})">Select from gallery</button>
+            <button class="gallery-button" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound || isBackgroundMusic})">Select from gallery</button>
         `;
     }
 }
@@ -501,8 +581,11 @@ function useGalleryAsset(name, category) {
     closeGallery();
 }
 
-function clearFile(sceneIndex, field, isSound = false) {
-    if (isSound) {
+function clearFile(sceneIndex, field, isSound = false, isBackgroundMusic = false) {
+    if (isBackgroundMusic) {
+        backgroundMusicMap.delete(sceneIndex);
+        projectData.scenes[sceneIndex].backgroundMusic = "";
+    } else if (isSound) {
         soundMap.delete(sceneIndex);
         projectData.scenes[sceneIndex].sound = "";
     } else {
@@ -529,6 +612,8 @@ function addScene() {
         sound: null,
         soundVolume: 1.0,
         soundDelay: 0,
+        backgroundMusic: null,
+        backgroundMusicVolume: 1.0,
         censorSpeaker: false,
         demonSpeaker: false,
         bustLeft: null,
@@ -800,6 +885,21 @@ function createSceneElement(index) {
                         <input id="inputSoundDelay${index}" type="number" value="${scene.soundDelay}" min="0" max="10000"
                             onchange="updateSceneValue(${index}, 'soundDelay', parseInt(this.value))">
                     </div>
+                    <div class="form-group audio">
+                        <input type="checkbox" class="null-checkbox" id="backgroundMusic-checkbox-${index}"
+                            ${isValidData(scene.backgroundMusic) ? "checked" : ""}
+                            onchange="toggleNull(${index}, 'backgroundMusic', !this.checked)"
+                            title="Uncheck to disable this parameter">
+                        <label for="backgroundMusic-checkbox-${index}">Background music:</label>
+                        <div style="display: flex; align-items: center; gap: 0.8vmax; flex: 1;">
+                            ${createFileSelectHTML(index, "backgroundMusic", scene.backgroundMusic, true, true)}
+                        </div>
+                    </div>
+                    <div class="form-group audio">
+                        <label for="inputBackgroundMusicVolume${index}">Background music volume:</label>
+                        <input id="inputBackgroundMusicVolume${index}" type="number" value="${scene.backgroundMusicVolume}" min="0" max="1" step="0.1"
+                            onchange="updateSceneValue(${index}, 'backgroundMusicVolume', parseFloat(this.value))">
+                    </div>
                 </div>
 
                 <div class="scene-group timimg-assets-group">
@@ -1045,6 +1145,36 @@ async function handleSoundUpload(sceneIndex, input) {
     }
 }
 
+async function handleBackgroundMusicUpload(sceneIndex, input) {
+    const file = input.files[0];
+    if (file) {
+        projectData.scenes[sceneIndex].backgroundMusic = file.name;
+        backgroundMusicMap.set(sceneIndex, file);
+
+        if (window.memoryManager) {
+            try {
+                await window.memoryManager.saveLocalFile(file.name, file, "audio");
+            } catch (error) {
+                //console.error('Failed to save local file to IndexedDB:', error);
+            }
+        }
+
+        updateScenesList();
+    }
+}
+
+function handleBackgroundMusicUrl(sceneIndex, url) {
+    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+        projectData.scenes[sceneIndex].backgroundMusic = url;
+        backgroundMusicMap.delete(sceneIndex);
+        updateScenesList();
+    } else if (!url) {
+        projectData.scenes[sceneIndex].backgroundMusic = "";
+        backgroundMusicMap.delete(sceneIndex);
+        updateScenesList();
+    }
+}
+
 function toggleSound(sceneIndex) {
     const button = document.getElementById(`sound-button-${sceneIndex}`);
 
@@ -1113,6 +1243,74 @@ function toggleSound(sceneIndex) {
     });
 }
 
+function toggleBackgroundMusicScene(sceneIndex) {
+    const button = document.getElementById(`bgmusic-button-${sceneIndex}`);
+
+    if (currentlyPlayingAudio && !currentlyPlayingAudio.paused) {
+        currentlyPlayingAudio.pause();
+        currentlyPlayingAudio = null;
+
+        document.querySelectorAll(".play-button").forEach((btn) => {
+            btn.textContent = "▶ Play";
+            btn.classList.remove("stop-button");
+        });
+        return;
+    }
+
+    const file = backgroundMusicMap.get(sceneIndex);
+    const bgMusicPath = projectData.scenes[sceneIndex].backgroundMusic;
+
+    let audioCreated = false;
+
+    if (file) {
+        if (file instanceof Blob) {
+            const url = URL.createObjectURL(file);
+            currentlyPlayingAudio = new Audio(url);
+            audioCreated = true;
+        } else if (file.blob) {
+            const url = URL.createObjectURL(file.blob);
+            currentlyPlayingAudio = new Audio(url);
+            audioCreated = true;
+        }
+    }
+
+    if (!audioCreated) {
+        if (bgMusicPath && bgMusicPath.startsWith("gallery:")) {
+            const match = bgMusicPath.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.audio[category]?.[name];
+                if (asset) {
+                    currentlyPlayingAudio = new Audio(asset.url);
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        } else if (bgMusicPath && (bgMusicPath.startsWith("http://") || bgMusicPath.startsWith("https://"))) {
+            currentlyPlayingAudio = new Audio(bgMusicPath);
+        } else if (bgMusicPath) {
+            currentlyPlayingAudio = new Audio("sounds/" + bgMusicPath);
+        } else {
+            return;
+        }
+    }
+
+    currentlyPlayingAudio.volume = projectData.scenes[sceneIndex].backgroundMusicVolume;
+
+    button.textContent = "⬛ Stop";
+    button.classList.add("stop-button");
+
+    currentlyPlayingAudio.play();
+
+    currentlyPlayingAudio.addEventListener("ended", () => {
+        button.textContent = "▶ Play";
+        button.classList.remove("stop-button");
+        currentlyPlayingAudio = null;
+    });
+}
+
 function toggleNull(sceneIndex, field, isNull) {
     if (isNull) {
         projectData.scenes[sceneIndex][field] = null;
@@ -1121,6 +1319,12 @@ function toggleNull(sceneIndex, field, isNull) {
             imageMap.delete(`${sceneIndex}-${field}`);
         } else if (field === "sound") {
             soundMap.delete(sceneIndex);
+            if (currentlyPlayingAudio) {
+                currentlyPlayingAudio.pause();
+                currentlyPlayingAudio = null;
+            }
+        } else if (field === "backgroundMusic") {
+            backgroundMusicMap.delete(sceneIndex);
             if (currentlyPlayingAudio) {
                 currentlyPlayingAudio.pause();
                 currentlyPlayingAudio = null;
@@ -1136,7 +1340,12 @@ function toggleNull(sceneIndex, field, isNull) {
 }
 
 function updateNullCheckboxVisibility(sceneIndex, field, isNull) {
-    const selectId = field === "sound" ? `select-sound-${sceneIndex}` : `select-${field}-${sceneIndex}`;
+    const selectId =
+        field === "sound"
+            ? `select-sound-${sceneIndex}`
+            : field === "backgroundMusic"
+              ? `select-backgroundMusic-${sceneIndex}`
+              : `select-${field}-${sceneIndex}`;
     const containerId = `${selectId}-container`;
 
     const selectElement = document.getElementById(selectId);
@@ -1152,6 +1361,11 @@ function updateNullCheckboxVisibility(sceneIndex, field, isNull) {
 
     if (field === "sound") {
         const playButton = document.getElementById(`sound-button-${sceneIndex}`);
+        if (playButton) {
+            playButton.style.display = isNull ? "none" : "inline-block";
+        }
+    } else if (field === "backgroundMusic") {
+        const playButton = document.getElementById(`bgmusic-button-${sceneIndex}`);
         if (playButton) {
             playButton.style.display = isNull ? "none" : "inline-block";
         }
@@ -1204,6 +1418,19 @@ function moveScene(index, direction) {
             soundMap.delete(newIndex);
         }
 
+        const tempBgMusic = backgroundMusicMap.get(index);
+        if (backgroundMusicMap.has(newIndex)) {
+            backgroundMusicMap.set(index, backgroundMusicMap.get(newIndex));
+        } else {
+            backgroundMusicMap.delete(index);
+        }
+
+        if (tempBgMusic !== undefined) {
+            backgroundMusicMap.set(newIndex, tempBgMusic);
+        } else {
+            backgroundMusicMap.delete(newIndex);
+        }
+
         const wasExpanded = expandedScenes.has(index);
         const wasNewExpanded = expandedScenes.has(newIndex);
         expandedScenes.delete(index);
@@ -1239,6 +1466,10 @@ function duplicateScene(index) {
         if (soundMap.has(i - 1)) {
             soundMap.set(i, soundMap.get(i - 1));
         }
+
+        if (backgroundMusicMap.has(i - 1)) {
+            backgroundMusicMap.set(i, backgroundMusicMap.get(i - 1));
+        }
     }
 
     ["image", "bustLeft", "bustRight"].forEach((key) => {
@@ -1251,6 +1482,10 @@ function duplicateScene(index) {
 
     if (soundMap.has(index)) {
         soundMap.set(index + 1, soundMap.get(index));
+    }
+
+    if (backgroundMusicMap.has(index)) {
+        backgroundMusicMap.set(index + 1, backgroundMusicMap.get(index));
     }
 
     updateScenesList();
@@ -1269,6 +1504,7 @@ function deleteScene(index) {
         imageMap.delete(`${index}-bustLeft`);
         imageMap.delete(`${index}-bustRight`);
         soundMap.delete(index);
+        backgroundMusicMap.delete(index);
 
         for (let i = index; i < projectData.scenes.length; i++) {
             ["image", "bustLeft", "bustRight"].forEach((key) => {
@@ -1283,6 +1519,11 @@ function deleteScene(index) {
             if (soundMap.has(i + 1)) {
                 soundMap.set(i, soundMap.get(i + 1));
                 soundMap.delete(i + 1);
+            }
+
+            if (backgroundMusicMap.has(i + 1)) {
+                backgroundMusicMap.set(i, backgroundMusicMap.get(i + 1));
+                backgroundMusicMap.delete(i + 1);
             }
         }
 
@@ -1614,6 +1855,12 @@ function generateCode() {
             soundDelay: ${scene.soundDelay}`;
         }
 
+        if (scene.backgroundMusic !== null) {
+            code += `,
+            backgroundMusic: '${scene.backgroundMusic}',
+            backgroundMusicVolume: ${scene.backgroundMusicVolume}`;
+        }
+
         if (scene.bustLeft !== null) {
             code += `,
             bustLeft: '${scene.bustLeft}'`;
@@ -1722,6 +1969,7 @@ function resetScenesToDefault() {
         projectData.scenes = [];
         imageMap.clear();
         soundMap.clear();
+        backgroundMusicMap.clear();
         expandedScenes.clear();
         updateScenesList();
 
