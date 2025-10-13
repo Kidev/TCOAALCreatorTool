@@ -52,7 +52,7 @@ if (!document.getElementById("outputCode")) {
 async function loadLocalFilesForScenes() {
     if (!window.memoryManager) return;
 
-    const imageFields = ['image', 'bustLeft', 'bustRight'];
+    const imageFields = ["image", "bustLeft", "bustRight"];
 
     for (let sceneIndex = 0; sceneIndex < projectData.scenes.length; sceneIndex++) {
         const scene = projectData.scenes[sceneIndex];
@@ -62,13 +62,13 @@ async function loadLocalFilesForScenes() {
             if (!path) continue;
 
             // Skip if it's a URL or gallery reference (those are handled elsewhere)
-            if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('gallery:')) {
+            if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("gallery:")) {
                 continue;
             }
 
             let loaded = false;
 
-            const filename = path.split('/').pop();
+            const filename = path.split("/").pop();
 
             try {
                 const localFile = await window.memoryManager.getLocalFile(filename);
@@ -76,9 +76,7 @@ async function loadLocalFilesForScenes() {
                     imageMap.set(`${sceneIndex}-${field}`, localFile.blob);
                     loaded = true;
                 }
-            } catch (error) {
-            }
-
+            } catch (error) {}
 
             if (!loaded) {
                 try {
@@ -89,13 +87,10 @@ async function loadLocalFilesForScenes() {
                         const file = new File([blob], filename, { type: blob.type });
                         imageMap.set(`${sceneIndex}-${field}`, file);
                         // Save to IndexedDB for future use
-                        await window.memoryManager.saveLocalFile(filename, file, 'image');
+                        await window.memoryManager.saveLocalFile(filename, file, "image");
                         loaded = true;
                     }
-
-                } catch (error) {
-                }
-
+                } catch (error) {}
             }
 
             // If still not loaded, disable the parameter
@@ -107,13 +102,17 @@ async function loadLocalFilesForScenes() {
         const soundPath = scene.sound;
         if (soundPath) {
             // Skip if it's a URL or gallery reference
-            if (soundPath.startsWith('http://') || soundPath.startsWith('https://') || soundPath.startsWith('gallery:')) {
+            if (
+                soundPath.startsWith("http://") ||
+                soundPath.startsWith("https://") ||
+                soundPath.startsWith("gallery:")
+            ) {
                 continue;
             }
 
             let loaded = false;
 
-            const filename = soundPath.split('/').pop();
+            const filename = soundPath.split("/").pop();
 
             try {
                 const localFile = await window.memoryManager.getLocalFile(filename);
@@ -121,8 +120,7 @@ async function loadLocalFilesForScenes() {
                     soundMap.set(sceneIndex, localFile.blob);
                     loaded = true;
                 }
-            } catch (error) {
-            }
+            } catch (error) {}
 
             if (!loaded) {
                 try {
@@ -133,11 +131,10 @@ async function loadLocalFilesForScenes() {
                         const file = new File([blob], filename, { type: blob.type });
                         soundMap.set(sceneIndex, file);
                         // Save to IndexedDB for future use
-                        await window.memoryManager.saveLocalFile(filename, file, 'audio');
+                        await window.memoryManager.saveLocalFile(filename, file, "audio");
                         loaded = true;
                     }
-                } catch (error) {
-                }
+                } catch (error) {}
             }
 
             // If still not loaded, disable the parameter
@@ -203,11 +200,12 @@ async function loadProjectData(data) {
 
     updateCharactersList();
 
-    const hasGalleryRefs = projectData.scenes.some(scene =>
-        (scene.image && scene.image.startsWith('gallery:')) ||
-        (scene.bustLeft && scene.bustLeft.startsWith('gallery:')) ||
-        (scene.bustRight && scene.bustRight.startsWith('gallery:')) ||
-        (scene.sound && scene.sound.startsWith('gallery:'))
+    const hasGalleryRefs = projectData.scenes.some(
+        (scene) =>
+            (scene.image && scene.image.startsWith("gallery:")) ||
+            (scene.bustLeft && scene.bustLeft.startsWith("gallery:")) ||
+            (scene.bustRight && scene.bustRight.startsWith("gallery:")) ||
+            (scene.sound && scene.sound.startsWith("gallery:")),
     );
 
     if (hasGalleryRefs && !window.gameImporterAssets && window.memoryManager) {
@@ -389,7 +387,7 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false) 
         }
         html += `
             <label for="${fileId}" style="display: none;"></label>
-            <button id="${fileId}" class="gallery-button ${isGallery ? 'has-file' : ''}" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound})">
+            <button id="${fileId}" class="gallery-button ${isGallery ? "has-file" : ""}" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound})">
                 <span class="filename">${displayName}</span>
                 ${isGallery ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound})">☓</button>` : ""}
             </button>
@@ -456,24 +454,24 @@ function handleFileTypeChange(sceneIndex, field, type, isSound = false) {
 function openGalleryForField(sceneIndex, field, isSound) {
     let currentAssetRef = null;
     const currentValue = projectData.scenes[sceneIndex][field];
-    if (currentValue && currentValue.startsWith('gallery:')) {
+    if (currentValue && currentValue.startsWith("gallery:")) {
         currentAssetRef = currentValue;
     }
 
     galleryContext = {
-        mode: 'select',
+        mode: "select",
         sceneIndex: sceneIndex,
         field: field,
         isSound: isSound,
-        assetType: isSound ? 'audio' : 'images',
-        currentAssetRef: currentAssetRef
+        assetType: isSound ? "audio" : "images",
+        currentAssetRef: currentAssetRef,
     };
 
     openGallery();
 }
 
 function useGalleryAsset(name, category) {
-    if (!galleryContext || galleryContext.mode !== 'select') {
+    if (!galleryContext || galleryContext.mode !== "select") {
         //console.warn('useGalleryAsset called without selection context');
         return;
     }
@@ -485,9 +483,10 @@ function useGalleryAsset(name, category) {
 
     projectData.scenes[sceneIndex][field] = galleryRef;
 
-    const assets = currentGalleryTab === "images"
-        ? window.gameImporterAssets.images[category]
-        : window.gameImporterAssets.audio[category];
+    const assets =
+        currentGalleryTab === "images"
+            ? window.gameImporterAssets.images[category]
+            : window.gameImporterAssets.audio[category];
     const asset = assets[name];
 
     if (asset) {
@@ -1018,7 +1017,7 @@ async function handleImageUpload(sceneIndex, field, input) {
 
         if (window.memoryManager) {
             try {
-                await window.memoryManager.saveLocalFile(file.name, file, 'image');
+                await window.memoryManager.saveLocalFile(file.name, file, "image");
             } catch (error) {
                 //console.error('Failed to save local file to IndexedDB:', error);
             }
@@ -1036,7 +1035,7 @@ async function handleSoundUpload(sceneIndex, input) {
 
         if (window.memoryManager) {
             try {
-                await window.memoryManager.saveLocalFile(file.name, file, 'audio');
+                await window.memoryManager.saveLocalFile(file.name, file, "audio");
             } catch (error) {
                 //console.error('Failed to save local file to IndexedDB:', error);
             }
@@ -1070,8 +1069,7 @@ function toggleSound(sceneIndex) {
             const url = URL.createObjectURL(file);
             currentlyPlayingAudio = new Audio(url);
             audioCreated = true;
-        }
-        else if (file.blob) {
+        } else if (file.blob) {
             const url = URL.createObjectURL(file.blob);
             currentlyPlayingAudio = new Audio(url);
             audioCreated = true;
@@ -1795,7 +1793,7 @@ async function preloadSavedDataAssets() {
                 window.gameImporterAssets = savedAssets;
 
                 if (window.imagesCroppingStarted === false) {
-                    cropAllImages().then(() => window.imagesCroppingStarted = false);
+                    cropAllImages().then(() => (window.imagesCroppingStarted = false));
                 }
             }
         } catch (error) {
@@ -1811,17 +1809,17 @@ async function openGallery() {
     await preloadSavedDataAssets();
 
     if (!galleryContext) {
-        galleryContext = { mode: 'browse' };
+        galleryContext = { mode: "browse" };
     }
 
-    if (galleryContext.mode === 'select' && galleryContext.assetType) {
+    if (galleryContext.mode === "select" && galleryContext.assetType) {
         currentGalleryTab = galleryContext.assetType;
     }
 
     const useButton = document.getElementById("previewDownloadBtn");
     if (useButton) {
-        if (galleryContext.mode === 'select') {
-            useButton.style.display = 'block';
+        if (galleryContext.mode === "select") {
+            useButton.style.display = "block";
             useButton.onclick = () => {
                 if (window.galleryManager && window.galleryManager.currentAsset) {
                     const { name, category } = window.galleryManager.currentAsset;
@@ -1829,7 +1827,7 @@ async function openGallery() {
                 }
             };
         } else {
-            useButton.style.display = 'none';
+            useButton.style.display = "none";
         }
     }
 
@@ -1884,7 +1882,7 @@ function closeGallery() {
 }
 
 function switchGalleryTab(tab) {
-    if (galleryContext && galleryContext.mode === 'select') {
+    if (galleryContext && galleryContext.mode === "select") {
         if (tab !== galleryContext.assetType) {
             return;
         }
@@ -1902,17 +1900,17 @@ function switchGalleryTab(tab) {
             btn.classList.add("active");
         }
 
-        if (galleryContext && galleryContext.mode === 'select') {
-            const btnTab = btn.textContent.toLowerCase().includes('images') ? 'images' : 'audio';
+        if (galleryContext && galleryContext.mode === "select") {
+            const btnTab = btn.textContent.toLowerCase().includes("images") ? "images" : "audio";
             if (btnTab !== galleryContext.assetType) {
-                btn.classList.add('disabled');
+                btn.classList.add("disabled");
                 btn.disabled = true;
             } else {
-                btn.classList.remove('disabled');
+                btn.classList.remove("disabled");
                 btn.disabled = false;
             }
         } else {
-            btn.classList.remove('disabled');
+            btn.classList.remove("disabled");
             btn.disabled = false;
         }
     });
@@ -1975,7 +1973,7 @@ function updateGalleryCategories() {
         selectGalleryCategory(targetCategory);
     }
     if (!window.imagesCroppingStarted) {
-        cropAllImages().then(() => window.imagesCroppingStarted = false);
+        cropAllImages().then(() => (window.imagesCroppingStarted = false));
     }
 }
 
@@ -2025,7 +2023,7 @@ function updateGalleryContent() {
             : window.gameImporterAssets.audio[currentGalleryCategory];
     if (!assets) return;
 
-    const isSelectionMode = galleryContext && galleryContext.mode === 'select';
+    const isSelectionMode = galleryContext && galleryContext.mode === "select";
 
     let currentAssetName = null;
     let currentAssetCategory = null;
@@ -2160,7 +2158,6 @@ function updateGalleryContent() {
 }
 
 async function cropAllImages() {
-
     window.imagesCroppingStarted = true;
     const imagesByCategory = window.gameImporterAssets.images;
     const downloadAllButton = document.getElementById("download-all-button");
@@ -2188,7 +2185,6 @@ async function cropAllImages() {
     const total = toCrop.length;
 
     for (const [count, { name, asset, category }] of toCrop.entries()) {
-
         const pct = Math.round((count / total) * 100);
         updateLoadingBar(pct, name);
         updateDownloadButton(pct);

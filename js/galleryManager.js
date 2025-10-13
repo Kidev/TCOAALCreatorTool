@@ -51,7 +51,6 @@ class GalleryManager {
     init() {}
 
     detectSpriteSheetFromName(filename) {
-
         if (filename in spritesSheetsVariants) {
             const variant = spritesSheetsVariants[filename];
             const size = variant.sizes[variant.default];
@@ -335,15 +334,15 @@ class GalleryManager {
                     </div>`;
             }
 
-       //     setTimeout(() => {
-                this.extractedSprites.forEach((sprite, i) => {
-                    const targetCanvas = document.getElementById(`sprite-preview-${i}`);
-                    if (targetCanvas) {
-                        const ctx = targetCanvas.getContext("2d");
-                        ctx.drawImage(sprite.canvas, 0, 0);
-                    }
-                });
-           // }, 10);
+            //     setTimeout(() => {
+            this.extractedSprites.forEach((sprite, i) => {
+                const targetCanvas = document.getElementById(`sprite-preview-${i}`);
+                if (targetCanvas) {
+                    const ctx = targetCanvas.getContext("2d");
+                    ctx.drawImage(sprite.canvas, 0, 0);
+                }
+            });
+            // }, 10);
 
             controlsDiv.innerHTML = `
                 <div class="asset-filename-title">${this.formatAssetTitle(name, "images")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>

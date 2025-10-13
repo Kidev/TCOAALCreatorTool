@@ -39,9 +39,18 @@
         </div>
         <div id="galleryModal" class="gallery-modal" style="display: none">
             <div id="galleryModalContent" class="gallery-modal-content">
-                <div class="gallery-header" style="display:flex;flex-direction:row;justify-content:space-between;align-items:center;padding:1vmin;">
+                <div
+                    class="gallery-header"
+                    style="
+                        display: flex;
+                        flex-direction: row;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 1vmin;
+                    "
+                >
                     <div class="h2">Assets Gallery</div>
-                    <div id="croppingProgressIndicatorModal" style="display: none;">
+                    <div id="croppingProgressIndicatorModal" style="display: none">
                         <div class="bar" id="croppingProgressBarModal"></div>
                         <span class="label" id="croppingProgressSpanModal">Cropping...</span>
                     </div>
@@ -59,11 +68,7 @@
                     <div class="gallery-preview-panel" id="galleryPreviewPanel">
                         <div class="preview-panel-header">
                             <h3>Preview</h3>
-                            <button
-                                class="preview-download-btn"
-                                id="previewDownloadBtn"
-                                style="display: none;"
-                            >
+                            <button class="preview-download-btn" id="previewDownloadBtn" style="display: none">
                                 Use
                             </button>
                         </div>
@@ -71,8 +76,8 @@
                             <div class="preview-placeholder">Select an item to preview</div>
                         </div>
                         <div class="preview-controls" id="previewControls"></div>
-                        </div>
                     </div>
+                </div>
             </div>
         </div>
         <input type="file" id="folderInput" style="display: none" webkitdirectory directory multiple />
@@ -85,9 +90,12 @@
                 </div>
             </div>
             <div class="controls" id="controlsContainer">
-
                 <div class="nav-controls" id="navControls">
-                    <button class="tcoaal-button-small tcoaal-button-small-header" onclick="openEditor()" title="Edit the dialog">
+                    <button
+                        class="tcoaal-button-small tcoaal-button-small-header"
+                        onclick="openEditor()"
+                        title="Edit the dialog"
+                    >
                         Editor
                     </button>
                     <button
@@ -135,32 +143,32 @@
                             Game assets
                         </button>
                         <button
-                                class="tcoaal-button-small tcoaal-button-small-header js-download"
-                                onclick="downloadSequence()"
-                                title="Export the current dialog"
+                            class="tcoaal-button-small tcoaal-button-small-header js-download"
+                            onclick="downloadSequence()"
+                            title="Export the current dialog"
                         >
                             Export
                         </button>
                         <button
-                                class="tcoaal-button-small tcoaal-button-small-header js-upload"
-                                onclick="importSequence()"
-                                title="Import a dialog from file, will replace the current one"
+                            class="tcoaal-button-small tcoaal-button-small-header js-upload"
+                            onclick="importSequence()"
+                            title="Import a dialog from file, will replace the current one"
                         >
                             Import
                         </button>
                         <button
-                                class="tcoaal-button-small tcoaal-button-small-header js-save"
-                                onclick="saveSequence()"
-                                title="Save the current dialog to browser storage"
+                            class="tcoaal-button-small tcoaal-button-small-header js-save"
+                            onclick="saveSequence()"
+                            title="Save the current dialog to browser storage"
                         >
                             Save
                         </button>
                         <button
-                                class="tcoaal-button-small tcoaal-button-small-header js-clear danger"
-                                onclick="clearSavedSequence()"
-                                title="Clear saved dialog from browser storage"
-                                style="display: none;"
-                                id="clearSavedBtn"
+                            class="tcoaal-button-small tcoaal-button-small-header js-clear danger"
+                            onclick="clearSavedSequence()"
+                            title="Clear saved dialog from browser storage"
+                            style="display: none"
+                            id="clearSavedBtn"
                         >
                             Clear Saved
                         </button>
@@ -176,9 +184,9 @@
                 <div class="editor-zone right">
                     <div class="header-buttons">
                         <button
-                                class="tcoaal-button-small tcoaal-button-small-header overlay-close"
-                                onclick="closeEditor(true)"
-                                title="Cancel changes and return to the animation screen"
+                            class="tcoaal-button-small tcoaal-button-small-header overlay-close"
+                            onclick="closeEditor(true)"
+                            title="Cancel changes and return to the animation screen"
                         >
                             Cancel
                         </button>
@@ -194,9 +202,7 @@
             </div>
             <div class="editor-container" onclick="event.stopPropagation()">
                 <div class="section">
-                    <button class="section-header collapsible" onclick="toggleSection(this)">
-                        Configuration
-                    </button>
+                    <button class="section-header collapsible" onclick="toggleSection(this)">Configuration</button>
                     <div class="section-content">
                         <div class="subsection">
                             <h3>General configuration</h3>
@@ -221,7 +227,7 @@
                                     type="checkbox"
                                 />
                                 <label for="backgroundMusicEnabled">Background music:</label>
-                                <label for="select-bgmusic" style="display:none;"></label>
+                                <label for="select-bgmusic" style="display: none"></label>
                                 <div class="file-select-wrapper" id="bgmusic-wrapper" style="display: none">
                                     <select
                                         class="file-type-select"
@@ -262,7 +268,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="form-group" id="backgroundMusicVolumeGroup" style="display: none">
                                 <label for="backgroundMusicVolume" style="grid-column: 2">Music volume:</label>
                                 <input
@@ -319,9 +325,9 @@
                         <button class="reset-default" onclick="resetCharactersToDefault()">Reset all characters</button>
                         <div id="charactersList"></div>
                         <div class="form-group add-character">
-                            <label for="newCharacterName" style="display:none"></label>
+                            <label for="newCharacterName" style="display: none"></label>
                             <input id="newCharacterName" placeholder="Character name" type="text" />
-                            <label for="newCharacterColor" style="display:none"></label>
+                            <label for="newCharacterColor" style="display: none"></label>
                             <input id="newCharacterColor" type="color" />
                             <button class="success" onclick="addCharacter()">Add character</button>
                         </div>

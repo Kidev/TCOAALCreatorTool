@@ -271,12 +271,11 @@ function loadSavedSequence() {
         loadProjectData(parsedData);
 
         //setTimeout(() => {
-            updateScenesList();
+        updateScenesList();
         //}, 100);
 
         //console.log("Loaded saved sequence from localStorage");
         return true;
-
     } catch (error) {
         console.error("Error loading saved sequence:", error);
         return false;
@@ -310,14 +309,15 @@ function importSequence() {
             }
 
             const hasGalleryRefs = text.includes("gallery:");
-            const hasGameAssets = window.gameImporterAssets &&
-                                  (Object.keys(window.gameImporterAssets.images || {}).length > 0 ||
-                                   Object.keys(window.gameImporterAssets.audio || {}).length > 0);
+            const hasGameAssets =
+                window.gameImporterAssets &&
+                (Object.keys(window.gameImporterAssets.images || {}).length > 0 ||
+                    Object.keys(window.gameImporterAssets.audio || {}).length > 0);
 
             if (hasGalleryRefs && !hasGameAssets) {
                 alert(
                     "This sequence file uses gallery assets, but no game has been imported yet.\n\n" +
-                    "Please click 'Import assets' button first, then try importing this sequence file again."
+                        "Please click 'Import assets' button first, then try importing this sequence file again.",
                 );
                 return;
             }
@@ -346,11 +346,10 @@ function importSequence() {
             loadProjectData(parsedData);
 
             //setTimeout(() => {
-                updateScenesList();
+            updateScenesList();
             //}, 100);
 
             alert("Sequence imported successfully!");
-
         } catch (error) {
             console.error("Error importing sequence:", error);
             alert("Error importing sequence file: " + error.message);
@@ -386,12 +385,12 @@ function parseSequenceFile(code) {
             addScene(scene) {
                 this.scenes.push(scene);
                 return this;
-            }
+            },
         };
 
         const safeContext = {
             dialogFramework: mockFramework,
-            Color: window.Color || {}
+            Color: window.Color || {},
         };
 
         const wrappedCode = `
@@ -401,14 +400,14 @@ function parseSequenceFile(code) {
             })();
         `;
 
-        const func = new Function('dialogFramework', 'Color', wrappedCode);
+        const func = new Function("dialogFramework", "Color", wrappedCode);
         func(mockFramework, safeContext.Color);
 
         const parsedData = {
             config: mockFramework.config || {
                 showControls: true,
                 showDebug: true,
-                backgroundMusic: null
+                backgroundMusic: null,
             },
             characters: {},
             glitchConfig: mockFramework.glitchConfig || {
@@ -417,21 +416,21 @@ function parseSequenceFile(code) {
                 changeSpeed: 50,
                 realProbability: 5,
                 autoStart: true,
-                charsAllowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+                charsAllowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
             },
-            scenes: []
+            scenes: [],
         };
 
         if (mockFramework.characters) {
             Object.entries(mockFramework.characters).forEach(([name, data]) => {
                 parsedData.characters[name] = {
                     color: data.color,
-                    aliases: data.aliases || []
+                    aliases: data.aliases || [],
                 };
             });
         }
 
-        mockFramework.scenes.forEach(scene => {
+        mockFramework.scenes.forEach((scene) => {
             const editorScene = {
                 image: scene.image === undefined ? null : scene.image,
                 speaker: scene.speaker || "",
@@ -456,14 +455,13 @@ function parseSequenceFile(code) {
                 shake: scene.shake || false,
                 shakeDelay: scene.shakeDelay !== undefined ? scene.shakeDelay : 0,
                 shakeIntensity: scene.shakeIntensity !== undefined ? scene.shakeIntensity : 1,
-                shakeDuration: scene.shakeDuration !== undefined ? scene.shakeDuration : 500
+                shakeDuration: scene.shakeDuration !== undefined ? scene.shakeDuration : 500,
             };
 
             parsedData.scenes.push(editorScene);
         });
 
         return parsedData;
-
     } catch (error) {
         console.error("Error parsing sequence file:", error);
         return null;
@@ -1025,7 +1023,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     window.imagesCroppingStarted = false;
 
     //setTimeout(checkSavedDataOnLoad, 10);
-/*
+    /*
     if (window.memoryManager && !window.gameImporterAssets) {
         try {
             const storageState = await window.memoryManager.getStorageState();
@@ -1103,7 +1101,6 @@ let lastKeyPress = 0;
 const keyPressCooldown = 100;
 
 function handleGalleryKeydown(e) {
-
     let gallery = document.getElementById("gallerySection");
     let isModalGallery = false;
     if (!gallery || gallery.style.display === "none") {

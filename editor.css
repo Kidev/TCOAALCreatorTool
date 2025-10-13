@@ -474,7 +474,6 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header {
     background: url("https://i.imgur.com/5DspJvG.png");
     background-size: 100% 100%;
     padding: 0.5vmax 0.5vmax;
-
 }
 
 div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header:hover {
@@ -1840,7 +1839,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     cursor: pointer;
     transition: all 0.2s;
     background: var(--bg-color-section-lighter);
-    display:flex;
+    display: flex;
 }
 
 .sprite-cell-preview:hover {
@@ -2035,15 +2034,15 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     text-align: center;
     color: var(--white);
     text-shadow:
-            0 0 1px #000000,
-            0 0 1px #000000,
-            0 0 1px #000000,
-            0 0 1px #000000,
-            0 0 1px #000000,
-            0 0 1px #000000,
-            0 0 2px #000000,
-            0 0 3px #000000,
-            0 0 4px #000000;
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 2px #000000,
+        0 0 3px #000000,
+        0 0 4px #000000;
 }
 
 #download-all-button:hover {

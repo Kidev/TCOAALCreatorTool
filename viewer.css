@@ -287,7 +287,6 @@ body {
     padding: 0;
 }
 
-
 /*
 .editor-btn {
     grid-column: span 2;
@@ -297,7 +296,6 @@ body {
     align-content: center;
 }
 
-
 .controls.hidden {
     opacity: 0;
     pointer-events: none;
@@ -305,19 +303,21 @@ body {
 }
 
 .scene-jump-select {
-    background: rgba(0,0,0,0.9);
+    background: rgba(0, 0, 0, 0.9);
     border: 1px solid #4a90e2;
     color: var(--default);
     font-size: 0.7vmax;
-    width: 1vw; height: 1vh;
+    width: 1vw;
+    height: 1vh;
 }
 
 .scene-jump-select::before {
-    background: rgba(0,0,0,0.9);
+    background: rgba(0, 0, 0, 0.9);
     border: 1px solid #4a90e2;
     color: var(--default);
     font-size: 1vmax;
-    width: 2.5vw; height: 1.8vh;
+    width: 2.5vw;
+    height: 1.8vh;
 }
 
 /*
@@ -881,7 +881,9 @@ body {
     border: 0;
     position: absolute;
     z-index: 1000;
-    transition: top 1s ease, opacity 1s ease;
+    transition:
+        top 1s ease,
+        opacity 1s ease;
     top: -200px;
     left: 20px;
     opacity: 0;
@@ -895,8 +897,8 @@ body {
 #github-logo-icon {
     height: var(--header-height);
     position: absolute;
-    top:0;
-    right:0;
+    top: 0;
+    right: 0;
     z-index: 10;
     align-content: center;
 }

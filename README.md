@@ -1,10 +1,11 @@
 # kidev's TCOAAL Creator Tool
 
-A powerful, feature-rich dialog system for creating visual novel-style dialogs inspired by [_The Coffin of Andy and Leyley_](https://store.steampowered.com/app/2378900/The_Coffin_of_Andy_and_Leyley/) (by *Nemlei*). Features an asset explorer, integrated visual editor, advanced effects, and smooth transitions. Written in pure JavaScript.
+A powerful, feature-rich dialog system for creating visual novel-style dialogs inspired by [_The Coffin of Andy and Leyley_](https://store.steampowered.com/app/2378900/The_Coffin_of_Andy_and_Leyley/) (by _Nemlei_). Features an asset explorer, integrated visual editor, advanced effects, and smooth transitions. Written in pure JavaScript.
 
 ## Features
 
 ### Integrated Visual Editor
+
 - **Built-in editor** accessible via the controls menu ('Editor' button)
 - **Visual scene builder** with preview
 - **Save button** positioned at top right for quick updates
@@ -13,6 +14,7 @@ A powerful, feature-rich dialog system for creating visual novel-style dialogs i
 - No manual coding required, everything through the UI (but code possible)
 
 ### Asset Management
+
 - **Dual input system**: Upload local files OR use URLs for all assets
 - **Background images** with preview thumbnails
 - **Character busts** (left and right positions)
@@ -20,6 +22,7 @@ A powerful, feature-rich dialog system for creating visual novel-style dialogs i
 - **Automatic asset handling** that prioritizes uploaded files over URLs
 
 ### Character System
+
 - Define unlimited characters with custom colors
 - Automatic CSS generation for character styling
 - Speaker names with optional glitch censoring effect
@@ -27,18 +30,20 @@ A powerful, feature-rich dialog system for creating visual novel-style dialogs i
 - Visual character management in editor
 
 ### Advanced Visual Effects
+
 - **Glitch text effects** with customizable parameters:
-  - Scrambled/real colors
-  - Change speed and probability
-  - Custom character sets
+    - Scrambled/real colors
+    - Change speed and probability
+    - Custom character sets
 - **Screen shake effects** with adjustable:
-  - Intensity levels
-  - Duration
-  - Delay timing
+    - Intensity levels
+    - Duration
+    - Delay timing
 - **Smooth typing animation** with variable speed
 - (WIP) **Text formatting** support: `<b>bold</b>`, `<i>italic</i>`, `<u>underline</u>`
 
 ### Transition System
+
 - **Independent timing controls** for dialog and images
 - **Fade effects**: In/out with millisecond precision
 - **Delay controls**: Precise timing choreography
@@ -47,6 +52,7 @@ A powerful, feature-rich dialog system for creating visual novel-style dialogs i
 - **Bust transitions**: Character sprites with fade effects
 
 ### Audio System
+
 - HTML5 Audio with automatic loading/caching
 - Volume control (0-1 scale)
 - Delayed playback timing
@@ -54,12 +60,13 @@ A powerful, feature-rich dialog system for creating visual novel-style dialogs i
 - Preview sounds directly in editor
 
 ### Navigation & Controls
+
 - **Keyboard and mouse controls**
 - **Control buttons** (with tooltips):
-  - ⬅ Previous: previous scene
-  - ➡ Next: next scene
-  - ⟲ Restart: restart the sequence
-  - Editor: open the visual editor
+    - ⬅ Previous: previous scene
+    - ➡ Next: next scene
+    - ⟲ Restart: restart the sequence
+    - Editor: open the visual editor
 - **Scene jumping**: Navigate to any scene directly (code only)
 - **Debug info**: Current scene counter
 
@@ -83,16 +90,16 @@ function setupScene() {
     dialogFramework
         .setConfig({
             showControls: false,
-            showDebug: false
+            showDebug: false,
         })
         .setCharacters({
-            'Ashley': { color: '#e2829a' },
-            'Andrew': { color: '#a6de7f' }
+            "Ashley": { color: "#e2829a" },
+            "Andrew": { color: "#a6de7f" },
         })
         .addScene({
-            image: 'intro.png',
-            speaker: 'Ashley',
-            text: 'Welcome to the story!'
+            image: "intro.png",
+            speaker: "Ashley",
+            text: "Welcome to the story!",
         })
         .start();
 }
@@ -101,28 +108,33 @@ function setupScene() {
 ## Visual Editor Guide
 
 ### Character Management
+
 1. Enter character name and pick a color
-2. Click **Add Character** 
+2. Click **Add Character**
 3. Edit colors anytime with the color picker
 4. Delete characters with the **Delete** button
 
 ### Scene Creation
+
 1. Click **Add New Scene**
 2. Configure:
-   - **Speaker**: Select from character list
-   - **Text**: Enter dialog (supports formatting)
-   - **Assets**: Upload files or enter URLs
-   - **Timing**: Fine-tune all transitions
-   - **Effects**: Add shake or glitch effects
+    - **Speaker**: Select from character list
+    - **Text**: Enter dialog (supports formatting)
+    - **Assets**: Upload files or enter URLs
+    - **Timing**: Fine-tune all transitions
+    - **Effects**: Add shake or glitch effects
 
 ### Asset Input Options
+
 Each asset field (images/sounds) offers two input methods:
+
 - **File Upload**: Click to browse local files
 - **URL Input**: Enter direct URLs (http:// or https://)
 
 Priority: Uploaded file > URL > null
 
 ### Scene Controls
+
 - **↑/↓**: Reorder scenes
 - **Duplicate**: Copy scene with all settings
 - **Delete**: Remove scene
@@ -135,44 +147,45 @@ Priority: Uploaded file > URL > null
 ```javascript
 dialogFramework.addScene({
     // Visual Assets
-    image: 'background.png',        // Background image (img/ folder or URL)
-    bustLeft: 'character1.png',     // Left character sprite
-    bustRight: 'character2.png',    // Right character sprite
-    bustFade: 200,                  // Bust fade duration (ms)
+    image: "background.png", // Background image (img/ folder or URL)
+    bustLeft: "character1.png", // Left character sprite
+    bustRight: "character2.png", // Right character sprite
+    bustFade: 200, // Bust fade duration (ms)
 
     // Dialog
-    speaker: 'Ashley',              // Character name
-    text: 'Dialog text here',       // Supports <b>, <i>, <u> tags
-    censorSpeaker: true,           // Apply glitch to speaker name
+    speaker: "Ashley", // Character name
+    text: "Dialog text here", // Supports <b>, <i>, <u> tags
+    censorSpeaker: true, // Apply glitch to speaker name
 
     // Timing - Dialog
-    dialogFadeInTime: 200,         // Dialog fade in (ms)
-    dialogFadeOutTime: 200,        // Dialog fade out (ms)
-    dialogDelayIn: 500,            // Delay before fade in
-    dialogDelayOut: 0,             // Delay before fade out
+    dialogFadeInTime: 200, // Dialog fade in (ms)
+    dialogFadeOutTime: 200, // Dialog fade out (ms)
+    dialogDelayIn: 500, // Delay before fade in
+    dialogDelayOut: 0, // Delay before fade out
 
     // Timing - Images
-    imageFadeInTime: 200,          // Image fade in (ms)
-    imageFadeOutTime: 200,         // Image fade out (ms)
-    imageDelayIn: 0,               // Delay before fade in
-    imageDelayOut: 0,              // Delay before fade out
+    imageFadeInTime: 200, // Image fade in (ms)
+    imageFadeOutTime: 200, // Image fade out (ms)
+    imageDelayIn: 0, // Delay before fade in
+    imageDelayOut: 0, // Delay before fade out
 
     // Audio
-    sound: 'effect.mp3',           // Sound file (sounds/ folder or URL)
-    soundVolume: 1.0,              // Volume (0-1)
-    soundDelay: 0,                 // Delay before playing (ms)
+    sound: "effect.mp3", // Sound file (sounds/ folder or URL)
+    soundVolume: 1.0, // Volume (0-1)
+    soundDelay: 0, // Delay before playing (ms)
 
     // Effects
-    shake: false,                  // Enable shake effect
-    shakeDelay: 0,                 // Delay before shake (ms)
-    shakeIntensity: 1,             // Shake strength multiplier
-    shakeDuration: 500             // Shake duration (ms)
+    shake: false, // Enable shake effect
+    shakeDelay: 0, // Delay before shake (ms)
+    shakeIntensity: 1, // Shake strength multiplier
+    shakeDuration: 500, // Shake duration (ms)
 });
 ```
 
 ### Special Effects
 
 #### Crossfade Between Images
+
 ```javascript
 // Scene 1 - Prepare for crossfade
 .addScene({
@@ -187,6 +200,7 @@ dialogFramework.addScene({
 ```
 
 #### Dramatic Shake Effect
+
 ```javascript
 .addScene({
     text: 'EARTHQUAKE!',
@@ -197,6 +211,7 @@ dialogFramework.addScene({
 ```
 
 #### Glitched Introduction
+
 ```javascript
 .addScene({
     speaker: 'Lord Unknown',
@@ -215,6 +230,7 @@ dialogFramework.addScene({
 ```
 
 ### Null Values
+
 Use `null` to explicitly disable features:
 
 ```javascript
@@ -251,13 +267,13 @@ project/
 
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| Click | Next scene / Skip typing |
-| `Space` | Next scene / Skip typing |
+| Key          | Action                   |
+| ------------ | ------------------------ |
+| Click        | Next scene / Skip typing |
+| `Space`      | Next scene / Skip typing |
 | `RightArrow` | Next scene / Skip typing |
-| `LeftArrow` | Previous scene |
-| `Tab` | Show/Hide controls |
+| `LeftArrow`  | Previous scene           |
+| `Tab`        | Show/Hide controls       |
 
 ## Advanced Features
 
@@ -265,12 +281,12 @@ project/
 
 ```javascript
 dialogFramework.setGlitchConfig({
-    scrambledColor: '#ff0000',     // Red for scrambled text
-    realColor: '#00ff00',          // Green for real text
-    changeSpeed: 30,               // Faster changes
-    realProbability: 10,           // 10% chance of real char
+    scrambledColor: "#ff0000", // Red for scrambled text
+    realColor: "#00ff00", // Green for real text
+    changeSpeed: 30, // Faster changes
+    realProbability: 10, // 10% chance of real char
     autoStart: true,
-    charsAllowed: '01'             // Binary-style glitch
+    charsAllowed: "01", // Binary-style glitch
 });
 ```
 
@@ -284,7 +300,7 @@ dialogFramework.jumpToScene(5);
 let currentScene = dialogFramework.getCurrentScene();
 
 // Programmatic control
-dialogFramework.previous();  // Go back one scene
+dialogFramework.previous(); // Go back one scene
 ```
 
 ### Dynamic Scene Building
@@ -292,11 +308,11 @@ dialogFramework.previous();  // Go back one scene
 ```javascript
 // Build scenes from data
 const storyData = [
-    { speaker: 'Ashley', text: 'Hello!' },
-    { speaker: 'Andrew', text: 'Hi there!' }
+    { speaker: "Ashley", text: "Hello!" },
+    { speaker: "Andrew", text: "Hi there!" },
 ];
 
-storyData.forEach(scene => dialogFramework.addScene(scene));
+storyData.forEach((scene) => dialogFramework.addScene(scene));
 ```
 
 ## Tips & Best Practices
@@ -327,4 +343,4 @@ storyData.forEach(scene => dialogFramework.addScene(scene));
 Dialog system and assets inspired by _The Coffin of Andy and Leyley_ by Nemlei.  
 Faustina font by Google.  
 [gif.js](https://github.com/jnordberg/gif.js/) by jnordberg.  
-Created by Kidev as a fan tool for the community.  
+Created by Kidev as a fan tool for the community.

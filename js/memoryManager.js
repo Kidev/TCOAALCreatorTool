@@ -325,7 +325,6 @@ class MemoryManager {
         });
     }
 
-
     async saveMetadata(key, data) {
         await this.ensureReady();
 
