@@ -1887,12 +1887,22 @@ class DialogFramework {
             return;
         }
 
-        element.textContent = "";
+        element.innerHTML = "";
 
+        const chars = [];
         for (let i = 0; i < text.length; i++) {
+            const span = document.createElement("span");
+            span.className = "typing-char";
+            span.textContent = text[i] === " " ? "\u00A0" : text[i];
+            span.style.opacity = "0";
+            element.appendChild(span);
+            chars.push(span);
+        }
+
+        for (let i = 0; i < chars.length; i++) {
             if (!this.isTyping) break;
 
-            element.textContent += text[i];
+            chars[i].style.opacity = "1";
             await this.wait(this.typeSpeed);
         }
     }
@@ -1905,25 +1915,60 @@ class DialogFramework {
             return;
         }
 
-        element.textContent = "";
+        element.innerHTML = parsedContainer.innerHTML;
 
-        for (let i = 0; i < plainText.length; i++) {
+        const glitchContainers = element.querySelectorAll(".glitch-container");
+        glitchContainers.forEach((container) => {
+            const config = JSON.parse(container.dataset.glitchConfig);
+            const glitchEffect = new GlitchTextEffect(container, this.glitchConfig);
+            this.glitchEffects.push(glitchEffect);
+        });
+
+        const chars = this.wrapTextNodesInSpans(element);
+
+        for (let i = 0; i < chars.length; i++) {
             if (!this.isTyping) break;
 
-            element.textContent += plainText[i];
+            chars[i].style.opacity = "1";
             await this.wait(this.typeSpeed);
         }
+    }
 
-        if (this.isTyping) {
-            element.innerHTML = parsedContainer.innerHTML;
+    wrapTextNodesInSpans(element) {
+        const chars = [];
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                if (node.parentElement && node.parentElement.classList.contains("glitch-container")) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            },
+        });
 
-            const glitchContainers = element.querySelectorAll(".glitch-container");
-            glitchContainers.forEach((container) => {
-                const config = JSON.parse(container.dataset.glitchConfig);
-                const glitchEffect = new GlitchTextEffect(container, this.glitchConfig);
-                this.glitchEffects.push(glitchEffect);
-            });
+        const textNodes = [];
+        let node;
+        while ((node = walker.nextNode())) {
+            textNodes.push(node);
         }
+
+        textNodes.forEach((textNode) => {
+            const text = textNode.textContent;
+            const parent = textNode.parentNode;
+            const fragment = document.createDocumentFragment();
+
+            for (let i = 0; i < text.length; i++) {
+                const span = document.createElement("span");
+                span.className = "typing-char";
+                span.textContent = text[i] === " " ? "\u00A0" : text[i];
+                span.style.opacity = "0";
+                fragment.appendChild(span);
+                chars.push(span);
+            }
+
+            parent.replaceChild(fragment, textNode);
+        });
+
+        return chars;
     }
 
     skipText() {
@@ -1936,7 +1981,6 @@ class DialogFramework {
             if (this.currentScene < this.scenes.length) {
                 const scene = this.scenes[this.currentScene];
 
-                // Process quotes
                 let processedLine1 = scene.line1 || "";
                 let processedLine2 = scene.line2 || "";
 
