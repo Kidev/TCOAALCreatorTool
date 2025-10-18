@@ -212,7 +212,7 @@ h6 {
     font-family: "Faustina", serif;
 }
 
-/*FORM STYLES */
+/* FORM STYLES */
 
 .form-group {
     display: grid;
@@ -1181,13 +1181,13 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     line-height: 1.2;
 }
 
-/*   ACTION BUTTONS & UTILITIES */
+/* ACTION BUTTONS & UTILITIES */
 .action-buttons {
     display: flex;
     justify-content: center;
 }
 
-/*  RESPONSIVE ADJUSTMENTS */
+/* RESPONSIVE ADJUSTMENTS */
 @media (max-width: 500px) {
     .header-buttons {
         gap: 0;
@@ -1583,7 +1583,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1vmax;
+    padding: 0 1vmax;
     background: var(--bg-color-section-lighter);
     border-bottom: 1px solid var(--accent-color);
 }
@@ -1591,17 +1591,18 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 .preview-panel-header h3 {
     margin: 0;
     color: var(--txt-color);
-    font-size: 1.2vmax;
+    font-size: 1vmax;
+    padding: 1vmax 0;
 }
 
 .preview-download-btn {
     background: var(--accent-color);
     color: var(--txt-color);
-    border: none;
-    border-radius: 4px;
+    border: 1px solid white;
     padding: 0.5vmax 1vmax;
     cursor: pointer;
-    font-size: 0.9vmax;
+    font-size: 1vmax;
+    font-weight: bold;
     display: none;
 }
 
@@ -1612,6 +1613,109 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 .preview-download-btn:hover {
     background: var(--accent-color-light);
 }
+
+.gallery-category-btn-editor {
+    background: var(--accent-color);
+    color: var(--txt-color);
+    border: 1px solid white;
+    padding: 0.5vmax 1vmax;
+    cursor: pointer;
+    font-size: 1vmax;
+    font-weight: bold;
+}
+
+.gallery-category-btn-editor:hover {
+    background: var(--accent-color-light);
+}
+
+.asset-image-preview-title-line {
+    /*display: flex;*/
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.preview-title-bar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+input[type="number"]#animationSpeed {
+    -moz-appearance: textfield;
+}
+
+input[type="number"]#animationSpeed::-webkit-inner-spin-button,
+input[type="number"]#animationSpeed::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* DROP DOWN BUTTON */
+
+.split-button {
+    display: inline-flex;
+    position: relative;
+    font-family: sans-serif;
+}
+
+.btn {
+    background: var(--accent-color);
+    color: var(--txt-color);
+    border: 1px solid white;
+    padding: 0.5vmax 1vmax;
+    cursor: pointer;
+    font-size: 1vmax;
+    font-weight: bold;
+}
+
+.btn:hover {
+    background: var(--accent-color-light);
+}
+
+.arrow {
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    width: 2vmax;
+    /*display: flex;*/
+    justify-content: center;
+
+    display: none;
+}
+
+.menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 2px);
+    right: 0;
+    background: white;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.menu.visible {
+    display: block;
+}
+
+.menu button {
+    background: none;
+    color: #222;
+    border: none;
+    text-align: left;
+    padding: 0.5vmax 1vmax;
+    cursor: pointer;
+    font-size: 1vmax;
+    font-weight: bold;
+    width: 100%;
+}
+
+.menu button:hover {
+    background: var(--accent-color-light);
+}
+
+/* PREVIEW */
 
 .preview-panel-content {
     padding: 0;
@@ -1640,8 +1744,8 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     max-width: 100%;
     max-height: 50vh;
     object-fit: contain;
-    border: 1px solid var(--accent-color);
-    border-radius: 4px;
+    /*border: 1px solid var(--accent-color);
+    border-radius: 4px;*/
 }
 
 .preview-sprite-animation {
@@ -1664,6 +1768,15 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 
 .preview-control-group:last-child {
     margin-bottom: 0;
+}
+
+.preview-control-group-add-editor {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
 }
 
 .preview-control-label {
@@ -1844,7 +1957,14 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 
 .sprite-cell-preview:hover {
     border-color: var(--accent-color-light);
+    /*transform: scale(1.05);*/
     transform: scale(1.05);
+}
+
+.sprite-sheet-preview-info-title {
+    margin-bottom: 0.75vmax;
+    font-size: 0.75vmax;
+    margin-top: 0.75vmax;
 }
 
 .sprite-cell-preview.selected {
@@ -2006,10 +2126,56 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 .preview-sprite-controls.compact {
     display: flex;
     justify-content: space-evenly;
+    flex-wrap: nowrap;
+    /*align-items: stretch;*/
+    /*gap: 0.25vmax;*/
+}
+
+.preview-sprite-controls.compact > * {
+    box-sizing: border-box;
+    /*height: 100%;*/
+}
+
+#addToEditorSpritesButton.preview-control-group-add-editor {
+    flex-direction: row;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: end;
+}
+
+/*.preview-sprite-controls.compact > *:nth-child(1) { flex: 0 0 calc(15% - 1vmax); }
+.preview-sprite-controls.compact > *:nth-child(2) { flex: 0 0 calc(15% - 1vmax); }
+.preview-sprite-controls.compact > *:nth-child(3) { flex: 0 0 calc(34% - 1vmax); }
+.preview-sprite-controls.compact > *:nth-child(4) { flex: 0 0 calc(1% - 1vmax); }
+.preview-sprite-controls.compact > *:nth-child(5) { flex: 0 0 calc(35% - 1vmax); }*/
+.preview-sprite-controls.compact > *:nth-child(1) {
+    flex: 0 1 calc(14%);
+}
+.preview-sprite-controls.compact > *:nth-child(2) {
+    flex: 0 1 calc(14%);
+}
+.preview-sprite-controls.compact > *:nth-child(3) {
+    flex: 0 1 calc(33%);
+}
+.preview-sprite-controls.compact > *:nth-child(4) {
+    flex: 0 1 calc(0%);
+}
+.preview-sprite-controls.compact > *:nth-child(5) {
+    flex: 0 1 calc(34%);
+}
+
+.preview-sprite-controls.compact > *.hidden {
+    visibility: hidden;
+}
+
+/*
+.preview-sprite-controls.compact {
+    display: flex;
+    justify-content: space-evenly;
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-}
+}*/
 
 .preview-sprite-controls .divider {
     color: var(--txt-color-darker);
@@ -2017,6 +2183,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 }
 
 .preview-control-input.inline.compact {
+    padding: 0;
     width: auto;
 }
 
@@ -2029,7 +2196,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     background: url("https://i.imgur.com/5DspJvG.png");
     background-size: 100% 100%;
     font-family: "Faustina", serif;
-    font-size: 1.1vmin;
+    font-size: 1.5vmin;
     width: 17vmin;
     text-align: center;
     color: var(--white);
@@ -2100,4 +2267,342 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     transform: translate(-50%, -50%);
     font-size: 0.9vmin;
     white-space: nowrap;
+}
+
+/* COMPOSITION EDITOR STYLES */
+.composition-editor-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 2002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.composition-editor-content {
+    background: var(--bg-color-darker);
+    width: 95%;
+    height: 95%;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.composition-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5vmax;
+    background: var(--bg-color-section-lighter);
+    border-bottom: 2px solid var(--accent-color);
+}
+
+.composition-editor-header h2 {
+    margin: 0;
+    color: var(--txt-color);
+    font-size: 1.5vmax;
+    font-family: "Faustina", serif;
+}
+
+.composition-header-actions {
+    display: flex;
+    gap: 1vmax;
+}
+
+.composition-btn {
+    background: var(--accent-color-light);
+    color: var(--txt-color);
+    border: none;
+    border-radius: 4px;
+    padding: 0.6vmax 1.2vmax;
+    cursor: pointer;
+    font-size: 0.9vmax;
+    font-family: "Faustina", serif;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.composition-btn:hover {
+    background: var(--accent-color);
+}
+
+.composition-btn.success {
+    background: var(--success-color);
+}
+
+.composition-btn.success:hover {
+    background: var(--success-color-deep);
+}
+
+.composition-btn.danger {
+    background: var(--danger-color);
+}
+
+.composition-btn.danger:hover {
+    background: var(--danger-color-deep);
+}
+
+.composition-editor-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.composition-canvas-panel {
+    flex: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-color-section);
+    padding: 2vmax;
+}
+
+.composition-canvas-container {
+    position: relative;
+    width: fit-content;
+    height: fit-content;
+    border: 2px solid var(--accent-color);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+#compositionCanvas {
+    display: block;
+    background: #000000;
+    image-rendering: pixelated;
+    max-width: 100%;
+    max-height: 80vh;
+}
+
+.composition-layers-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-color-section-lighter);
+    border-left: 2px solid var(--accent-color);
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.composition-layers-header {
+    padding: 1vmax;
+    background: var(--bg-color-section);
+    border-bottom: 1px solid var(--accent-color);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-content: center;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.composition-layers-header h3 {
+    margin: 0;
+    color: var(--txt-color);
+    font-size: 1.2vmax;
+    font-family: "Faustina", serif;
+}
+
+.composition-layers-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1vmax;
+}
+
+.no-layers-message {
+    text-align: center;
+    color: var(--txt-color-darker);
+    font-size: 0.9vmax;
+    padding: 2vmax;
+}
+
+.composition-layer-item {
+    background: var(--bg-color-section);
+    border: 1px solid var(--accent-color);
+    border-radius: 6px;
+    padding: 1vmax;
+    margin-bottom: 1vmax;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.composition-layer-item:hover {
+    border-color: var(--accent-color-light);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.composition-layer-item.selected {
+    border-color: var(--success-color);
+    background: var(--bg-color-section-lightest);
+    box-shadow: 0 2px 12px rgba(74, 144, 226, 0.3);
+}
+
+.composition-layer-item .layer-preview {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0.5vmax;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.composition-layer-item .layer-info {
+    margin-bottom: 0.5vmax;
+}
+
+.composition-layer-item .layer-name {
+    font-size: 0.9vmax;
+    font-weight: 600;
+    color: var(--txt-color);
+    margin-bottom: 0.2vmax;
+}
+
+.composition-layer-item .layer-type {
+    font-size: 0.75vmax;
+    color: var(--txt-color-darker);
+    text-transform: capitalize;
+}
+
+.composition-layer-item .layer-controls {
+    display: flex;
+    gap: 0.4vmax;
+    margin-bottom: 0.5vmax;
+    flex-wrap: wrap;
+}
+
+.layer-control-btn {
+    background: var(--accent-color-light);
+    color: var(--txt-color);
+    border: none;
+    border-radius: 4px;
+    padding: 0.3vmax 0.6vmax;
+    cursor: pointer;
+    font-size: 0.8vmax;
+    font-family: "Faustina", serif;
+    transition: all 0.2s;
+}
+
+.layer-control-btn:hover {
+    background: var(--accent-color);
+}
+
+.layer-control-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.layer-control-btn.visibility-btn.active {
+    background: var(--success-color);
+}
+
+.layer-control-btn.delete-btn {
+    background: var(--danger-color);
+}
+
+.layer-control-btn.delete-btn:hover {
+    background: var(--danger-color-deep);
+}
+
+.composition-layer-item .layer-position {
+    display: flex;
+    gap: 0.5vmax;
+    font-size: 0.8vmax;
+}
+
+.composition-layer-item .layer-position label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.3vmax;
+    color: var(--txt-color);
+}
+
+.composition-layer-item .position-input {
+    flex: 1;
+    width: auto;
+    min-width: 50px;
+    background: var(--bg-color-section-lighter);
+    border: 1px solid var(--accent-color);
+    color: var(--txt-color);
+    padding: 0.2vmax 0.4vmax;
+    border-radius: 3px;
+    font-size: 0.75vmax;
+    font-family: "Faustina", serif;
+}
+
+@media (max-width: 1200px) {
+    .composition-editor-main {
+        flex-direction: column;
+    }
+
+    .composition-layers-panel {
+        max-width: 100%;
+        min-width: 100%;
+        border-left: none;
+        border-top: 2px solid var(--accent-color);
+        max-height: 40vh;
+    }
+
+    .composition-canvas-panel {
+        flex: 2;
+    }
+}
+
+@media (max-width: 800px) {
+    .composition-editor-header h2 {
+        font-size: 2.5vmax;
+    }
+
+    .composition-btn {
+        font-size: 1.5vmax;
+        padding: 1vmax 2vmax;
+    }
+
+    .composition-layers-header h3 {
+        font-size: 2vmax;
+    }
+
+    .composition-layer-item .layer-name {
+        font-size: 1.5vmax;
+    }
+
+    .composition-layer-item .layer-type {
+        font-size: 1.2vmax;
+    }
+
+    .layer-control-btn {
+        font-size: 1.3vmax;
+        padding: 0.5vmax 1vmax;
+    }
+}
+
+.preview-control-btn.success {
+    background: var(--success-color);
+    color: var(--txt-color);
+}
+
+.preview-control-btn.success:hover {
+    background: var(--success-color-deep);
+}
+
+.composition-editor-open-btn {
+    background: url("https://i.imgur.com/5DspJvG.png");
+    background-size: 100% 100%;
+    color: var(--white);
+    text-shadow:
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 2px #000000;
+}
+
+.composition-editor-open-btn:hover {
+    background: url("https://i.imgur.com/6477Nct.png");
+    background-size: 100% 100%;
+    color: var(--white);
 }

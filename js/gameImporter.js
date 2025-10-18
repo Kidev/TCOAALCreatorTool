@@ -87,10 +87,13 @@ class GameImporter {
 
         this.showProgress(false);
 
-        this.saveImportedAssets();
+        await this.saveImportedAssets();
 
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get("mode") === "gallery") {
+        const mode = urlParams.get("mode");
+        const useParam = urlParams.get("use");
+
+        if (mode === "gallery") {
             document.getElementById("gallerySection").style.display = "block";
             document.getElementById("download-all-button").style.display = "block";
 
@@ -102,6 +105,8 @@ class GameImporter {
             if (typeof updateGalleryCategories === "function") {
                 updateGalleryCategories();
             }
+        } else if (mode === "viewer" && useParam) {
+            //console.log("Skipping gallery open in viewer mode with shared link");
         } else {
             if (typeof openGallery === "function") {
                 openGallery();
@@ -317,8 +322,18 @@ class GameImporter {
         if (text) text.textContent = `Processing game assets... ${percentage}%`;
     }
 
-    saveImportedAssets() {
+    async saveImportedAssets() {
         window.gameImporterAssets = this.importedAssets;
+
+        if (window.pendingCompositions && window.pendingCompositions.length > 0) {
+            //console.log(`Processing ${window.pendingCompositions.length} pending compositions after asset import...`);
+            const pending = window.pendingCompositions;
+            window.pendingCompositions = [];
+
+            if (typeof reconstructCompositionsToGallery === "function") {
+                await reconstructCompositionsToGallery(pending);
+            }
+        }
     }
 }
 

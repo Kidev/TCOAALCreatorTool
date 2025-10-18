@@ -95,6 +95,9 @@ class MemoryManager {
             cropped: false,
             timestamp: Date.now(),
             variants: assetData.variants,
+            isComposition: assetData.isComposition || false,
+            compositionId: assetData.compositionId || null,
+            compositionDescriptor: assetData.compositionDescriptor || null,
         };
 
         return new Promise((resolve, reject) => {
@@ -111,12 +114,10 @@ class MemoryManager {
         const store = transaction.objectStore("assets");
 
         return new Promise((resolve, reject) => {
-            // First get the existing record
             const getRequest = store.get(assetId);
             getRequest.onsuccess = () => {
                 const assetRecord = getRequest.result;
                 if (assetRecord) {
-                    // Update with cropped data
                     assetRecord.croppedBlob = croppedBlob;
                     assetRecord.cropped = true;
                     assetRecord.timestamp = Date.now();
@@ -162,7 +163,6 @@ class MemoryManager {
                         organized[asset.type][asset.category] = {};
                     }
 
-                    // Recreate blob URLs
                     const assetData = {
                         url: URL.createObjectURL(asset.blob),
                         blob: asset.blob,
@@ -173,9 +173,11 @@ class MemoryManager {
                         cropped: asset.cropped,
                         originalPath: asset.originalPath,
                         variants: asset.variants,
+                        isComposition: asset.isComposition || false,
+                        compositionId: asset.compositionId || null,
+                        compositionDescriptor: asset.compositionDescriptor || null,
                     };
 
-                    // Add cropped data if available
                     if (asset.croppedBlob) {
                         assetData.croppedUrl = URL.createObjectURL(asset.croppedBlob);
                         assetData.croppedBlob = asset.croppedBlob;

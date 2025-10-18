@@ -29,7 +29,7 @@ class GalleryManager {
         this.isLooping = false;
         this.spriteSheetData = null;
         this.extractedSprites = [];
-        this.globalImageViewMode = "cropped";
+        this.globalImageViewMode = "original";
         this.currentlyCropping = false;
         this.cropQueue = [];
         this.isCropping = false;
@@ -38,8 +38,8 @@ class GalleryManager {
 
     setGlobalImageViewMode(mode) {
         this.globalImageViewMode = mode;
-        const checkbox = document.getElementById("toggleCropped");
-        if (checkbox) checkbox.checked = mode === "cropped";
+        //const checkbox = document.getElementById("toggleCropped");
+        //if (checkbox) checkbox.checked = mode === "cropped";
         if (this.currentAsset && this.currentAsset.type === "images") {
             const { name, category, asset } = this.currentAsset;
             const contentDiv = document.getElementById("previewPanelContent");
@@ -74,6 +74,37 @@ class GalleryManager {
     }
 
     scrollIfRequired(el) {
+        const galModal = document.getElementById("galleryModal");
+        if (galModal) {
+            this.scrollIfRequiredModal(el);
+        } else {
+            this.scrollIfRequiredGallery(el);
+        }
+    }
+
+    scrollIfRequiredModal(el) {
+        const container = document.getElementById("galleryContent");
+        if (!container || !el) return;
+
+        const cRect = container.getBoundingClientRect();
+        const eRect = el.getBoundingClientRect();
+
+        const hiddenTop = eRect.top < cRect.top;
+        const hiddenBottom = eRect.bottom > cRect.bottom;
+
+        if (!hiddenTop && !hiddenBottom) return;
+
+        const scrollOffset = el.offsetTop - container.offsetTop;
+
+        if (hiddenTop) {
+            container.scrollTo({ top: scrollOffset, behavior: "smooth" });
+        } else if (hiddenBottom) {
+            const diff = eRect.bottom - cRect.bottom;
+            container.scrollBy({ top: diff, behavior: "smooth" });
+        }
+    }
+
+    scrollIfRequiredGallery(el) {
         const rect = el.getBoundingClientRect();
         const viewHeight = window.innerHeight || document.documentElement.clientHeight;
         const offset = document.getElementById("editorHeader")?.offsetHeight || 0;
@@ -94,24 +125,18 @@ class GalleryManager {
     }
 
     previewAsset(name, category, type, variant = null) {
-        this.clearPreview();
-
-        document.querySelectorAll(".gallery-item").forEach((item) => {
-            item.classList.remove("selected");
-        });
-        event.currentTarget.classList.add("selected");
-
-        this.scrollIfRequired(event.currentTarget);
-
         const assets =
             type === "images" ? window.gameImporterAssets.images[category] : window.gameImporterAssets.audio[category];
 
         const asset = assets[name];
         if (!asset) return;
 
+        if (this.currentAsset?.asset?.isSprite) {
+            this.clearSpriteSelection();
+        }
+
         this.currentAsset = { name, category, type, asset };
-        // If this is an image (non-portrait) and not a sprite sheet, enqueue it for cropping
-        // Only crop if not already cropped or currently being cropped
+
         if (
             type === "images" &&
             category !== "Portraits" &&
@@ -155,6 +180,9 @@ class GalleryManager {
 
         const canvas = document.getElementById("animationCanvas");
         const previewContainer = document.getElementById("preview-canvas-location");
+        const sheetControlsDiv = document.getElementById("previewControlsSheetSpecific");
+        const previewSpriteGifButton = document.getElementById("previewSpriteGifButton");
+        const addToEditorSpritesButton = document.getElementById("addToEditorSpritesButton");
         if (!canvas || !previewContainer) return;
 
         if (this.selectedSprites.length === 0) {
@@ -163,8 +191,25 @@ class GalleryManager {
             canvas.style.width = "0px";
             canvas.style.height = "0px";
             previewContainer.style.display = "none";
+            sheetControlsDiv.style.display = "none";
+            //addToEditorSpritesButton.style.display = "none";
+            //sheetControlsDiv.classList.toggle("hidden", true);
+            addToEditorSpritesButton.classList.toggle("hidden", true);
             return;
         }
+
+        if (this.selectedSprites.length > 1) {
+            //previewSpriteGifButton.style.display = "block";
+            previewSpriteGifButton.classList.toggle("hidden", false);
+        } else {
+            //previewSpriteGifButton.style.display = "none";
+            previewSpriteGifButton.classList.toggle("hidden", true);
+        }
+
+        //addToEditorSpritesButton.style.display = "block";
+        sheetControlsDiv.style.display = "block";
+        addToEditorSpritesButton.classList.toggle("hidden", false);
+        //sheetControlsDiv.classList.toggle("hidden", false);
 
         previewContainer.style.display = "inline-flex";
 
@@ -233,7 +278,73 @@ class GalleryManager {
         this.animationInterval = setInterval(animate, newSpeed);
     }
 
+    async extractSpritesFromAsset(asset, name, spriteInfo = null) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                let cols, rows;
+
+                if (spriteInfo) {
+                    cols = spriteInfo.cols;
+                    rows = spriteInfo.rows;
+                } else if (name in spritesSheetsVariants) {
+                    const variants = spritesSheetsVariants[name];
+                    const defaultVariant = variants.sizes[variants.default];
+                    cols = defaultVariant.cols;
+                    rows = defaultVariant.rows;
+                } else {
+                    const detectedInfo = this.detectSpriteSheetFromName(name);
+                    if (detectedInfo) {
+                        cols = detectedInfo.cols;
+                        rows = detectedInfo.rows;
+                    } else {
+                        cols = Math.floor(img.width / 48);
+                        rows = Math.floor(img.height / 48);
+                    }
+                }
+
+                const cellWidth = img.width / cols;
+                const cellHeight = img.height / rows;
+
+                const extractedSprites = [];
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        const canvas = document.createElement("canvas");
+                        canvas.width = cellWidth;
+                        canvas.height = cellHeight;
+                        const ctx = canvas.getContext("2d");
+
+                        ctx.drawImage(
+                            img,
+                            col * cellWidth,
+                            row * cellHeight,
+                            cellWidth,
+                            cellHeight,
+                            0,
+                            0,
+                            cellWidth,
+                            cellHeight,
+                        );
+
+                        extractedSprites.push({
+                            canvas: canvas,
+                            index: row * cols + col,
+                            row: row,
+                            col: col,
+                        });
+                    }
+                }
+
+                resolve(extractedSprites);
+            };
+            img.onerror = () => reject(new Error(`Failed to load sprite sheet: ${name}`));
+            img.src = asset.croppedUrl || asset.url;
+        });
+    }
+
     previewSpriteSheet(asset, name, contentDiv, controlsDiv, spriteInfo) {
+        this.updateCropButtonInPreviewTitle(false);
+
         const img = new Image();
         img.onload = () => {
             let cols, rows;
@@ -282,19 +393,20 @@ class GalleryManager {
                 const selectId = `variantSelect-${Math.random().toString(36).slice(2)}`;
                 contentDiv.innerHTML = `
                     <div class="sprite-sheet-preview">
-                        <h4>
-                            Sprite Sheet:
-                            <select id="${selectId}" class="preview-control-input inline compact">
-                                ${asset.variants
-                                    .map(
-                                        (v, idx) =>
-                                            `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
-                                                ${v.rows}x${v.cols}
-                                            </option>`,
-                                    )
-                                    .join("")}
-                            </select>
-                        </h4>
+                        <div style="display: flex; flex-direction: row; align-items: center;">
+                        <h4 class="sprite-sheet-preview-info-title">
+                            Sprite Sheet:</h4>
+                        <select id="${selectId}" class="preview-control-input inline compact">
+                            ${asset.variants
+                                .map(
+                                    (v, idx) =>
+                                        `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
+                                            ${v.rows}x${v.cols}
+                                        </option>`,
+                                )
+                                .join("")}
+                        </select></div>
+                        
                         <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
                             ${this.extractedSprites
                                 .map(
@@ -318,7 +430,9 @@ class GalleryManager {
             } else {
                 contentDiv.innerHTML = `
                     <div class="sprite-sheet-preview">
-                        <h4>Sprite Sheet: ${cols}x${rows}</h4>
+                    <div style="display: flex; flex-direction: row; align-items: center;">
+                        <h4 class="sprite-sheet-preview-info-title">Sprite Sheet: ${cols}x${rows}</h4>
+                        </div>
                         <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
                             ${this.extractedSprites
                                 .map(
@@ -338,31 +452,75 @@ class GalleryManager {
             this.extractedSprites.forEach((sprite, i) => {
                 const targetCanvas = document.getElementById(`sprite-preview-${i}`);
                 if (targetCanvas) {
-                    const ctx = targetCanvas.getContext("2d");
+                    const ctx = targetCanvas.getContext("2d", { willReadFrequently: this.willReadFrequently });
                     ctx.drawImage(sprite.canvas, 0, 0);
                 }
             });
             // }, 10);
 
+            let titleName = this.formatAssetTitle(name, "images").split(" ");
+            titleName.pop();
+            const titleWithoutSize = titleName.join(" ");
+
             controlsDiv.innerHTML = `
-                <div class="asset-filename-title">${this.formatAssetTitle(name, "images")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
+                <div class="asset-image-preview-title-line"><div class="asset-filename-title">${titleWithoutSize}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
+</div>
+                <div id="previewControlsSheetSpecific">
                 <div class="preview-control-group preview-sprite-controls compact">
                     <button class="preview-control-btn" onclick="galleryManager.clearSpriteSelection()">Clear</button>
-                    <button class="preview-control-btn" onclick="galleryManager.exportAsGif()">GIF</button>
                     <button class="preview-control-btn" onclick="galleryManager.exportAsPng()">PNG(s)</button>
-                    <br>
-                    <label class="preview-control-label inline" style="display: inline;">Speed (ms): <input type="number" id="animationSpeed" style="display: inline; width: auto;" class="preview-control-input inline compact" value="250" min="10" max="5000" step="10" oninput="galleryManager.updateAnimationSpeed()"></label>
+                    <button id="previewSpriteGifButton" class="preview-control-btn" onclick="galleryManager.exportAsGif()">GIF&nbsp(
+                        <label class="preview-control-label inline" style="display: inline;"><input type="number" id="animationSpeed" style="display: inline; width: 2.5vmax;" class="preview-control-input inline compact" value="250" min="10" max="5000" step="10" oninput="galleryManager.updateAnimationSpeed();" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">ms)</label>
+                    </button>
+                    <div></div>
+                    <div id="addToEditorSpritesButton" class="preview-control-group-add-editor">
+                        <div class="split-button" id="spritesOpenEditorChoiceButton">
+                            <button class="btn main"></button>
+                            <button class="btn arrow">▼</button>
+                        <div class="menu"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="preview-control-group" style="display: flex; justify-content: center;">
                     <div id="preview-canvas-location" class="animation-preview" style="display: none;">
                         <canvas id="animationCanvas" style="display: block;"></canvas>
                     </div>
+                </div>
+
                 </div>`;
+
+            if (window.compositionEditor.autoOpenButtonManager) {
+                window.compositionEditor.autoOpenButtonManager.attachTo(
+                    document.getElementById("spritesOpenEditorChoiceButton"),
+                    this,
+                    this.addSpriteToCompositionEditor,
+                );
+            }
+
+            const sheetControlsDiv = document.getElementById("previewControlsSheetSpecific");
+            const addToEditorSpritesButton = document.getElementById("addToEditorSpritesButton");
+            const previewSpriteGifButton = document.getElementById("previewSpriteGifButton");
+            if (this.selectedSprites.length === 0) {
+                sheetControlsDiv.style.display = "none";
+                //addToEditorSpritesButton.style.display = "none";
+                //previewSpriteGifButton.style.display = "none";
+                //sheetControlsDiv.classList.toggle("hidden", true);
+                addToEditorSpritesButton.classList.toggle("hidden", true);
+                previewSpriteGifButton.classList.toggle("hidden", true);
+            } else {
+                sheetControlsDiv.style.display = "block";
+                //addToEditorSpritesButton.style.display = "block";
+                //sheetControlsDiv.classList.toggle("hidden", false);
+                addToEditorSpritesButton.classList.toggle("hidden", false);
+                if (this.selectedSprites.length > 1) {
+                    //previewSpriteGifButton.style.display = "block";
+                    previewSpriteGifButton.classList.toggle("hidden", false);
+                }
+            }
 
             this.spriteSheetData = { img, cols, rows, cellWidth, cellHeight };
         };
         img.src = asset.url;
-        img.loading = "lazy";
     }
 
     previewImage(asset, name, contentDiv, controlsDiv) {
@@ -370,26 +528,52 @@ class GalleryManager {
         const src = this.globalImageViewMode === "cropped" && asset.croppedUrl ? asset.croppedUrl : asset.url;
         contentDiv.innerHTML = `
         <div class="preview-image-container">
-          <img src="${src}" alt="${name}" class="preview-image" id="previewMainImage">
-        </div>
-    `;
+            <img src="${src}" alt="${name}" class="preview-image" id="previewMainImage">
+        </div>`;
 
         controlsDiv.innerHTML = `
-            <div class="asset-filename-title">${this.formatAssetTitle(name, "images")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
-            <div class="preview-control-group" ${showCroppedBox ? "" : "style='display: none;'"}>
-                <label class="preview-control-label">
-                    <input type="checkbox" id="toggleCropped"
-                           onchange="window.galleryManager.setGlobalImageViewMode(this.checked ? 'cropped' : 'original')"
-                           ${this.globalImageViewMode === "cropped" ? "checked" : ""}>
-                    Cropped
-                </label>
+            <div class="asset-image-preview-title-line"><div class="asset-filename-title">${this.formatAssetTitle(name, "images")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
+            </div>
+                                        <div class="preview-control-group-add-editor">
+                <div class="split-button" id="imageOpenEditorChoiceButton">
+                    <button class="btn main"></button>
+                    <button class="btn arrow">▼</button>
+                    <div class="menu"></div>
+                </div>
             </div>`;
+
+        this.updateCropButtonInPreviewTitle(showCroppedBox);
+
+        if (window.compositionEditor.autoOpenButtonManager) {
+            window.compositionEditor.autoOpenButtonManager.attachTo(
+                document.getElementById("imageOpenEditorChoiceButton"),
+                this,
+                this.addImageToCompositionEditor,
+            );
+        }
+    }
+
+    updateCropButtonInPreviewTitle(show) {
+        const previewBox = document.getElementById("previewCropBoxContainer");
+        if (show) {
+            previewBox.innerHTML = `
+                <button ${show ? "style='padding:0 0.2vmax;margin-left:0.5vmax;width:4vmax;'" : ""} 
+                    title="${this.globalImageViewMode === "cropped" ? "Preview is cropped to content: click for original" : "Preview is original: click for cropped to content"}"
+                    onclick="window.galleryManager.setGlobalImageViewMode(window.galleryManager.globalImageViewMode === 'original' ? 'cropped' : 'original');window.galleryManager.updateCropButtonInPreviewTitle(${show ? "true" : "false"});">
+                    ${this.globalImageViewMode === "cropped" ? "(cropped)" : "(original)"}
+                </button>
+            `;
+        } else {
+            previewBox.innerHTML = ``;
+        }
     }
 
     previewAudio(asset, name, contentDiv, controlsDiv) {
         if (!this._audioSessionId) this._audioSessionId = 0;
         this._audioSessionId++;
         const sessionId = this._audioSessionId;
+
+        this.updateCropButtonInPreviewTitle(false);
 
         if (this.currentAudio) {
             try {
@@ -763,7 +947,9 @@ class GalleryManager {
             parseInt(el.dataset.assetIndex, 10) < parseInt(min.dataset.assetIndex, 10) ? el : min,
         );
 
-        first.click();
+        if (first.checkVisibility()) {
+            first.click();
+        }
     }
 
     async processCropQueue() {
@@ -853,6 +1039,155 @@ class GalleryManager {
         }
         this.isCropping = false;
         updateLoadingBar();
+    }
+
+    async addImageToCompositionEditor() {
+        if (!this.currentAsset || this.currentAsset.type !== "images") {
+            alert("No image selected");
+            return;
+        }
+
+        const { name, category, asset } = this.currentAsset;
+
+        if (!window.compositionEditor) {
+            console.error("Composition editor not initialized");
+            return;
+        }
+
+        if (asset.isComposition && asset.compositionDescriptor) {
+            //console.log(`Adding composition "${name}" as individual layers...`);
+
+            for (const layerDesc of asset.compositionDescriptor.layers) {
+                const galleryRef = layerDesc.galleryRef;
+                if (!galleryRef) continue;
+
+                // Parse gallery reference: "gallery:Category/filename"
+                const match = galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                if (!match) continue;
+
+                const [, srcCategory, srcName] = match;
+                const srcAsset = window.gameImporterAssets.images[srcCategory]?.[srcName];
+
+                if (!srcAsset) {
+                    console.warn(`Missing asset for layer: ${srcCategory}/${srcName}`);
+                    continue;
+                }
+
+                const assetData = {
+                    name: srcName,
+                    type: layerDesc.type,
+                    assetRef: galleryRef,
+                    blobUrl: srcAsset.url,
+                    x: layerDesc.x,
+                    y: layerDesc.y,
+                    width: layerDesc.width,
+                    height: layerDesc.height,
+                };
+
+                if (layerDesc.type === "sprite" && srcAsset.isSprite) {
+                    try {
+                        const extractedSprites = await this.extractSpritesFromAsset(
+                            srcAsset,
+                            srcName,
+                            layerDesc.spriteVariant,
+                        );
+                        assetData.isAnimated = layerDesc.isAnimated;
+                        assetData.spriteIndices = layerDesc.spriteIndices;
+                        assetData.animationSpeed = layerDesc.animationSpeed;
+                        assetData.spriteCanvases = extractedSprites.map((s) => s.canvas);
+                        assetData.spriteVariant = layerDesc.spriteVariant; // Preserve variant
+                    } catch (error) {
+                        console.error(`Failed to extract sprites for ${srcName}:`, error);
+                        continue;
+                    }
+                }
+
+                const layerId = window.compositionEditor.addLayer(assetData);
+
+                const addedLayer = window.compositionEditor.layers.find((l) => l.id === layerId);
+                if (addedLayer && addedLayer.visible !== layerDesc.visible) {
+                    addedLayer.visible = layerDesc.visible;
+                }
+            }
+
+            //console.log(`Added ${asset.compositionDescriptor.layers.length} layers from composition "${name}"`);
+        } else {
+            let assetType = "background";
+            if (category === "Portraits") {
+                assetType = "portrait";
+            }
+
+            const assetData = {
+                name: name,
+                type: assetType,
+                assetRef: `gallery:${category}/${name}`,
+                blobUrl: asset.url,
+                x: 0,
+                y: 0,
+            };
+
+            window.compositionEditor.addLayer(assetData);
+        }
+
+        if (window.compositionEditor.autoOpen === true) {
+            window.compositionEditor.open();
+        }
+    }
+
+    addSpriteToCompositionEditor() {
+        if (!this.currentAsset || this.currentAsset.type !== "images") {
+            alert("No sprite selected");
+            return;
+        }
+
+        if (this.selectedSprites.length === 0) {
+            alert("Please select at least one sprite frame first");
+            return;
+        }
+
+        const { name, category } = this.currentAsset;
+        const animationSpeed = parseInt(document.getElementById("animationSpeed")?.value) || 250;
+        const isAnimated = this.selectedSprites.length > 1;
+
+        const firstSpriteIndex = this.selectedSprites[0];
+        const firstSprite = this.extractedSprites[firstSpriteIndex];
+
+        if (!firstSprite) {
+            alert("Error: Sprite data not found");
+            return;
+        }
+
+        const assetData = {
+            name: name + (isAnimated ? " (animated)" : ""),
+            type: "sprite",
+            assetRef: `gallery:${category}/${name}`,
+            blobUrl: null,
+            x: 0,
+            y: 0,
+            width: firstSprite.canvas.width,
+            height: firstSprite.canvas.height,
+            isAnimated: isAnimated,
+            spriteIndices: [...this.selectedSprites],
+            animationSpeed: animationSpeed,
+            spriteCanvases: this.extractedSprites.map((s) => s.canvas),
+            spriteVariant: this.spriteSheetData
+                ? {
+                      cols: this.spriteSheetData.cols,
+                      rows: this.spriteSheetData.rows,
+                  }
+                : null,
+        };
+
+        if (!window.compositionEditor) {
+            console.error("Composition editor not initialized");
+            return;
+        }
+
+        window.compositionEditor.addLayer(assetData);
+
+        if (window.compositionEditor.autoOpen === true) {
+            window.compositionEditor.open();
+        }
     }
 }
 

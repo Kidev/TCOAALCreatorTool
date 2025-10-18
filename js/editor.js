@@ -32,6 +32,7 @@ let projectData = {
         charsAllowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
     },
     scenes: [],
+    compositions: [], // Shareable composition descriptors
 };
 
 let imageMap = new Map();
@@ -257,6 +258,15 @@ async function loadProjectData(data) {
             if (storageState !== "none") {
                 const savedAssets = await window.memoryManager.loadSavedAssets();
                 window.gameImporterAssets = savedAssets;
+
+                if (window.pendingCompositions && window.pendingCompositions.length > 0) {
+                    //console.log(`Processing ${window.pendingCompositions.length} pending compositions after loading assets...`,);
+                    const pending = window.pendingCompositions;
+                    window.pendingCompositions = []; // Clear queue to avoid recursion
+                    if (typeof reconstructCompositionsToGallery === "function") {
+                        await reconstructCompositionsToGallery(pending);
+                    }
+                }
             }
         } catch (error) {
             //console.warn("Failed to load gallery assets for project:", error);
@@ -1888,7 +1898,72 @@ function generateCode() {
         })`;
     });
 
-    code += `;
+    code += `;`;
+
+    const compositionsToExport = new Map();
+
+    if (projectData.compositions && projectData.compositions.length > 0) {
+        projectData.compositions.forEach((comp) => {
+            compositionsToExport.set(comp.id, comp);
+        });
+    }
+
+    // Scan all scenes for gallery:Misc/* references and check if they're compositions
+    if (window.gameImporterAssets && window.gameImporterAssets.images["Misc"]) {
+        projectData.scenes.forEach((scene) => {
+            const fieldsToCheck = [scene.image, scene.bustLeft, scene.bustRight];
+
+            fieldsToCheck.forEach((field) => {
+                if (field && typeof field === "string" && field.startsWith("gallery:Misc/")) {
+                    const filename = field.replace("gallery:Misc/", "");
+                    const asset = window.gameImporterAssets.images["Misc"][filename];
+
+                    // Check if this asset is a composition by either:
+                    // 1. isComposition flag is true AND has a descriptor
+                    // 2. originalPath is "compositions" (fallback for assets loaded from IndexedDB)
+                    if (asset) {
+                        const isCompositionByFlag = asset.isComposition && asset.compositionDescriptor;
+                        const isCompositionByPath = asset.originalPath === "compositions";
+
+                        if (isCompositionByFlag || isCompositionByPath) {
+                            // Try to get descriptor from asset, or extract from projectData.compositions
+                            let descriptor = asset.compositionDescriptor;
+
+                            // If no descriptor on asset, try to find it in projectData.compositions
+                            if (!descriptor && asset.compositionId && projectData.compositions) {
+                                descriptor = projectData.compositions.find((c) => c.id === asset.compositionId);
+                            }
+
+                            // If still no descriptor but we know it's a composition from path, try to find by name
+                            if (!descriptor && isCompositionByPath && projectData.compositions) {
+                                // Extract name without extension
+                                const nameWithoutExt = filename.replace(/\.png$/, "");
+                                descriptor = projectData.compositions.find((c) => c.name === nameWithoutExt);
+                            }
+
+                            if (descriptor && !compositionsToExport.has(descriptor.id)) {
+                                compositionsToExport.set(descriptor.id, descriptor);
+                                //console.log(`Found composition in scene: "${descriptor.name}"`);
+                            } else if (!descriptor) {
+                                console.warn(`Found composition asset "${filename}" but no descriptor available`);
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    // Include compositions if any were found
+    if (compositionsToExport.size > 0) {
+        const compositionsArray = Array.from(compositionsToExport.values());
+        code += `
+
+        dialogFramework.setCompositions(${JSON.stringify(compositionsArray, null, 8).replace(/\n/g, "\n    ")});
+        `;
+    }
+
+    code += `
 }`;
 
     document.getElementById("outputCode").value = code;
@@ -2040,6 +2115,15 @@ async function preloadSavedDataAssets() {
                 const savedAssets = await window.memoryManager.loadSavedAssets();
                 window.gameImporterAssets = savedAssets;
 
+                if (window.pendingCompositions && window.pendingCompositions.length > 0) {
+                    //console.log(`Processing ${window.pendingCompositions.length} pending compositions after loading assets...`,);
+                    const pending = window.pendingCompositions;
+                    window.pendingCompositions = []; // Clear queue to avoid recursion
+                    if (typeof reconstructCompositionsToGallery === "function") {
+                        await reconstructCompositionsToGallery(pending);
+                    }
+                }
+
                 if (window.imagesCroppingStarted === false) {
                     cropAllImages().then(() => (window.imagesCroppingStarted = false));
                 }
@@ -2184,10 +2268,34 @@ function updateGalleryCategories() {
     const assets = isImageTab ? window.gameImporterAssets.images : window.gameImporterAssets.audio;
     const categories = Object.keys(assets);
 
+    const lineDiv = document.createElement("div");
+    const categoryDiv = document.createElement("div");
+    const editorDiv = document.createElement("div");
+
+    lineDiv.style.display = "flex";
+    lineDiv.style.flexDirection = "row";
+    lineDiv.style.justifyContent = "space-between";
+    lineDiv.style.alignItems = "center";
+    lineDiv.style.alignContent = "center";
+    lineDiv.style.flexWrap = "nowrap";
+    lineDiv.style.width = "100%";
+
+    categoryDiv.style.display = "flex";
+    categoryDiv.style.flexDirection = "row";
+    categoryDiv.style.justifyContent = "flex-start";
+    categoryDiv.style.alignItems = "center";
+    categoryDiv.style.alignContent = "center";
+    categoryDiv.style.flexWrap = "nowrap";
+
+    lineDiv.appendChild(categoryDiv);
+    lineDiv.appendChild(editorDiv);
+    categoriesContainer.appendChild(lineDiv);
+
     categories.forEach((category) => {
         const btn = document.createElement("button");
         btn.className = "gallery-category-btn";
         btn.textContent = category;
+        btn.style.marginRight = "0.15vmax";
         btn.onclick = () => {
             if (isImageTab) {
                 galleryManager.lastImageCategory = category;
@@ -2196,8 +2304,21 @@ function updateGalleryCategories() {
             }
             selectGalleryCategory(category);
         };
-        categoriesContainer.appendChild(btn);
+        categoryDiv.appendChild(btn);
     });
+
+    if (isImageTab) {
+        const buttonEditor = document.createElement("button");
+        buttonEditor.id = "composition-editor-btn";
+        buttonEditor.className = "gallery-category-btn-editor";
+        buttonEditor.style.fontSize = "1vmax";
+        buttonEditor.style.fontWeight = "bold";
+        buttonEditor.style.border = "1px solid white";
+        buttonEditor.onclick = openCompositionEditor;
+        buttonEditor.title = "Open composition editor to create custom elements";
+        buttonEditor.textContent = "✎ Editor";
+        editorDiv.appendChild(buttonEditor);
+    }
 
     if (categories.length > 0) {
         let targetCategory;
@@ -2372,7 +2493,12 @@ function updateGalleryContent() {
         item.dataset.baseFileName = asset.baseFileName;
         item.dataset.originalName = asset.originalName;
         item.dataset.formatName = formatName;
-        item.onclick = function () {
+        item.onclick = function (ev) {
+            document.querySelectorAll(".gallery-item").forEach((it) => {
+                it.classList.remove("selected");
+            });
+            ev.currentTarget.classList.add("selected");
+            window.galleryManager.scrollIfRequired(ev.currentTarget);
             window.galleryManager.previewAsset(name, currentGalleryCategory, currentGalleryTab);
         };
         if (currentGalleryTab === "images") {

@@ -99,6 +99,20 @@ function openEditor() {
         importBtn.textContent = "Gallery";
         importBtn.classList.add("gallery-button");
         importBtn.classList.remove("game-import");
+
+        const compositionDescriptors = extractCompositionDescriptorsFromGallery();
+        if (compositionDescriptors.length > 0 && typeof projectData !== "undefined") {
+            if (!projectData.compositions) {
+                projectData.compositions = [];
+            }
+            compositionDescriptors.forEach((descriptor) => {
+                const exists = projectData.compositions.some((c) => c.id === descriptor.id);
+                if (!exists) {
+                    projectData.compositions.push(descriptor);
+                }
+            });
+            //console.log(`Restored ${compositionDescriptors.length} composition descriptors when opening editor`);
+        }
     } else {
         window.memoryManager?.getStorageState().then((state) => {
             if (state === "partial" || state === "complete" || state === "base") {
@@ -128,6 +142,116 @@ function closeEditor(ask_confirm = false) {
     if (typeof dialogFramework !== "undefined") {
         dialogFramework.reset();
     }
+}
+
+function openCompositionEditor() {
+    if (window.compositionEditor) {
+        window.compositionEditor.open();
+    } else {
+        console.error("Composition editor not initialized");
+    }
+}
+
+window.pendingCompositions = window.pendingCompositions || [];
+
+async function reconstructCompositionsToGallery(compositions) {
+    if (!compositions || compositions.length === 0) {
+        return;
+    }
+
+    if (!window.gameImporterAssets || Object.keys(window.gameImporterAssets.images || {}).length === 0) {
+        console.warn("Game assets not loaded yet. Queueing compositions for later reconstruction...");
+        window.pendingCompositions = compositions;
+        return;
+    }
+
+    if (!window.gameImporterAssets.images["Misc"]) {
+        window.gameImporterAssets.images["Misc"] = {};
+    }
+
+    //console.log(`Reconstructing ${compositions.length} compositions...`);
+
+    for (const descriptor of compositions) {
+        try {
+            const existingFileName = `${descriptor.name}.png`;
+            if (window.gameImporterAssets.images["Misc"][existingFileName]) {
+                //console.log(`Composition "${descriptor.name}" already exists, skipping...`);
+                continue;
+            }
+
+            const blob = await CompositionEditor.reconstructComposition(descriptor);
+
+            if (blob) {
+                const blobUrl = URL.createObjectURL(blob);
+
+                window.gameImporterAssets.images["Misc"][existingFileName] = {
+                    url: blobUrl,
+                    blob: blob,
+                    cropped: false,
+                    isComposition: true,
+                    compositionId: descriptor.id,
+                    compositionDescriptor: descriptor,
+                };
+
+                if (window.memoryManager) {
+                    try {
+                        const assetData = {
+                            name: existingFileName,
+                            originalName: existingFileName,
+                            baseFileName: existingFileName,
+                            blob: blob,
+                            isSprite: false,
+                            variants: null,
+                            isComposition: true,
+                            compositionId: descriptor.id,
+                            compositionDescriptor: descriptor,
+                        };
+
+                        await window.memoryManager.savePartialAsset(assetData, "compositions", "Misc", "images");
+
+                        //console.log(`Reconstructed composition saved to IndexedDB: "${descriptor.name}"`);
+
+                        window.compositionRecontructedCount += 1;
+                    } catch (error) {
+                        console.error(`Failed to save reconstructed composition to IndexedDB:`, error);
+                    }
+                }
+
+                //console.log(`Reconstructed composition: "${descriptor.name}"`);
+            } else {
+                console.warn(`Failed to reconstruct composition: "${descriptor.name}"`);
+            }
+        } catch (error) {
+            console.error(`Error reconstructing composition "${descriptor.name}":`, error);
+        }
+    }
+
+    if (typeof updateGalleryCategories === "function") {
+        updateGalleryCategories();
+    }
+}
+
+function extractCompositionDescriptorsFromGallery() {
+    if (!window.gameImporterAssets || !window.gameImporterAssets.images["Misc"]) {
+        return [];
+    }
+
+    const descriptors = [];
+    const miscAssets = window.gameImporterAssets.images["Misc"];
+
+    for (const [fileName, asset] of Object.entries(miscAssets)) {
+        const isCompositionByFlag = asset.isComposition && asset.compositionDescriptor;
+        const isCompositionByPath = asset.originalPath === "compositions";
+
+        if (isCompositionByFlag) {
+            descriptors.push(asset.compositionDescriptor);
+            //console.log(`Extracted composition descriptor: "${asset.compositionDescriptor.name}"`);
+        } else if (isCompositionByPath && !asset.compositionDescriptor) {
+            console.warn(`Composition asset "${fileName}" has no descriptor (originalPath: "compositions")`);
+        }
+    }
+
+    return descriptors;
 }
 
 async function runSequence() {
@@ -233,6 +357,7 @@ const KEY_MAP = {
     "characters": "1",
     "glitchConfig": "2",
     "scenes": "3",
+    "compositions": "E", // New: compositions array
 
     // Config keys
     "showControls": "4",
@@ -277,6 +402,22 @@ const KEY_MAP = {
     "shakeDelay": "B",
     "shakeIntensity": "C",
     "shakeDuration": "D",
+
+    // Composition keys
+    "id": "F",
+    "name": "G",
+    "width": "H",
+    "height": "I",
+    "layers": "J",
+    "type": "K",
+    "galleryRef": "L",
+    "x": "M",
+    "y": "N",
+    "visible": "O",
+    "zIndex": "P",
+    "spriteIndices": "Q",
+    "isAnimated": "R",
+    "animationSpeed": "S",
 };
 
 // Reverse mapping for decompression (short key -> long key)
@@ -401,7 +542,7 @@ function generateShareLink() {
     const baseUrl = window.location.origin + window.location.pathname;
     const shareUrl = `${baseUrl}?mode=viewer&use=${encodedData}`;
 
-    console.log("Generated URL: " + shareUrl);
+    //console.log("Generated URL: " + shareUrl);
 
     navigator.clipboard
         .writeText(shareUrl)
@@ -519,6 +660,8 @@ function showGalleryAssetsModal(mode = "viewer") {
             folderInput.onchange = async (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length > 0) {
+                    window.isImportingAssets = true;
+
                     closeModal(true);
 
                     const progressModal = document.getElementById("importProgressModal");
@@ -540,6 +683,8 @@ function showGalleryAssetsModal(mode = "viewer") {
                     if (progressModal) {
                         progressModal.style.display = "none";
                     }
+
+                    window.isImportingAssets = false;
 
                     if (success) {
                         window.location.reload();
@@ -697,6 +842,11 @@ function loadSavedSequence() {
 
         loadProjectData(parsedData);
 
+        // Reconstruct compositions if present
+        if (parsedData.compositions && parsedData.compositions.length > 0) {
+            reconstructCompositionsToGallery(parsedData.compositions);
+        }
+
         //setTimeout(() => {
         updateScenesList();
         //}, 100);
@@ -781,6 +931,11 @@ async function importFromLink() {
         }
 
         loadProjectData(decodedData);
+
+        if (decodedData.compositions && decodedData.compositions.length > 0) {
+            await reconstructCompositionsToGallery(decodedData.compositions);
+        }
+
         updateScenesList();
 
         alert("Sequence imported successfully from link!");
@@ -845,6 +1000,11 @@ function importSequence() {
 
             loadProjectData(parsedData);
 
+            // Reconstruct compositions if present
+            if (parsedData.compositions && parsedData.compositions.length > 0) {
+                await reconstructCompositionsToGallery(parsedData.compositions);
+            }
+
             //setTimeout(() => {
             updateScenesList();
             //}, 100);
@@ -866,6 +1026,7 @@ function parseSequenceFile(code) {
             characters: null,
             glitchConfig: null,
             scenes: [],
+            compositions: [],
 
             setConfig(config) {
                 this.config = config;
@@ -884,6 +1045,11 @@ function parseSequenceFile(code) {
 
             addScene(scene) {
                 this.scenes.push(scene);
+                return this;
+            },
+
+            setCompositions(compositions) {
+                this.compositions = compositions;
                 return this;
             },
         };
@@ -919,6 +1085,7 @@ function parseSequenceFile(code) {
                 charsAllowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
             },
             scenes: [],
+            compositions: mockFramework.compositions || [],
         };
 
         if (mockFramework.characters) {
@@ -1140,6 +1307,7 @@ function setupGalleryOnlyMode() {
                 </div>
                 <div class="editor-zone right">
                     <div class="header-buttons" style="display: flex;flex-direction: column;width:25vmin;gap:0.1vmin;font-size:1vmax;justify-content: center;align-items: center;border-radius: 4px;">
+                        <!--<button id="composition-editor-btn" class="tcoaal-button-small tcoaal-button-small-header composition-editor-open-btn" onclick="openCompositionEditor()" title="Open composition editor to create custom scenes" style="display: none;">🖼 Composition</button>-->
                         <button id="download-all-button" class="tcoaal-button-small tcoaal-button-small-header download-all disabled" onclick="downloadAllAssets()" title="Download all imported assets">Download All</button>
                         <div id="croppingProgressIndicator" style="display: none;">
                           <div class="bar" id="croppingProgressBar"></div>
@@ -1200,7 +1368,7 @@ function setupGalleryOnlyMode() {
                         </div>
                         <div class="gallery-preview-panel" id="galleryPreviewPanel">
                             <div class="preview-panel-header">
-                                <h3>Preview</h3>
+                                <h3 class="preview-title-bar">Preview<span id="previewCropBoxContainer"></span></h3>
                                 <button class="preview-download-btn" id="previewDownloadBtn" onclick="downloadPreviewAsset()">⬇ Download</button>
                             </div>
                             <div class="preview-panel-content" id="previewPanelContent">
@@ -1221,6 +1389,48 @@ function setupGalleryOnlyMode() {
                     <div id="importProgressFill" class="import-progress-fill"></div>
                 </div>
                 <div id="importProgressText" class="import-progress-text">Processing...</div>
+            </div>
+        </div>
+        <!-- Composition Editor Modal -->
+        <div id="compositionEditorModal" class="composition-editor-modal" style="display: none">
+            <div class="composition-editor-content">
+                <div class="composition-editor-header">
+                    <h2>Image Composition Editor</h2>
+                    <div class="composition-header-actions">
+                        <button class="composition-btn success" onclick="compositionEditor.saveToGallery()" title="Save composition to gallery for reuse and sharing">
+                            ✔ Save to gallery
+                        </button>
+                        <!--<button class="composition-btn danger" onclick="compositionEditor.clearAllLayers()" title="Remove all layers">
+                            Clear All
+                        </button>-->
+                        <button class="composition-btn danger" onclick="compositionEditor.close()" title="Close editor">
+                            Close
+                        </button>
+                    </div>
+                </div>
+                <div class="composition-editor-main">
+                    <div class="composition-canvas-panel">
+                        <div class="composition-canvas-container">
+                            <canvas id="compositionCanvas"></canvas>
+                        </div>
+                    </div>
+                    <div class="composition-layers-panel">
+                        <div class="composition-layers-header">
+                            <div><h3>Layers</h3></div>
+                            <div>
+                                <button id="exportGifBtn" class="preview-control-btn" onclick="compositionEditor.exportAsGif()" title="Export composition as GIF" style="display: none;">
+                                    GIF
+                                </button>
+                                <button id="exportPngBtn" class="preview-control-btn" onclick="compositionEditor.exportComposition()" title="Export composition as PNG" style="display: none;">
+                                    PNG
+                                </button>
+                            </div>
+                        </div>
+                        <div class="composition-layers-list" id="compositionLayersList">
+                            <div class="no-layers-message">No layers yet. Add assets from the gallery!</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <iframe id="popup-buy-frame" src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>`;
@@ -1245,6 +1455,17 @@ function setupGalleryOnlyMode() {
             }
         };
         document.head.appendChild(memoryScript);
+    }
+
+    if (!window.compositionEditor) {
+        const compositionEditor = document.createElement("script");
+        compositionEditor.src = "js/compositionEditor.js";
+        compositionEditor.onload = function () {
+            if (!window.compositionEditor) {
+                window.compositionEditor = new CompositionEditor();
+            }
+        };
+        document.head.appendChild(compositionEditor);
     }
 
     if (!window.updateGalleryCategories) {
@@ -1487,7 +1708,6 @@ async function checkSavedDataOnLoad() {
 
         if (clearBtn) {
             if (storageState !== "none") {
-                // Show the button and update its text with storage info
                 const size = await window.memoryManager.getDatabaseSize();
                 const sizeText = window.memoryManager.formatSize(size);
 
@@ -1517,6 +1737,8 @@ async function checkSavedDataOnLoad() {
 }
 
 document.addEventListener("DOMContentLoaded", async function () {
+    window.compositionRecontructedCount = 0;
+
     createLoadingIndicator();
     updateStickyPositions();
     window.addEventListener("resize", updateStickyPositions);
@@ -1560,6 +1782,9 @@ document.addEventListener("DOMContentLoaded", async function () {
                         Object.keys(window.gameImporterAssets.audio || {}).length > 0);
 
                 if (hasGalleryRefs && !hasGameAssets) {
+                    // Store decoded data for use after import completes
+                    window.pendingSequenceData = decodedData;
+
                     const shouldImport = await showGalleryAssetsModal("viewer");
 
                     if (shouldImport) {
@@ -1575,6 +1800,11 @@ document.addEventListener("DOMContentLoaded", async function () {
                     const processedScene = processSceneWithGalleryReferences(scene);
                     dialogFramework.addScene(processedScene);
                 });
+
+                // Reconstruct compositions if present
+                if (decodedData.compositions && decodedData.compositions.length > 0) {
+                    await reconstructCompositionsToGallery(decodedData.compositions);
+                }
 
                 if (mode === null || mode === undefined) {
                     mode = "viewer";
@@ -1652,7 +1882,12 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     await checkSavedDataOnLoad();
-    preloadSavedDataAssets();
+    await preloadSavedDataAssets();
+
+    if (window.compositionRecontructedCount > 0) {
+        const newUrl = new URL(window.location);
+        window.location.href = newUrl.toString();
+    }
 });
 
 let lastKeyPress = 0;
@@ -1783,7 +2018,6 @@ function handleGalleryKeydown(e) {
     }
 }
 
-// Attach to document for gallery-only mode
 document.addEventListener("keydown", handleGalleryKeydown);
 
 async function clearSavedData() {
@@ -1859,6 +2093,11 @@ async function loadGalleryFromSavedData(storageState) {
         document.getElementById("gallerySection").style.display = "block";
         document.getElementById("download-all-button").style.display = "block";
 
+        const compositionBtn = document.getElementById("composition-editor-btn");
+        if (compositionBtn) {
+            compositionBtn.style.display = "block";
+        }
+
         const importBtn = document.getElementById("import-game-assets-button");
         if (importBtn) {
             importBtn.textContent = "Game assets";
@@ -1883,8 +2122,31 @@ async function loadGalleryFromSavedData(storageState) {
             document.body.appendChild(script);
         }
 
+        if (typeof projectData !== "undefined") {
+            const compositionDescriptors = extractCompositionDescriptorsFromGallery();
+            if (compositionDescriptors.length > 0) {
+                if (!projectData.compositions) {
+                    projectData.compositions = [];
+                }
+                compositionDescriptors.forEach((descriptor) => {
+                    const exists = projectData.compositions.some((c) => c.id === descriptor.id);
+                    if (!exists) {
+                        projectData.compositions.push(descriptor);
+                    }
+                });
+                //console.log(`Restored ${compositionDescriptors.length} composition descriptors to projectData`);
+            }
+        }
+
         if (modal) {
             modal.style.display = "none";
+        }
+
+        if (window.pendingCompositions && window.pendingCompositions.length > 0) {
+            //console.log(`Processing ${window.pendingCompositions.length} pending compositions...`);
+            const pending = window.pendingCompositions;
+            window.pendingCompositions = [];
+            await reconstructCompositionsToGallery(pending);
         }
 
         //await handleSmartLoading(storageState, savedAssets);
@@ -1947,4 +2209,85 @@ function enhanceGameActions() {
         updateMobileDebugInfo();
         return result;
     };
+}
+
+class DropDownButton {
+    constructor(setMode, getMode, getAllModesString) {
+        this.root = null;
+        this.setMode = setMode;
+        this.getMode = getMode;
+        this.getAllModesString = getAllModesString;
+        this.execute = null;
+        this.mainBtn = null;
+        this.arrowBtn = null;
+        this.menu = null;
+        this._removeVis = null;
+    }
+
+    attachTo(new_root, target, method) {
+        this._unlink();
+        this.root = new_root;
+        this.execute = (...args) => method.call(target, args);
+        this._link();
+    }
+
+    _link() {
+        this.mainBtn = this.root.querySelector(".main");
+        this.arrowBtn = this.root.querySelector(".arrow");
+        this.menu = this.root.querySelector(".menu");
+
+        this._updateLabel();
+
+        this.mainBtn.onclick = () => {
+            this.execute(this.getMode());
+        };
+
+        this.arrowBtn.onclick = (e) => {
+            e.stopPropagation();
+            this._updateMenu();
+            this.menu.classList.toggle("visible");
+        };
+
+        this.menu.onclick = (e) => {
+            const mode = e.target.dataset.mode;
+            this.setMode(mode);
+            this._updateLabel();
+            this.menu.classList.remove("visible");
+        };
+
+        this._removeVis = (e) => {
+            if (!this.menu.contains(e.target) && e.target !== this.arrowBtn) {
+                this.menu.classList.remove("visible");
+            }
+        };
+
+        document.addEventListener("click", this._removeVis);
+    }
+
+    _unlink() {
+        if (this.mainBtn) this.mainBtn.onclick = () => {};
+        if (this.arrowBtn) this.arrowBtn.onclick = () => {};
+        if (this.menu) this.menu.onclick = () => {};
+        if (this.root) document.removeEventListener("click", this._removeVis);
+    }
+
+    _updateLabel() {
+        const mode = +this.getMode();
+        const all = this.getAllModesString();
+        this.mainBtn.textContent = all[mode] ?? mode;
+    }
+
+    _updateMenu() {
+        const current = +this.getMode();
+        const all = this.getAllModesString();
+        this.menu.innerHTML = "";
+        Object.entries(all).forEach(([mode, label]) => {
+            if (+mode === +current) return;
+            const btn = document.createElement("button");
+            btn.textContent = label;
+            btn.dataset.mode = +mode;
+            btn.style.zIndex = "100";
+            this.menu.appendChild(btn);
+        });
+    }
 }

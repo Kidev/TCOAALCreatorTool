@@ -47,6 +47,7 @@
                         justify-content: space-between;
                         align-items: center;
                         padding: 1vmin;
+                        gap: 1vmin;
                     "
                 >
                     <div class="h2">Assets Gallery</div>
@@ -54,6 +55,9 @@
                         <div class="bar" id="croppingProgressBarModal"></div>
                         <span class="label" id="croppingProgressSpanModal">Cropping...</span>
                     </div>
+                    <!--<button class="tcoaal-button-small composition-editor-open-btn" onclick="openCompositionEditor()" title="Open composition editor to create custom scenes">
+                        🖼 Composition Editor
+                    </button>-->
                     <button class="gallery-close-btn" onclick="closeGallery()">✕</button>
                 </div>
                 <div id="galleryMainContainer" class="gallery-main-container">
@@ -67,15 +71,73 @@
                     </div>
                     <div class="gallery-preview-panel" id="galleryPreviewPanel">
                         <div class="preview-panel-header">
-                            <h3>Preview</h3>
+                            <h3 class="preview-title-bar">Preview<span id="previewCropBoxContainer"></span></h3>
                             <button class="preview-download-btn" id="previewDownloadBtn" style="display: none">
-                                Use
+                                ⏎ Use
                             </button>
                         </div>
                         <div class="preview-panel-content" id="previewPanelContent">
                             <div class="preview-placeholder">Select an item to preview</div>
                         </div>
                         <div class="preview-controls" id="previewControls"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Composition Editor Modal -->
+        <div id="compositionEditorModal" class="composition-editor-modal" style="display: none">
+            <div class="composition-editor-content">
+                <div class="composition-editor-header">
+                    <h2>Image Composition Editor</h2>
+                    <div class="composition-header-actions">
+                        <button
+                            class="composition-btn success"
+                            onclick="compositionEditor.saveToGallery()"
+                            title="Save composition to gallery for reuse and sharing"
+                        >
+                            ✔ Save to gallery
+                        </button>
+                        <!--<button class="composition-btn danger" onclick="compositionEditor.clearAllLayers()" title="Remove all layers">
+                            Clear All
+                        </button>-->
+                        <button class="composition-btn danger" onclick="compositionEditor.close()" title="Close editor">
+                            Close
+                        </button>
+                    </div>
+                </div>
+                <div class="composition-editor-main">
+                    <div class="composition-canvas-panel">
+                        <div class="composition-canvas-container">
+                            <canvas id="compositionCanvas"></canvas>
+                        </div>
+                    </div>
+                    <div class="composition-layers-panel">
+                        <div class="composition-layers-header">
+                            <div><h3>Layers</h3></div>
+                            <div>
+                                <button
+                                    id="exportGifBtn"
+                                    class="preview-control-btn"
+                                    onclick="compositionEditor.exportAsGif()"
+                                    title="Export composition as GIF"
+                                    style="display: none"
+                                >
+                                    GIF
+                                </button>
+                                <button
+                                    id="exportPngBtn"
+                                    class="preview-control-btn"
+                                    onclick="compositionEditor.exportComposition()"
+                                    title="Export composition as PNG"
+                                    style="display: none"
+                                >
+                                    PNG
+                                </button>
+                            </div>
+                        </div>
+                        <div class="composition-layers-list" id="compositionLayersList">
+                            <div class="no-layers-message">No layers yet. Add assets from the gallery!</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -368,5 +430,6 @@
         <script src="js/sequence.js"></script>
         <script src="js/editor.js"></script>
         <script src="js/galleryManager.js"></script>
+        <script src="js/compositionEditor.js"></script>
     </body>
 </html>

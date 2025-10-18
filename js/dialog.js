@@ -732,6 +732,11 @@ class DialogFramework {
                 return;
             }
 
+            // Block interactions during import or if not started
+            if (window.isImportingAssets) {
+                return;
+            }
+
             if (e.code === "Space" || e.code === "ArrowRight") {
                 e.preventDefault();
                 if (this.isTyping) {
@@ -760,6 +765,10 @@ class DialogFramework {
                 return;
             }
 
+            if (window.isImportingAssets) {
+                return;
+            }
+
             if (
                 !e.target.closest(".controls") &&
                 !e.target.closest(".editor-overlay") &&
@@ -773,7 +782,6 @@ class DialogFramework {
             }
         });
 
-        // Add resize handler with debouncing
         let resizeTimeout;
         window.addEventListener("resize", () => {
             clearTimeout(resizeTimeout);
@@ -782,7 +790,6 @@ class DialogFramework {
             }, 250);
         });
 
-        // Initial screen size check
         this.checkScreenSize();
     }
 
@@ -1539,7 +1546,8 @@ class DialogFramework {
             }
         }
 
-        if (line2 && this.isTyping) {
+        //if (line2 && this.isTyping) {
+        if (line2) {
             const hasFormattingLine2 = line2.includes("<");
 
             if (hasFormattingLine2) {
@@ -1900,8 +1908,12 @@ class DialogFramework {
         }
 
         for (let i = 0; i < chars.length; i++) {
-            if (!this.isTyping) break;
-
+            if (!this.isTyping) {
+                for (let i = 0; i < chars.length; i++) {
+                    chars[i].style.opacity = "1";
+                }
+                break;
+            }
             chars[i].style.opacity = "1";
             await this.wait(this.typeSpeed);
         }
@@ -1974,6 +1986,12 @@ class DialogFramework {
     skipText() {
         if (this.isTyping) {
             this.isTyping = false;
+        }
+    }
+
+    /*skipText() {
+        if (this.isTyping) {
+            this.isTyping = false;
 
             const textLine1 = document.getElementById("textLine1");
             const textLine2 = document.getElementById("textLine2");
@@ -1984,7 +2002,8 @@ class DialogFramework {
                 let processedLine1 = scene.line1 || "";
                 let processedLine2 = scene.line2 || "";
 
-                if (scene.speaker && this.characters[scene.speaker]) {
+                const characterInfo = this.getCharacterFromSpeaker(scene.speaker);
+                if (scene.speaker && characterInfo) {
                     if (processedLine1.trim() !== "" && processedLine2.trim() !== "") {
                         processedLine1 = '"' + processedLine1;
                         processedLine2 = processedLine2 + '"';
@@ -2012,7 +2031,7 @@ class DialogFramework {
                 }
             }
         }
-    }
+    }*/
 
     next() {
         if (this.isTyping) {
