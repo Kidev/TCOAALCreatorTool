@@ -17,6 +17,19 @@ The beginning of the game recreated as animation [here](https://kidev.github.io/
 - **Scene organizer** with drag-and-drop reordering
 - No manual coding required, everything through the UI (but code possible)
 
+### Composition Editor (New!)
+
+- **Layer-based composition system** for creating custom images and animations
+- **Keyframe animation support**:
+    - Add multiple keyframes to any layer with independent time and position
+    - Animate asset positions over time
+    - Convert layers into keyframes of other layers
+    - Export as animated GIF with full keyframe support
+- **Sprite animation**: Import and animate sprite sheets
+- **Mix animations**: Combine sprite animations with keyframe animations
+- **Gallery integration**: Use imported game assets in compositions
+- **PNG/GIF export**: Export compositions as static PNG or animated GIF
+
 ### Asset Management
 
 - **Dual input system**: Upload local files OR use URLs for all assets
@@ -24,6 +37,8 @@ The beginning of the game recreated as animation [here](https://kidev.github.io/
 - **Character busts** (left and right positions)
 - **Sound effects** with inline playback controls
 - **Automatic asset handling** that prioritizes uploaded files over URLs
+- **Game asset import**: Import and decrypt assets from game installation folder
+- **Asset gallery**: Browse, preview, crop, and manage imported assets
 
 ### Character System
 
@@ -76,9 +91,29 @@ The beginning of the game recreated as animation [here](https://kidev.github.io/
 
 ## Quick Start
 
+### Running the Application
+
+**For basic use**: Simply open `index.html` in your browser.
+
+**For GIF export** (composition editor animations): You need to run a local web server due to browser security restrictions:
+
+```bash
+# Option 1: Python (if installed)
+python -m http.server 8000
+# Then open: http://localhost:8000
+
+# Option 2: Node.js (if installed)
+npx serve
+# Follow the URL shown in terminal
+
+# Option 3: PHP (if installed)
+php -S localhost:8000
+# Then open: http://localhost:8000
+```
+
 ### Method 1: Visual Editor (Recommended)
 
-1. Open `index.html` in your browser
+1. Open `index.html` in your browser (or via local server)
 2. Click the **Editor** button in the controls
 3. Add characters with the color picker
 4. Build scenes using the visual interface
@@ -108,6 +143,40 @@ function setupScene() {
         .start();
 }
 ```
+
+## Composition Editor Guide
+
+### Creating Compositions
+
+1. Open the gallery mode (`?mode=gallery`)
+2. Import game assets or use your own
+3. Click on an asset to add it to the composition editor
+4. Position layers by dragging on the canvas or using X/Y inputs
+5. Export as PNG or (if animated) as GIF
+
+### Using Keyframe Animations
+
+1. Add a layer with an asset (e.g., a character sprite)
+2. Click the **+ KF** button to add a keyframe
+3. Select different keyframe tabs (KF 1, KF 2, etc.) to edit
+4. Adjust the **Time** value (in milliseconds) for each keyframe
+5. Move the layer to different positions for each keyframe
+6. Export as GIF to see the animation
+
+### Converting Layers to Keyframes
+
+1. Add multiple layers with different assets
+2. On a layer without keyframes, use the "Move as keyframe of..." dropdown
+3. Select the target layer to merge into
+4. The source layer becomes a keyframe of the target layer
+
+### Animation Export
+
+- **PNG Export**: Exports the current frame as a static image
+- **GIF Export**: Exports the full animation (requires local web server)
+    - Automatically calculates duration from keyframes
+    - Combines sprite animations with keyframe animations
+    - Default ~30fps for smooth playback
 
 ## Visual Editor Guide
 
@@ -251,22 +320,23 @@ Use `null` to explicitly disable features:
 
 ```
 project/
-├── index.html              # Main application
-├── colors.css              # General color styles
-├── viewer.css              # Game viewer styles
-├── editor.css              # Editor interface styles
+├── index.html               # Main application
+├── colors.css               # General color styles
+├── viewer.css               # Game viewer styles
+├── editor.css               # Editor interface styles
 ├── js/
-│   ├── dialog.js           # Dialog viewer framework
-│   ├── editor.js           # Visual dialog editor logic
-│   ├── filenameMapper.js   # Map encrypted files to readble names
-│   ├── galleryManager.js   # Handles gallery display logic
-│   ├── gameImporter.js     # Import game files
-│   ├── interface.js        # UI management
-│   ├── memoryManager.js    # Stores data in browser memory
-│   └── sequence.js         # Your scene definitions
-├── img/                    # Image assets
-├── sounds/                 # Audio files
-└── fonts/                  # Fonts assets
+│   ├── compositionEditor.js # Handle composition of stock assets
+│   ├── dialog.js            # Dialog viewer framework
+│   ├── editor.js            # Visual dialog editor logic
+│   ├── filenameMapper.js    # Map encrypted files to readble names
+│   ├── galleryManager.js    # Handles gallery display logic
+│   ├── gameImporter.js      # Import game files
+│   ├── interface.js         # UI management
+│   ├── memoryManager.js     # Stores data in browser memory
+│   └── sequence.js          # Your scene definitions
+├── img/                     # Image assets
+├── sounds/                  # Audio files
+└── fonts/                   # Fonts assets
 ```
 
 ## Keyboard Shortcuts
@@ -339,12 +409,27 @@ storyData.forEach((scene) => dialogFramework.addScene(scene));
 ## Troubleshooting
 
 **Can't see controls**: Press `Tab` to toggle visibility
+
 **Audio not playing**: Check browser autoplay policies
+
 **Glitch not working**: Verify glitch config and `censorSpeaker: true`
+
+**GIF export fails**:
+
+- Error: "Failed to construct 'Worker'" means you're running from `file://` protocol
+- Solution: Use a local web server (see "Running the Application" section above)
+- The app works fine for everything else without a server, but GIF encoding requires Web Workers which have security restrictions on local files
+
+**Compositions not animating**:
+
+- Make sure layers have keyframes with different time values
+- Check that the GIF export button appears (only shows when animations are present)
+- Verify assets are loaded (thumbnails should be visible)
 
 ## Credits
 
 Dialog system and assets inspired by _The Coffin of Andy and Leyley_ by Nemlei.  
 Faustina font by Google.  
 [gif.js](https://github.com/jnordberg/gif.js/) by jnordberg.  
+[lz-string](https://github.com/pieroxy/lz-string) by pieroxy
 Created by Kidev as a fan tool for the community.

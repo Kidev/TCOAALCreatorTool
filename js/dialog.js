@@ -176,6 +176,14 @@ class DialogFramework {
         this.isTyping = false;
         this.typeSpeed = 20;
         this.currentText = "";
+
+        // Auto-play state
+        this.isAutoPlaying = false;
+        this.autoPlayTimeout = null;
+        this.autoPlaySettings = {
+            delayBetweenScenes: 1000, // 1 second default
+            typeSpeed: 20, // matches this.typeSpeed
+        };
         this.typingTimeout = null;
         this.currentBackgroundImage = null;
         this.currentBustLeft = null;
@@ -246,6 +254,29 @@ class DialogFramework {
 
             return word;
         });
+    }
+
+    toEntitySpeechPreserveTags(text) {
+        // If no HTML tags, just apply normal transformation
+        if (!text.includes("<")) {
+            return this.toEntitySpeech(text);
+        }
+
+        // Parse and transform only text content, preserving HTML tags
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = text;
+
+        // Function to recursively process text nodes
+        const processTextNodes = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                node.textContent = this.toEntitySpeech(node.textContent);
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                Array.from(node.childNodes).forEach((child) => processTextNodes(child));
+            }
+        };
+
+        processTextNodes(tempDiv);
+        return tempDiv.innerHTML;
     }
 
     generateCharacterCSS() {
@@ -737,18 +768,11 @@ class DialogFramework {
                 return;
             }
 
-            if (e.code === "Space" || e.code === "ArrowRight") {
+            // Tab key only toggles controls (no sequence advancement)
+            if (e.code === "Tab") {
                 e.preventDefault();
-                if (this.isTyping) {
-                    this.skipText();
-                } else {
-                    this.next();
-                }
-            } else if (e.code === "ArrowLeft") {
-                e.preventDefault();
-                this.previous();
-            } else if (e.code === "Tab") {
-                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
                 if (window.innerWidth <= 768 || window.innerHeight <= 600) {
                     if (typeof window.toggleMobileControls === "function") {
                         window.toggleMobileControls();
@@ -757,6 +781,21 @@ class DialogFramework {
                     this.toggleControls();
                     this.toggleDebugInfo();
                 }
+                return;
+            }
+
+            // All other keys work normally (even during recording)
+            // Manual interactions stop auto-play
+            if (e.code === "Space" || e.code === "ArrowRight") {
+                e.preventDefault();
+                if (this.isTyping) {
+                    this.skipText();
+                } else {
+                    this.next(); // Manual next, will stop auto-play
+                }
+            } else if (e.code === "ArrowLeft") {
+                e.preventDefault();
+                this.previous(); // Stops auto-play internally
             }
         });
 
@@ -769,6 +808,8 @@ class DialogFramework {
                 return;
             }
 
+            // Clicks work normally (even during recording)
+            // Manual clicks stop auto-play
             if (
                 !e.target.closest(".controls") &&
                 !e.target.closest(".editor-overlay") &&
@@ -777,7 +818,7 @@ class DialogFramework {
                 if (this.isTyping) {
                     this.skipText();
                 } else {
-                    this.next();
+                    this.next(); // Manual next, will stop auto-play
                 }
             }
         });
@@ -820,7 +861,7 @@ class DialogFramework {
                 prevButton.disabled = true;
             }
 
-            if (this.currentScene >= this.scenes.length) {
+            if (this.scenes.length <= 0 || this.currentScene >= this.scenes.length) {
                 nextButton.disabled = true;
             }
         }
@@ -858,6 +899,9 @@ class DialogFramework {
             this.hideDialog();
             return;
         }
+
+        // Hide dialog arrow at the start of each scene
+        this.hideDialogArrow();
 
         this.sceneVersion++;
         const currentVersion = this.sceneVersion;
@@ -1426,6 +1470,14 @@ class DialogFramework {
             .replace(/<u>/g, '<span style="text-decoration: underline;">')
             .replace(/<\/u>/g, "</span>");
 
+        // Handle <l> tags with optional size attribute
+        const lRegex = /<l([^>]*)>(.*?)<\/l>/g;
+        formattedText = formattedText.replace(lRegex, (match, attributes, content) => {
+            const sizeMatch = attributes.match(/size="([^"]+)"/);
+            const size = sizeMatch ? sizeMatch[1] : "1.3";
+            return `<span style="font-size: ${size}em;">${content}</span>`;
+        });
+
         const glitchRegex = /<glitch([^>]*)>(.*?)<\/glitch>/g;
         let match;
         let glitchCounter = 0;
@@ -1462,8 +1514,10 @@ class DialogFramework {
         const glitchContainers = container.querySelectorAll(".glitch-container");
 
         glitchContainers.forEach((glitchContainer) => {
-            const config = JSON.parse(glitchContainer.dataset.glitchConfig);
-            const glitchEffect = new GlitchTextEffect(glitchContainer, this.glitchConfig);
+            const tagConfig = JSON.parse(glitchContainer.dataset.glitchConfig);
+            // Merge global config with tag-specific config (tag config takes precedence)
+            const mergedConfig = { ...this.glitchConfig, ...tagConfig };
+            const glitchEffect = new GlitchTextEffect(glitchContainer, mergedConfig);
             this.glitchEffects.push(glitchEffect);
         });
     }
@@ -1507,8 +1561,8 @@ class DialogFramework {
         let processedLine2 = line2 || "";
 
         if (demonSpeaker === true) {
-            processedLine1 = dialogFramework.toEntitySpeech(processedLine1);
-            processedLine2 = dialogFramework.toEntitySpeech(processedLine2);
+            processedLine1 = dialogFramework.toEntitySpeechPreserveTags(processedLine1);
+            processedLine2 = dialogFramework.toEntitySpeechPreserveTags(processedLine2);
         }
 
         if (speaker && characterInfo) {
@@ -1559,6 +1613,11 @@ class DialogFramework {
         }
 
         this.isTyping = false;
+
+        // Show dialog arrow when typing completes (if enabled in config)
+        if (this.config.showDialogArrow !== false) {
+            this.showDialogArrow();
+        }
     }
 
     showDialogInstant(speaker, line1, line2, censorSpeaker) {
@@ -1772,8 +1831,9 @@ class DialogFramework {
 
             const glitchContainers = element.querySelectorAll(".glitch-container");
             glitchContainers.forEach((container) => {
-                const config = JSON.parse(container.dataset.glitchConfig);
-                const glitchEffect = new GlitchTextEffect(container, this.glitchConfig);
+                const tagConfig = JSON.parse(container.dataset.glitchConfig);
+                const mergedConfig = { ...this.glitchConfig, ...tagConfig };
+                const glitchEffect = new GlitchTextEffect(container, mergedConfig);
                 this.glitchEffects.push(glitchEffect);
             });
         }
@@ -1805,8 +1865,9 @@ class DialogFramework {
 
                 const glitchContainers = element.querySelectorAll(".glitch-container");
                 glitchContainers.forEach((container) => {
-                    const config = JSON.parse(container.dataset.glitchConfig);
-                    const glitchEffect = new GlitchTextEffect(container, this.glitchConfig);
+                    const tagConfig = JSON.parse(container.dataset.glitchConfig);
+                    const mergedConfig = { ...this.glitchConfig, ...tagConfig };
+                    const glitchEffect = new GlitchTextEffect(container, mergedConfig);
                     this.glitchEffects.push(glitchEffect);
                 });
             }
@@ -1931,8 +1992,9 @@ class DialogFramework {
 
         const glitchContainers = element.querySelectorAll(".glitch-container");
         glitchContainers.forEach((container) => {
-            const config = JSON.parse(container.dataset.glitchConfig);
-            const glitchEffect = new GlitchTextEffect(container, this.glitchConfig);
+            const tagConfig = JSON.parse(container.dataset.glitchConfig);
+            const mergedConfig = { ...this.glitchConfig, ...tagConfig };
+            const glitchEffect = new GlitchTextEffect(container, mergedConfig);
             this.glitchEffects.push(glitchEffect);
         });
 
@@ -2033,10 +2095,15 @@ class DialogFramework {
         }
     }*/
 
-    next() {
+    next(isAutoPlay = false) {
         if (this.isTyping) {
             this.skipText();
             return;
+        }
+
+        // Stop auto-play if this is a manual next() call
+        if (!isAutoPlay && this.isAutoPlaying) {
+            this.stopAutoPlay();
         }
 
         const wasNotStarted = this.currentScene === -1;
@@ -2055,14 +2122,25 @@ class DialogFramework {
     }
 
     previous() {
+        // Stop auto-play on manual interaction
+        if (this.isAutoPlaying) {
+            this.stopAutoPlay();
+        }
+
         if (this.currentScene < 0) {
             return;
         }
         let currentIndex = this.currentScene;
-        currentIndex--;
-        if (currentIndex < 0) {
-            currentIndex = 0;
+
+        if (currentIndex >= this.scenes.length) {
+            currentIndex = this.scenes.length - 1;
+        } else {
+            currentIndex--;
+            if (currentIndex < 0) {
+                currentIndex = 0;
+            }
         }
+
         this.reset();
         this.jumpToScene(currentIndex);
     }
@@ -2070,9 +2148,29 @@ class DialogFramework {
     hideDialog() {
         const dialogContainer = document.getElementById("dialogContainer");
         dialogContainer.classList.remove("active");
+        this.hideDialogArrow();
+    }
+
+    showDialogArrow() {
+        const dialogArrow = document.getElementById("dialogArrow");
+        if (dialogArrow) {
+            dialogArrow.style.display = "block";
+        }
+    }
+
+    hideDialogArrow() {
+        const dialogArrow = document.getElementById("dialogArrow");
+        if (dialogArrow) {
+            dialogArrow.style.display = "none";
+        }
     }
 
     reset() {
+        // Stop auto-play on reset
+        if (this.isAutoPlaying) {
+            this.stopAutoPlay();
+        }
+
         this.currentScene = -1;
         this.isTyping = false;
         this.currentBackgroundImage = null;
@@ -2095,27 +2193,145 @@ class DialogFramework {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
+    playPauseSequence() {
+        if (this.isAutoPlaying) {
+            // Pause auto-play
+            this.stopAutoPlay();
+        } else {
+            // Start auto-play
+            this.startAutoPlay();
+        }
+    }
+
+    startAutoPlay() {
+        this.isAutoPlaying = true;
+        const playButton = document.getElementById("playSequenceButton");
+        if (playButton) {
+            playButton.textContent = "⏸";
+            playButton.title = "Pause auto-play (right-click for settings)";
+        }
+
+        this.typeSpeed = this.autoPlaySettings.typeSpeed;
+
+        if (this.currentScene === -1) {
+            this.currentScene = 0;
+            this.showScene(0);
+            this.updateDebugInfo();
+        }
+
+        this.continueAutoPlay();
+    }
+
+    stopAutoPlay() {
+        this.isAutoPlaying = false;
+        if (this.autoPlayTimeout) {
+            clearTimeout(this.autoPlayTimeout);
+            this.autoPlayTimeout = null;
+        }
+        const playButton = document.getElementById("playSequenceButton");
+        if (playButton) {
+            playButton.textContent = "▶";
+            playButton.title = "Auto-play (right-click for settings)";
+        }
+    }
+
+    continueAutoPlay() {
+        if (!this.isAutoPlaying) return;
+
+        if (this.currentScene >= this.scenes.length) {
+            this.stopAutoPlay();
+            return;
+        }
+
+        this.waitForSceneCompletion().then(() => {
+            if (!this.isAutoPlaying) return;
+
+            this.autoPlayTimeout = setTimeout(() => {
+                if (!this.isAutoPlaying) return;
+
+                this.currentScene++;
+                if (this.currentScene < this.scenes.length) {
+                    this.showScene(this.currentScene);
+                } else {
+                    this.hideDialog();
+                    this.stopAutoPlay();
+                    this.updateDebugInfo();
+                    return;
+                }
+                this.updateDebugInfo();
+
+                this.continueAutoPlay();
+            }, this.autoPlaySettings.delayBetweenScenes);
+        });
+    }
+
+    async waitForSceneCompletion() {
+        while (this.isTyping) {
+            await this.wait(50);
+        }
+
+        if (this.currentScene >= 0 && this.currentScene < this.scenes.length) {
+            const scene = this.scenes[this.currentScene];
+
+            let totalDuration = 0;
+
+            let typingDuration = 0;
+            const line1 = scene.line1 || "";
+            const line2 = scene.line2 || "";
+            const plainLine1 = line1.replace(/<[^>]*>/g, "");
+            const plainLine2 = line2.replace(/<[^>]*>/g, "");
+            const totalChars = plainLine1.length + plainLine2.length;
+            typingDuration = totalChars * this.typeSpeed;
+
+            // Dialog timing
+            const dialogFadeIn = scene.dialogFadeInTime || this.defaultDialogFadeInTime || 500;
+            const dialogDelay = scene.dialogDelayIn || 0;
+            totalDuration = Math.max(totalDuration, dialogDelay + dialogFadeIn + typingDuration);
+
+            // Image timing
+            const imageFadeIn = scene.imageFadeInTime || this.defaultImageFadeInTime || 1000;
+            const imageDelay = scene.imageDelayIn || 0;
+            totalDuration = Math.max(totalDuration, imageDelay + imageFadeIn);
+
+            if (scene.shake) {
+                const shakeDelay = scene.shakeDelay || 0;
+                const shakeDuration = scene.shakeDuration || 500;
+                totalDuration = Math.max(totalDuration, shakeDelay + shakeDuration);
+            }
+
+            await this.wait(totalDuration);
+        }
+    }
+
     updateDebugInfo() {
         const debugInfo = document.getElementById("debugInfo");
-        if (debugInfo) {
+
+        if (this.scenes.length >= 1) {
+            if (debugInfo.classList.contains("disabled")) {
+                debugInfo.classList.remove("disabled");
+            }
             if (this.currentScene >= this.scenes.length) {
                 debugInfo.textContent = `End`;
-                debugInfo.style.cursor = "default";
-                debugInfo.onclick = null;
-                if (!debugInfo.classList.contains("disabled")) {
-                    debugInfo.classList.add("disabled");
-                }
-            } else {
-                debugInfo.textContent = `${this.currentScene + 1} / ${this.scenes.length}`;
-                debugInfo.style.cursor = "pointer";
+                //debugInfo.onclick = null;
                 debugInfo.onclick = (e) => {
                     e.stopPropagation(); // Prevent click-through
                     this.showSceneJumpInput();
                 };
-                if (debugInfo.classList.contains("disabled")) {
-                    debugInfo.classList.remove("disabled");
+                if (!debugInfo.classList.contains("disabled")) {
+                    //debugInfo.classList.add("disabled");
                 }
+            } else {
+                debugInfo.textContent = `${this.currentScene + 1 < 10 ? " " : ""}${this.currentScene + 1} / ${this.scenes.length}${this.scenes.length < 10 ? " " : ""}`;
+                debugInfo.onclick = (e) => {
+                    e.stopPropagation(); // Prevent click-through
+                    this.showSceneJumpInput();
+                };
             }
+        } else {
+            if (!debugInfo.classList.contains("disabled")) {
+                debugInfo.classList.add("disabled");
+            }
+            debugInfo.textContent = "No scene";
         }
 
         if (typeof updateMobileDebugInfo === "function") {
@@ -2128,13 +2344,13 @@ class DialogFramework {
 
     showSceneJumpInput() {
         const debugInfo = document.getElementById("debugInfo");
-        if (!debugInfo || this.currentScene >= this.scenes.length) return;
+        if (!debugInfo /*|| this.currentScene >= this.scenes.length*/) return;
 
         const currentSceneNum = this.currentScene + 1;
 
         let selectHTML = '<select class="scene-jump-select">';
 
-        selectHTML += `<option value="-1" ${this.currentScene === -1 ? "selected" : ""}>Scene 0 (Reset)</option>`;
+        selectHTML += `<option value="-1" ${this.currentScene === -1 || this.currentScene >= this.scenes.length ? "selected" : ""}>Scene 0 (Reset)</option>`;
 
         for (let i = 0; i < this.scenes.length; i++) {
             selectHTML += `<option value="${i}" ${i === this.currentScene ? "selected" : ""}>Scene ${i + 1}</option>`;
@@ -2194,6 +2410,11 @@ class DialogFramework {
     }
 
     jumpToScene(index) {
+        // Stop auto-play on manual scene jumping
+        if (this.isAutoPlaying) {
+            this.stopAutoPlay();
+        }
+
         if (index >= 0 && index < this.scenes.length) {
             this.currentScene = index;
             this.showScene(index, true);

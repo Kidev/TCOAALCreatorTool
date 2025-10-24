@@ -38,8 +38,6 @@ class GalleryManager {
 
     setGlobalImageViewMode(mode) {
         this.globalImageViewMode = mode;
-        //const checkbox = document.getElementById("toggleCropped");
-        //if (checkbox) checkbox.checked = mode === "cropped";
         if (this.currentAsset && this.currentAsset.type === "images") {
             const { name, category, asset } = this.currentAsset;
             const contentDiv = document.getElementById("previewPanelContent");
@@ -61,7 +59,6 @@ class GalleryManager {
             };
         }
 
-        // Check if filename matches pattern: spritessheet_COLSxROWS_description.png
         const match = filename.match(/spritessheet_(\d+)x(\d+)_/);
         if (match) {
             return {
@@ -192,24 +189,18 @@ class GalleryManager {
             canvas.style.height = "0px";
             previewContainer.style.display = "none";
             sheetControlsDiv.style.display = "none";
-            //addToEditorSpritesButton.style.display = "none";
-            //sheetControlsDiv.classList.toggle("hidden", true);
             addToEditorSpritesButton.classList.toggle("hidden", true);
             return;
         }
 
         if (this.selectedSprites.length > 1) {
-            //previewSpriteGifButton.style.display = "block";
             previewSpriteGifButton.classList.toggle("hidden", false);
         } else {
-            //previewSpriteGifButton.style.display = "none";
             previewSpriteGifButton.classList.toggle("hidden", true);
         }
 
-        //addToEditorSpritesButton.style.display = "block";
         sheetControlsDiv.style.display = "block";
         addToEditorSpritesButton.classList.toggle("hidden", false);
-        //sheetControlsDiv.classList.toggle("hidden", false);
 
         previewContainer.style.display = "inline-flex";
 
@@ -312,7 +303,7 @@ class GalleryManager {
                         const canvas = document.createElement("canvas");
                         canvas.width = cellWidth;
                         canvas.height = cellHeight;
-                        const ctx = canvas.getContext("2d");
+                        const ctx = canvas.getContext("2d", { alpha: true });
 
                         ctx.drawImage(
                             img,
@@ -325,6 +316,17 @@ class GalleryManager {
                             cellWidth,
                             cellHeight,
                         );
+
+                        const imageData = ctx.getImageData(0, 0, cellWidth, cellHeight);
+                        const data = imageData.data;
+                        for (let i = 0; i < data.length; i += 4) {
+                            if (data[i + 3] === 0) {
+                                data[i] = 0; // R
+                                data[i + 1] = 0; // G
+                                data[i + 2] = 0; // B
+                            }
+                        }
+                        ctx.putImageData(imageData, 0, 0);
 
                         extractedSprites.push({
                             canvas: canvas,
@@ -366,7 +368,7 @@ class GalleryManager {
                     const canvas = document.createElement("canvas");
                     canvas.width = cellWidth;
                     canvas.height = cellHeight;
-                    const ctx = canvas.getContext("2d");
+                    const ctx = canvas.getContext("2d", { alpha: true });
 
                     ctx.drawImage(
                         img,
@@ -379,6 +381,17 @@ class GalleryManager {
                         cellWidth,
                         cellHeight,
                     );
+
+                    const imageData = ctx.getImageData(0, 0, cellWidth, cellHeight);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        if (data[i + 3] === 0) {
+                            data[i] = 0; // R
+                            data[i + 1] = 0; // G
+                            data[i + 2] = 0; // B
+                        }
+                    }
+                    ctx.putImageData(imageData, 0, 0);
 
                     this.extractedSprites.push({
                         canvas: canvas,
@@ -448,7 +461,6 @@ class GalleryManager {
                     </div>`;
             }
 
-            //     setTimeout(() => {
             this.extractedSprites.forEach((sprite, i) => {
                 const targetCanvas = document.getElementById(`sprite-preview-${i}`);
                 if (targetCanvas) {
@@ -456,7 +468,6 @@ class GalleryManager {
                     ctx.drawImage(sprite.canvas, 0, 0);
                 }
             });
-            // }, 10);
 
             let titleName = this.formatAssetTitle(name, "images").split(" ");
             titleName.pop();
@@ -502,18 +513,12 @@ class GalleryManager {
             const previewSpriteGifButton = document.getElementById("previewSpriteGifButton");
             if (this.selectedSprites.length === 0) {
                 sheetControlsDiv.style.display = "none";
-                //addToEditorSpritesButton.style.display = "none";
-                //previewSpriteGifButton.style.display = "none";
-                //sheetControlsDiv.classList.toggle("hidden", true);
                 addToEditorSpritesButton.classList.toggle("hidden", true);
                 previewSpriteGifButton.classList.toggle("hidden", true);
             } else {
                 sheetControlsDiv.style.display = "block";
-                //addToEditorSpritesButton.style.display = "block";
-                //sheetControlsDiv.classList.toggle("hidden", false);
                 addToEditorSpritesButton.classList.toggle("hidden", false);
                 if (this.selectedSprites.length > 1) {
-                    //previewSpriteGifButton.style.display = "block";
                     previewSpriteGifButton.classList.toggle("hidden", false);
                 }
             }
@@ -560,6 +565,7 @@ class GalleryManager {
                 <button ${show ? "style='padding:0 0.2vmax;margin-left:0.5vmax;width:4vmax;'" : ""} 
                     title="${this.globalImageViewMode === "cropped" ? "Preview is cropped to content: click for original" : "Preview is original: click for cropped to content"}"
                     onclick="window.galleryManager.setGlobalImageViewMode(window.galleryManager.globalImageViewMode === 'original' ? 'cropped' : 'original');window.galleryManager.updateCropButtonInPreviewTitle(${show ? "true" : "false"});">
+
                     ${this.globalImageViewMode === "cropped" ? "(cropped)" : "(original)"}
                 </button>
             `;
@@ -792,11 +798,13 @@ class GalleryManager {
             width: firstSprite.canvas.width,
             height: firstSprite.canvas.height,
             workerScript: "js/libs/gif.worker.js",
+            transparent: 0x000000, // Make black (0,0,0) transparent
+            background: 0x000000,
         });
 
         this.selectedSprites.forEach((index) => {
             const sprite = this.extractedSprites[index];
-            gif.addFrame(sprite.canvas, { delay: speed });
+            gif.addFrame(sprite.canvas, { delay: speed, transparent: true });
         });
 
         gif.on("finished", (blob) => {
@@ -996,21 +1004,17 @@ class GalleryManager {
                 if (found) {
                     const trimW = maxX - minX + 1;
                     const trimH = maxY - minY + 1;
-                    // Crop only if bounding box is smaller than original
                     if (trimW < w || trimH < h) {
                         const croppedCanvas = document.createElement("canvas");
                         croppedCanvas.width = trimW;
                         croppedCanvas.height = trimH;
                         const croppedCtx = croppedCanvas.getContext("2d");
-                        // Draw cropped area
                         croppedCtx.drawImage(canvas, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
-                        // Convert to Blob
                         const blob = await new Promise((r) => croppedCanvas.toBlob(r, "image/png"));
                         asset.croppedBlob = blob;
                         asset.croppedUrl = URL.createObjectURL(blob);
                         asset.cropped = true;
 
-                        // Save cropped asset to persistent memory
                         if (window.memoryManager && asset.baseFileName) {
                             try {
                                 const assetId = window.memoryManager.generateAssetId(asset.baseFileName, name);
@@ -1025,7 +1029,6 @@ class GalleryManager {
                         const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
                         if (thumbImg) {
                             thumbImg.src = asset.croppedUrl;
-                            //thumbImg.loading = "lazy";
                             thumbImg.click();
                         }
                         asset.cropping = false;
@@ -1055,13 +1058,10 @@ class GalleryManager {
         }
 
         if (asset.isComposition && asset.compositionDescriptor) {
-            //console.log(`Adding composition "${name}" as individual layers...`);
-
             for (const layerDesc of asset.compositionDescriptor.layers) {
                 const galleryRef = layerDesc.galleryRef;
                 if (!galleryRef) continue;
 
-                // Parse gallery reference: "gallery:Category/filename"
                 const match = galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
                 if (!match) continue;
 
@@ -1095,7 +1095,7 @@ class GalleryManager {
                         assetData.spriteIndices = layerDesc.spriteIndices;
                         assetData.animationSpeed = layerDesc.animationSpeed;
                         assetData.spriteCanvases = extractedSprites.map((s) => s.canvas);
-                        assetData.spriteVariant = layerDesc.spriteVariant; // Preserve variant
+                        assetData.spriteVariant = layerDesc.spriteVariant;
                     } catch (error) {
                         console.error(`Failed to extract sprites for ${srcName}:`, error);
                         continue;
@@ -1109,8 +1109,6 @@ class GalleryManager {
                     addedLayer.visible = layerDesc.visible;
                 }
             }
-
-            //console.log(`Added ${asset.compositionDescriptor.layers.length} layers from composition "${name}"`);
         } else {
             let assetType = "background";
             if (category === "Portraits") {
@@ -1129,9 +1127,20 @@ class GalleryManager {
             window.compositionEditor.addLayer(assetData);
         }
 
+        this.flashSuccessOnButton();
+
         if (window.compositionEditor.autoOpen === true) {
             window.compositionEditor.open();
         }
+    }
+
+    flashSuccessOnButton() {
+        const btn = document.getElementById("composition-editor-btn");
+        if (!btn) return;
+
+        btn.classList.remove("success");
+        void btn.offsetWidth;
+        btn.classList.add("success");
     }
 
     addSpriteToCompositionEditor() {
@@ -1184,6 +1193,9 @@ class GalleryManager {
         }
 
         window.compositionEditor.addLayer(assetData);
+
+        this.clearSpriteSelection();
+        this.flashSuccessOnButton();
 
         if (window.compositionEditor.autoOpen === true) {
             window.compositionEditor.open();

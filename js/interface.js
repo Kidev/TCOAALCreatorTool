@@ -54,6 +54,14 @@ function openEditor() {
         dialogFramework.stopBackgroundMusic();
     }
 
+    // Hide capture and preset buttons in editor mode
+    const screenshotBtn = document.getElementById("screenshotButton");
+    const recordBtn = document.getElementById("recordButton");
+    const presetsBtn = document.getElementById("presetsButton");
+    if (screenshotBtn) screenshotBtn.style.display = "none";
+    if (recordBtn) recordBtn.style.display = "none";
+    if (presetsBtn) presetsBtn.style.display = "none";
+
     document.getElementById("editorOverlay").classList.add("active");
     const blocker = document.getElementById("interactionBlocker");
     if (blocker) {
@@ -132,6 +140,17 @@ function closeEditor(ask_confirm = false) {
     if (ask_confirm && !confirm("Modifications not applied will be lost. Are you sure?")) {
         return;
     }
+
+    const screenshotBtn = document.getElementById("screenshotButton");
+    const recordBtn = document.getElementById("recordButton");
+    const presetsBtn = document.getElementById("presetsButton");
+    if (screenshotBtn) screenshotBtn.style.display = "";
+    if (recordBtn) {
+        recordBtn.style.display = "";
+        recordBtn.title = "Record (right-click for settings)";
+    }
+    if (presetsBtn) presetsBtn.style.display = "";
+
     document.getElementById("editorOverlay").classList.remove("active");
 
     const blocker = document.getElementById("interactionBlocker");
@@ -173,7 +192,10 @@ async function reconstructCompositionsToGallery(compositions) {
 
     for (const descriptor of compositions) {
         try {
-            const existingFileName = `${descriptor.name}.png`;
+            const hasKeyframes = descriptor.layers?.some((layer) => layer.hasKeyframes && layer.keyframes?.length > 1);
+            const fileExtension = hasKeyframes ? "gif" : "png";
+            const existingFileName = `${descriptor.name}.${fileExtension}`;
+
             if (window.gameImporterAssets.images["Misc"][existingFileName]) {
                 //console.log(`Composition "${descriptor.name}" already exists, skipping...`);
                 continue;
@@ -191,6 +213,7 @@ async function reconstructCompositionsToGallery(compositions) {
                     isComposition: true,
                     compositionId: descriptor.id,
                     compositionDescriptor: descriptor,
+                    isAnimated: hasKeyframes,
                 };
 
                 if (window.memoryManager) {
@@ -357,7 +380,7 @@ const KEY_MAP = {
     "characters": "1",
     "glitchConfig": "2",
     "scenes": "3",
-    "compositions": "E", // New: compositions array
+    "compositions": "E",
 
     // Config keys
     "showControls": "4",
@@ -418,6 +441,12 @@ const KEY_MAP = {
     "spriteIndices": "Q",
     "isAnimated": "R",
     "animationSpeed": "S",
+
+    // Keyframe-specific keys
+    "hasKeyframes": "T",
+    "keyframes": "U",
+    "time": "V",
+    "spriteVariant": "W",
 };
 
 // Reverse mapping for decompression (short key -> long key)
@@ -619,21 +648,21 @@ function showGalleryAssetsModal(mode = "viewer") {
 
         const cancelButton = document.createElement("button");
         cancelButton.textContent = "Continue without assets";
-        cancelButton.className = "tcoaal-button";
-        cancelButton.style.cssText = `
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-            font-size: 1vmax;
-        `;
+        cancelButton.className = "tcoaal-button-menu";
+        // cancelButton.style.cssText = `
+        //     padding: 0.5rem 1rem;
+        //     cursor: pointer;
+        //     font-size: 1vmax;
+        // `;
 
         const importButton = document.createElement("button");
         importButton.textContent = "Import game assets";
-        importButton.className = "tcoaal-button success";
-        importButton.style.cssText = `
-            padding: 0.5rem 1rem;
-            font-size: 1vmax;
-            cursor: pointer;
-        `;
+        importButton.className = "tcoaal-button-menu success";
+        // importButton.style.cssText = `
+        //     padding: 0.5rem 1rem;
+        //     font-size: 1vmax;
+        //     cursor: pointer;
+        // `;
 
         const closeModal = (shouldImport) => {
             modal.remove();
@@ -1290,6 +1319,14 @@ function setupGalleryOnlyMode() {
         controls.style.display = "none";
     }
 
+    // Hide capture and preset buttons in gallery mode
+    const screenshotBtn = document.getElementById("screenshotButton");
+    const recordBtn = document.getElementById("recordButton");
+    const presetsBtn = document.getElementById("presetsButton");
+    if (screenshotBtn) screenshotBtn.style.display = "none";
+    if (recordBtn) recordBtn.style.display = "none";
+    if (presetsBtn) presetsBtn.style.display = "none";
+
     document.body.innerHTML = `
         <div class="editor-overlay gallery-only-mode initial active" id="editorOverlay">
             <div class="editor-header" id="editorHeader" >
@@ -1317,7 +1354,7 @@ function setupGalleryOnlyMode() {
                 </div>
                 <div id="github-logo-icon">
                     <a href="https://github.com/Kidev/TCOAALCreatorTool" target="_blank" title="Star me on GitHub">
-                        <img src="img/github.png" alt="Star me on GitHub"/>
+                        <img src="img/github.webp" alt="Star me on GitHub"/>
                     </a>
                 </div>
             </div>
@@ -1396,7 +1433,16 @@ function setupGalleryOnlyMode() {
             <div class="composition-editor-content">
                 <div class="composition-editor-header">
                     <h2>Image Composition Editor</h2>
+                    <div class="composition-notification-area" id="compositionNotificationArea"></div>
                     <div class="composition-header-actions">
+                        <input
+                            type="text"
+                            id="compositionNameInput"
+                            placeholder="composition_1"
+                            maxlength="50"
+                            title="Name for this composition"
+                            style="padding: 8px; border-radius: 4px; border: 1px solid #666; background: #222; color: #ddd; font-family: monospace; max-width: 200px;"
+                        />
                         <button class="composition-btn success" onclick="compositionEditor.saveToGallery()" title="Save composition to gallery for reuse and sharing">
                             ✔ Save to gallery
                         </button>

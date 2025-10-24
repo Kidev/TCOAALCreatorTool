@@ -20,6 +20,7 @@ let projectData = {
     config: {
         showControls: true,
         showDebug: true,
+        showDialogArrow: true,
         backgroundMusic: null,
     },
     characters: {},
@@ -193,6 +194,8 @@ async function loadProjectData(data) {
 
     document.getElementById("configShowControls").checked = projectData.config.showControls;
     document.getElementById("configShowDebug").checked = projectData.config.showDebug;
+    document.getElementById("configShowDialogArrow").checked =
+        projectData.config.showDialogArrow !== undefined ? projectData.config.showDialogArrow : true;
 
     const hasBackgroundMusic =
         projectData.config.backgroundMusic !== null && projectData.config.backgroundMusic !== undefined;
@@ -304,7 +307,14 @@ function addCharacter() {
 
     projectData.characters[name] = { color };
     document.getElementById("newCharacterName").value = "";
+
+    // Update dialogFramework with the new character data
+    if (typeof dialogFramework !== "undefined") {
+        dialogFramework.setCharacters(projectData.characters);
+    }
+
     updateCharactersList();
+    updateAllSpeakerDropdowns();
 }
 
 function updateCharactersList() {
@@ -313,7 +323,7 @@ function updateCharactersList() {
 
     Object.entries(projectData.characters).forEach(([name, data]) => {
         const aliases = data.aliases || [];
-        const aliasesDisplay = aliases.length > 0 ? aliases.join(", ") : "";
+        const aliasesDisplay = aliases.length > 0 ? aliases.join(", ") : "Click to add aliases";
 
         const item = document.createElement("div");
         item.className = "character-item";
@@ -321,12 +331,26 @@ function updateCharactersList() {
         <div class="character-header">
         <div>
         <span class="character-name">${name}</span>
-        ${aliasesDisplay ? `<span class="character-aliases">(${aliasesDisplay})</span>` : ""}
+        <span class="character-aliases" id="aliases-display-${name}"
+              onclick="startEditingAliases('${name}')"
+              style="cursor: pointer;"
+              title="Click to edit aliases">(${aliasesDisplay})</span>
+        <span class="character-aliases-edit" id="aliases-edit-${name}" style="display: none;">
+            <input type="text"
+                    id="aliases-input-${name}"
+                    value="${aliases.join(", ")}"
+                    placeholder="alias1, alias2, ..."
+                    style="width: 30vw; padding: 2px 4px; font-size: 0.9em; font-family: inherit;"
+                    onkeydown="if(event.key === 'Enter') saveAliases('${name}')">
+            <button onclick="saveAliases('${name}')"
+                    style="padding: 2px 8px; margin-left: 4px; font-size: 0.9em;">✓</button>
+            <button onclick="cancelEditingAliases('${name}')"
+                    style="padding: 2px 8px; margin-left: 2px; font-size: 0.9em;">✕</button>
+        </span>
         </div>
         <div class="header-action-buttons">
             <label for="inputCharacterColor${name}" style="display:none;"></label>
             <input id="inputCharacterColor${name}" type="color" value="${data.color}" onchange="updateCharacterColor('${name}', this.value)">
-            <button onclick="editCharacterAliases('${name}')">Set aliases</button>
             <button class="danger" onclick="deleteCharacter('${name}')">✕</button>
         </div>
         </div>
@@ -338,25 +362,51 @@ function updateCharactersList() {
     });
 }
 
-function editCharacterAliases(characterName) {
-    const character = projectData.characters[characterName];
-    const aliases = (character.aliases || []).join(", ");
+function startEditingAliases(characterName) {
+    document.getElementById(`aliases-display-${characterName}`).style.display = "none";
+    document.getElementById(`aliases-edit-${characterName}`).style.display = "inline";
+    document.getElementById(`aliases-input-${characterName}`).focus();
+    document.getElementById(`aliases-input-${characterName}`).select();
+}
 
-    const newAliases = prompt(`Enter aliases for ${characterName} (comma-separated):`, aliases);
-    if (newAliases !== null) {
-        updateCharacterAliases(
-            characterName,
-            newAliases
-                .split(",")
-                .map((alias) => alias.trim())
-                .filter((alias) => alias.length > 0),
-        );
-        updateCharactersList();
+function saveAliases(characterName) {
+    const input = document.getElementById(`aliases-input-${characterName}`);
+    const newAliases = input.value
+        .split(",")
+        .map((alias) => alias.trim())
+        .filter((alias) => alias.length > 0);
+
+    updateCharacterAliases(characterName, newAliases);
+
+    // Update dialogFramework with the updated character data
+    if (typeof dialogFramework !== "undefined") {
+        dialogFramework.setCharacters(projectData.characters);
     }
+
+    updateCharactersList();
+    updateAllSpeakerDropdowns();
+}
+
+function cancelEditingAliases(characterName) {
+    document.getElementById(`aliases-display-${characterName}`).style.display = "inline";
+    document.getElementById(`aliases-edit-${characterName}`).style.display = "none";
+}
+
+function editCharacterAliases(characterName) {
+    // Kept for backward compatibility, now just calls startEditingAliases
+    startEditingAliases(characterName);
 }
 
 function updateCharacterColor(name, color) {
     projectData.characters[name].color = color;
+
+    // Update dialogFramework with the updated character data
+    if (typeof dialogFramework !== "undefined") {
+        dialogFramework.setCharacters(projectData.characters);
+    }
+
+    // Update speaker dropdowns to reflect new color
+    updateAllSpeakerDropdowns();
 }
 
 function updateCharacterAliases(name, aliases) {
@@ -366,7 +416,14 @@ function updateCharacterAliases(name, aliases) {
 function deleteCharacter(name) {
     if (confirm(`Delete character "${name}"?`)) {
         delete projectData.characters[name];
+
+        // Update dialogFramework with the updated character data
+        if (typeof dialogFramework !== "undefined") {
+            dialogFramework.setCharacters(projectData.characters);
+        }
+
         updateCharactersList();
+        updateAllSpeakerDropdowns();
     }
 }
 
@@ -399,7 +456,7 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, 
     let html = `
         <div class="file-select-wrapper">
             <label for="${selectId}" style="display: none;"></label>
-            <select id="${selectId}" class="file-type-select" style="${selectDisplay}" onchange="handleFileTypeChange(${sceneIndex}, '${field}', this.value, ${isSound})">
+            <select id="${selectId}" class="file-type-select" style="${selectDisplay}" onchange="handleFileTypeChange(${sceneIndex}, '${field}', this.value, ${isSound}, ${isBackgroundMusic})">
                 <option value="gallery" ${selectValue === "gallery" ? "selected" : ""}>Gallery</option>
                 <option value="url" ${selectValue === "url" ? "selected" : ""}>URL</option>
                 <option value="local" ${selectValue === "local" ? "selected" : ""}>Local</option>
@@ -690,6 +747,16 @@ function updateScenesList(onlyUpdateIndex = null) {
     setTimeout(() => updateAllPreviewDialogs(), 0);
 }
 
+function escapeHtml(text) {
+    if (!text) return "";
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function createSceneElement(index) {
     const scene = projectData.scenes[index];
     const nbScenes = projectData.scenes.length;
@@ -701,13 +768,13 @@ function createSceneElement(index) {
     Object.keys(projectData.characters).forEach((charName) => {
         const char = projectData.characters[charName];
         const isSelected = scene.speaker === charName;
-        speakerOptions += `<option style="color: ${char.color}" value="${charName}" ${isSelected ? "selected" : ""}>${charName}</option>`;
+        speakerOptions += `<option style="color: ${char.color}" value="${escapeHtml(charName)}" ${isSelected ? "selected" : ""}>${escapeHtml(charName)}</option>`;
 
         if (char.aliases && char.aliases.length > 0) {
             char.aliases.forEach((alias) => {
                 if (alias.length > 0) {
                     const isAliasSelected = scene.speaker === alias;
-                    speakerOptions += `<option style="color: ${char.color}" value="${alias}" ${isAliasSelected ? "selected" : ""}>  → ${alias}</option>`;
+                    speakerOptions += `<option style="color: ${char.color}" value="${escapeHtml(alias)}" ${isAliasSelected ? "selected" : ""}>  → ${escapeHtml(alias)}</option>`;
                 }
             });
         }
@@ -732,8 +799,8 @@ function createSceneElement(index) {
     }
 
     if (scene.demonSpeaker === true) {
-        preview1 = dialogFramework.toEntitySpeech(preview1);
-        preview2 = dialogFramework.toEntitySpeech(preview2);
+        preview1 = dialogFramework.toEntitySpeechPreserveTags(preview1);
+        preview2 = dialogFramework.toEntitySpeechPreserveTags(preview2);
     }
 
     const isValidData = (data) => {
@@ -803,11 +870,11 @@ function createSceneElement(index) {
                         </div>
                         <div class="form-group">
                             <label for="inputLine1${index}">Line 1:</label>
-                            <input id="inputLine1${index}" type="text" value="${scene.line1 || ""}" onchange="updateSceneValue(${index}, 'line1', this.value)">
+                            <input id="inputLine1${index}" type="text" value="${escapeHtml(scene.line1)}" oninput="updateSceneValue(${index}, 'line1', this.value)">
                         </div>
                         <div class="form-group">
                             <label for="inputLine2${index}">Line 2:</label>
-                            <input id="inputLine2${index}" type="text" value="${scene.line2 || ""}" onchange="updateSceneValue(${index}, 'line2', this.value)">
+                            <input id="inputLine2${index}" type="text" value="${escapeHtml(scene.line2)}" oninput="updateSceneValue(${index}, 'line2', this.value)">
                         </div>
                         <!--<div class="form-group">
                             <label for="checkCensorSpeaker${index}">Censor:</label>
@@ -874,7 +941,8 @@ function createSceneElement(index) {
                 </div>
 
                 <div class="scene-group audio-assets-group">
-                    <h4>Audio</h4>
+                    <h4 class="collapsible-group-header" onclick="toggleSceneGroup(this)">Audio</h4>
+                    <div class="collapsible-group-content" style="display: none;">
                     <div class="form-group audio">
                         <input type="checkbox" class="null-checkbox" id="sound-checkbox-${index}"
                             ${isValidData(scene.sound) ? "checked" : ""}
@@ -902,7 +970,7 @@ function createSceneElement(index) {
                             title="Uncheck to disable this parameter">
                         <label for="backgroundMusic-checkbox-${index}">Background music:</label>
                         <div style="display: flex; align-items: center; gap: 0.8vmax; flex: 1;">
-                            ${createFileSelectHTML(index, "backgroundMusic", scene.backgroundMusic, true, true)}
+                            ${createFileSelectHTML(index, "backgroundMusic", scene.backgroundMusic, false, true)}
                         </div>
                     </div>
                     <div class="form-group audio">
@@ -910,10 +978,12 @@ function createSceneElement(index) {
                         <input id="inputBackgroundMusicVolume${index}" type="number" value="${scene.backgroundMusicVolume}" min="0" max="1" step="0.1"
                             onchange="updateSceneValue(${index}, 'backgroundMusicVolume', parseFloat(this.value))">
                     </div>
+                    </div>
                 </div>
 
                 <div class="scene-group timimg-assets-group">
-                    <h4>Timing</h4>
+                    <h4 class="collapsible-group-header" onclick="toggleSceneGroup(this)">Timing</h4>
+                    <div class="collapsible-group-content" style="display: none;">
                     <div class="form-group">
                         <label for="inputDialogFadeIn${index}">Dialog fade in:</label>
                         <input id="inputDialogFadeIn${index}" type="number" value="${scene.dialogFadeInTime}" min="-5000" max="5000"
@@ -954,10 +1024,12 @@ function createSceneElement(index) {
                         <input id="inputImageDelayOut${index}" type="number" value="${scene.imageDelayOut}" min="0" max="10000"
                             onchange="updateSceneValue(${index}, 'imageDelayOut', parseInt(this.value))">
                     </div>
+                    </div>
                 </div>
 
                 <div class="scene-group effects-assets-group">
-                    <h4>Effects</h4>
+                    <h4 class="collapsible-group-header" onclick="toggleSceneGroup(this)">Effects</h4>
+                    <div class="collapsible-group-content" style="display: none;">
                     <div class="form-group">
                         <label for="checkShakeEffect${index}">Shake effect:</label>
                         <input id="checkShakeEffect${index}" type="checkbox" ${scene.shake ? "checked" : ""}
@@ -978,12 +1050,52 @@ function createSceneElement(index) {
                         <input id="inputShakeDuration${index}" type="number" value="${scene.shakeDuration}" min="0" max="5000"
                             onchange="updateSceneValue(${index}, 'shakeDuration', parseInt(this.value))">
                     </div>
+                    </div>
                 </div>
             </div>
         </div>
     `;
 
     return item;
+}
+
+function toggleSceneGroup(headerElement) {
+    const content = headerElement.nextElementSibling;
+    if (content && content.classList.contains("collapsible-group-content")) {
+        const isVisible = content.style.display !== "none";
+        content.style.display = isVisible ? "none" : "block";
+        headerElement.classList.toggle("active", !isVisible);
+    }
+}
+
+function updateAllSpeakerDropdowns() {
+    projectData.scenes.forEach((scene, index) => {
+        const selectElement = document.getElementById(`selectSpeaker${index}`);
+        if (!selectElement) return;
+
+        const currentValue = selectElement.value;
+
+        let speakerOptions = '<option style="color: var(--txt-color)" value="">Narrator</option>';
+
+        Object.keys(projectData.characters).forEach((charName) => {
+            const char = projectData.characters[charName];
+            const isSelected = currentValue === charName;
+            speakerOptions += `<option style="color: ${char.color}" value="${charName}" ${isSelected ? "selected" : ""}>${charName}</option>`;
+
+            if (char.aliases && char.aliases.length > 0) {
+                char.aliases.forEach((alias) => {
+                    if (alias.length > 0) {
+                        const isAliasSelected = currentValue === alias;
+                        speakerOptions += `<option style="color: ${char.color}" value="${alias}" ${isAliasSelected ? "selected" : ""}>  → ${alias}</option>`;
+                    }
+                });
+            }
+        });
+
+        selectElement.innerHTML = speakerOptions;
+    });
+
+    updateAllPreviewDialogs();
 }
 
 function updatePreviewDialog(index) {
@@ -1034,8 +1146,8 @@ function updatePreviewDialog(index) {
     let processedLine2 = scene.line2 || "";
 
     if (scene.demonSpeaker === true) {
-        processedLine1 = dialogFramework.toEntitySpeech(processedLine1);
-        processedLine2 = dialogFramework.toEntitySpeech(processedLine2);
+        processedLine1 = dialogFramework.toEntitySpeechPreserveTags(processedLine1);
+        processedLine2 = dialogFramework.toEntitySpeechPreserveTags(processedLine2);
     }
 
     if (scene.speaker && characterInfo) {
@@ -1049,8 +1161,73 @@ function updatePreviewDialog(index) {
         }
     }
 
-    text1Element.textContent = processedLine1;
-    text2Element.textContent = processedLine2;
+    if (processedLine1.includes("<")) {
+        const parsed1 = dialogFramework.parseFormattedText(processedLine1);
+        text1Element.innerHTML = parsed1.innerHTML;
+
+        const glitchContainers1 = text1Element.querySelectorAll(".glitch-container");
+        glitchContainers1.forEach((container) => {
+            const tagConfig = JSON.parse(container.dataset.glitchConfig);
+            const mergedConfig = { ...dialogFramework.glitchConfig, ...tagConfig };
+            const glitchEffect = new GlitchTextEffect(container, mergedConfig);
+            window.previewGlitchEffects[index].push(glitchEffect);
+        });
+    } else {
+        text1Element.textContent = processedLine1;
+    }
+
+    if (processedLine2.includes("<")) {
+        const parsed2 = dialogFramework.parseFormattedText(processedLine2);
+        text2Element.innerHTML = parsed2.innerHTML;
+
+        const glitchContainers2 = text2Element.querySelectorAll(".glitch-container");
+        glitchContainers2.forEach((container) => {
+            const tagConfig = JSON.parse(container.dataset.glitchConfig);
+            const mergedConfig = { ...dialogFramework.glitchConfig, ...tagConfig };
+            const glitchEffect = new GlitchTextEffect(container, mergedConfig);
+            window.previewGlitchEffects[index].push(glitchEffect);
+        });
+    } else {
+        text2Element.textContent = processedLine2;
+    }
+
+    updateSceneHeaderPreview(index);
+}
+
+function updateSceneHeaderPreview(index) {
+    const scene = projectData.scenes[index];
+    const sceneItems = document.querySelectorAll(".scene-item");
+    const sceneItem = sceneItems[index];
+
+    if (!sceneItem) return;
+
+    const previewLinesElement = sceneItem.querySelector(".scene-preview-lines");
+    if (!previewLinesElement) return;
+
+    // Same logic as in createSceneElement for preview text
+    let preview1 = scene.line1 ? scene.line1.substring(0, 150) : "";
+    let preview2 = scene.line2 ? scene.line2.substring(0, 150) : "";
+    const quote = scene.speaker === "" ? "" : '"';
+
+    if (preview1.length > 0) {
+        preview1 = quote + preview1;
+        if (preview2.length > 0) {
+            preview2 = preview2 + quote;
+        } else {
+            preview1 = preview1 + quote;
+        }
+    } else if (preview2.length > 0) {
+        preview2 = quote + preview2 + quote;
+    } else {
+        preview1 = "(NO TEXT)";
+    }
+
+    if (scene.demonSpeaker === true) {
+        preview1 = dialogFramework.toEntitySpeechPreserveTags(preview1);
+        preview2 = dialogFramework.toEntitySpeechPreserveTags(preview2);
+    }
+
+    previewLinesElement.innerHTML = `${preview1}&nbsp;<br/>${preview2}&nbsp;`;
 }
 
 function updateAllPreviewDialogs() {
@@ -1079,7 +1256,25 @@ function toggleScene(index) {
 function updateSceneValue(index, field, value) {
     projectData.scenes[index][field] = value;
 
-    if (["speaker", "line1", "line2", "censorSpeaker", "demonSpeaker"].includes(field)) {
+    if (["line1", "line2"].includes(field)) {
+        // Check if preview container exists
+        const container = document.querySelector(`[data-scene-index="${index}"]`);
+        if (!container) {
+            const inputId = field === "line1" ? `inputLine1${index}` : `inputLine2${index}`;
+            const cursorPosition = document.getElementById(inputId)?.selectionStart || 0;
+
+            updateScenesList(index);
+
+            setTimeout(() => {
+                const newInput = document.getElementById(inputId);
+                if (newInput) {
+                    newInput.focus();
+                    newInput.setSelectionRange(cursorPosition, cursorPosition);
+                }
+            }, 0);
+        }
+        setTimeout(() => updatePreviewDialog(index), 0);
+    } else if (["speaker", "censorSpeaker", "demonSpeaker"].includes(field)) {
         updateScenesList(index);
         setTimeout(() => updatePreviewDialog(index), 0);
     }
@@ -1346,7 +1541,9 @@ function toggleNull(sceneIndex, field, isNull) {
 
     updateNullCheckboxVisibility(sceneIndex, field, isNull);
 
-    updateScenesList();
+    // Only update the preview for this specific scene, not the entire list
+    // This prevents collapsible groups from collapsing when toggling null checkboxes
+    updatePreviewDialog(sceneIndex);
 }
 
 function updateNullCheckboxVisibility(sceneIndex, field, isNull) {
@@ -1551,6 +1748,7 @@ function deleteScene(index) {
 function updateConfig() {
     projectData.config.showControls = document.getElementById("configShowControls").checked;
     projectData.config.showDebug = document.getElementById("configShowDebug").checked;
+    projectData.config.showDialogArrow = document.getElementById("configShowDialogArrow").checked;
 
     if (!document.getElementById("backgroundMusicEnabled").checked) {
         projectData.config.backgroundMusic = null;
@@ -1801,7 +1999,8 @@ function generateCode() {
     let code = `function setupScene() {
         dialogFramework.setConfig({
             showControls: ${projectData.config.showControls},
-            showDebug: ${projectData.config.showDebug}`;
+            showDebug: ${projectData.config.showDebug},
+            showDialogArrow: ${projectData.config.showDialogArrow !== undefined ? projectData.config.showDialogArrow : true}`;
 
     if (projectData.config.backgroundMusic) {
         code += `,
@@ -1918,26 +2117,19 @@ function generateCode() {
                     const filename = field.replace("gallery:Misc/", "");
                     const asset = window.gameImporterAssets.images["Misc"][filename];
 
-                    // Check if this asset is a composition by either:
-                    // 1. isComposition flag is true AND has a descriptor
-                    // 2. originalPath is "compositions" (fallback for assets loaded from IndexedDB)
                     if (asset) {
                         const isCompositionByFlag = asset.isComposition && asset.compositionDescriptor;
                         const isCompositionByPath = asset.originalPath === "compositions";
 
                         if (isCompositionByFlag || isCompositionByPath) {
-                            // Try to get descriptor from asset, or extract from projectData.compositions
                             let descriptor = asset.compositionDescriptor;
 
-                            // If no descriptor on asset, try to find it in projectData.compositions
                             if (!descriptor && asset.compositionId && projectData.compositions) {
                                 descriptor = projectData.compositions.find((c) => c.id === asset.compositionId);
                             }
 
-                            // If still no descriptor but we know it's a composition from path, try to find by name
                             if (!descriptor && isCompositionByPath && projectData.compositions) {
-                                // Extract name without extension
-                                const nameWithoutExt = filename.replace(/\.png$/, "");
+                                const nameWithoutExt = filename.replace(/\.(png|gif)$/, "");
                                 descriptor = projectData.compositions.find((c) => c.name === nameWithoutExt);
                             }
 
@@ -1972,6 +2164,7 @@ function generateCode() {
 if (document.getElementById("configShowControls")) {
     document.getElementById("configShowControls").addEventListener("change", updateConfig);
     document.getElementById("configShowDebug").addEventListener("change", updateConfig);
+    document.getElementById("configShowDialogArrow").addEventListener("change", updateConfig);
     document.getElementById("glitchScrambledColor").addEventListener("change", updateGlitchConfig);
     document.getElementById("glitchRealColor").addEventListener("change", updateGlitchConfig);
     document.getElementById("glitchChangeSpeed").addEventListener("change", updateGlitchConfig);
@@ -2000,12 +2193,14 @@ function resetConfigToDefault() {
         projectData.config = {
             showControls: true,
             showDebug: true,
+            showDialogArrow: true,
             backgroundMusic: null,
             backgroundMusicVolume: 0.5,
         };
 
         document.getElementById("configShowControls").checked = true;
         document.getElementById("configShowDebug").checked = true;
+        document.getElementById("configShowDialogArrow").checked = true;
         document.getElementById("backgroundMusicEnabled").checked = false;
         toggleBackgroundMusic(false);
     }
@@ -2165,6 +2360,17 @@ async function openGallery() {
 
     modal.style.display = "flex";
 
+    const modalContent = document.getElementById("galleryModalContent");
+    const clickOutsideHandler = (e) => {
+        if (e.target === modal && !modalContent.contains(e.target)) {
+            closeGallery();
+        }
+    };
+
+    modal.removeEventListener("click", modal._clickOutsideHandler);
+    modal._clickOutsideHandler = clickOutsideHandler;
+    modal.addEventListener("click", clickOutsideHandler);
+
     updateGalleryCategories();
 }
 
@@ -2208,6 +2414,10 @@ function closeGallery() {
     const modal = document.getElementById("galleryModal");
     if (modal) {
         modal.style.display = "none";
+        if (modal._clickOutsideHandler) {
+            modal.removeEventListener("click", modal._clickOutsideHandler);
+            modal._clickOutsideHandler = null;
+        }
     }
 
     galleryContext = null;
@@ -2280,7 +2490,7 @@ function updateGalleryCategories() {
     lineDiv.style.flexWrap = "nowrap";
     lineDiv.style.width = "100%";
 
-    categoryDiv.style.display = "flex";
+    //categoryDiv.style.display = "flex";
     categoryDiv.style.flexDirection = "row";
     categoryDiv.style.justifyContent = "flex-start";
     categoryDiv.style.alignItems = "center";

@@ -37,13 +37,14 @@
 }
 
 :root {
-    --site-banner: url("https://i.imgur.com/pkYWoIM.png");
-    --choice-button-hover: url("https://i.imgur.com/6477Nct.png");
-    --choice-button: url("https://i.imgur.com/5DspJvG.png");
-    --dialog-box: url("https://i.imgur.com/cH6ms0h.png");
+    --site-banner: url("./img/tcoaal-banner.webp");
+    --choice-button-hover: url("./img/tcoaal-choice-button-hover.webp");
+    --choice-button: url("./img/tcoaal-choice-button.webp");
+    --small-choice-button-hover: url("./img/tcoaal-choice-button-small-hover.webp");
+    --small-choice-button: url("./img/tcoaal-choice-button-small.webp");
+    --dialog-box: url("./img/tcoaal-dialog-box.webp");
     --site-home: url("./img/tcoaal-home.webp");
-    --site-loading: url("https://i.imgur.com/E0E2oCJ.png");
+    --site-loading: url("./img/tcoaal-loading.webp");
     --site-title: url("./img/tcoaal-title.webp");
-    --small-choice-button-hover: url("https://i.imgur.com/qDNa4Wr.png");
-    --small-choice-button: url("https://i.imgur.com/4Ew7ekk.png");
+    --dialog-arrow: url("./img/tcoaal-arrow.gif");
 }

@@ -26,6 +26,9 @@
         <link href="colors.css" rel="stylesheet" />
         <link href="viewer.css" rel="stylesheet" />
         <link href="editor.css" rel="stylesheet" />
+        <script src="js/libs/lz-string.min.js"></script>
+        <script src="js/libs/gif.js"></script>
+        <script src="js/libs/html2canvas.min.js" defer></script>
     </head>
     <body>
         <div id="importProgressModal" class="import-modal" style="display: none">
@@ -39,7 +42,7 @@
         </div>
         <div id="galleryModal" class="gallery-modal" style="display: none">
             <div id="galleryModalContent" class="gallery-modal-content">
-                <div
+                <!--<div
                     class="gallery-header"
                     style="
                         display: flex;
@@ -55,11 +58,11 @@
                         <div class="bar" id="croppingProgressBarModal"></div>
                         <span class="label" id="croppingProgressSpanModal">Cropping...</span>
                     </div>
-                    <!--<button class="tcoaal-button-small composition-editor-open-btn" onclick="openCompositionEditor()" title="Open composition editor to create custom scenes">
+                    <-<button class="tcoaal-button-small composition-editor-open-btn" onclick="openCompositionEditor()" title="Open composition editor to create custom scenes">
                         🖼 Composition Editor
-                    </button>-->
+                    </button>->
                     <button class="gallery-close-btn" onclick="closeGallery()">✕</button>
-                </div>
+                </div>-->
                 <div id="galleryMainContainer" class="gallery-main-container">
                     <div class="gallery-left-panel">
                         <div class="gallery-tabs">
@@ -89,7 +92,24 @@
             <div class="composition-editor-content">
                 <div class="composition-editor-header">
                     <h2>Image Composition Editor</h2>
+                    <div class="composition-notification-area" id="compositionNotificationArea"></div>
                     <div class="composition-header-actions">
+                        <input
+                            type="text"
+                            id="compositionNameInput"
+                            placeholder="composition_1"
+                            maxlength="50"
+                            title="Name for this composition"
+                            style="
+                                padding: 8px;
+                                border-radius: 4px;
+                                border: 1px solid #666;
+                                background: #222;
+                                color: #ddd;
+                                font-family: monospace;
+                                max-width: 200px;
+                            "
+                        />
                         <button
                             class="composition-btn success"
                             onclick="compositionEditor.saveToGallery()"
@@ -143,51 +163,83 @@
             </div>
         </div>
         <input type="file" id="folderInput" style="display: none" webkitdirectory directory multiple />
+        <div class="controls" id="controlsContainer">
+            <div class="controller-viewer-line0">
+                <button
+                    id="homeButton"
+                    class="controller-buttons-viewer"
+                    onclick="window.location.href = 'index.html'"
+                    title="Return to home screen"
+                >
+                    <img src="favicon.ico" alt="Home" width="1vmax" height="1vmax" />
+                </button>
+                <button class="controller-buttons-viewer" onclick="openEditor()" title="Edit the dialog">🛠</button>
+
+                <button id="presetsButton" class="controller-buttons-viewer" title="Load a preset sequence">🗂</button>
+                <button
+                    id="playSequenceButton"
+                    class="controller-buttons-viewer"
+                    onclick="dialogFramework.playPauseSequence()"
+                    title="Play / Pause entire sequence"
+                >
+                    ▶
+                </button>
+                <button
+                    id="resetButton"
+                    class="controller-buttons-viewer"
+                    onclick="dialogFramework.reset()"
+                    title="Reset"
+                >
+                    ⟲
+                </button>
+                <button
+                    id="prevButton"
+                    class="controller-buttons-viewer"
+                    onclick="dialogFramework.previous()"
+                    title="Previous (left arrow)"
+                >
+                    ⬅
+                </button>
+                <div class="controller-buttons-viewer controller-buttons-viewer-select disabled" id="debugInfo">
+                    No scene
+                </div>
+                <button
+                    id="nextButton"
+                    class="controller-buttons-viewer"
+                    onclick="dialogFramework.next()"
+                    title="Next (right arrow, click or space)"
+                >
+                    ➡
+                </button>
+
+                <button
+                    id="screenshotButton"
+                    class="controller-buttons-viewer"
+                    onclick="captureScreenshot()"
+                    title="Screenshot"
+                >
+                    🖼
+                </button>
+                <button
+                    id="recordButton"
+                    class="controller-buttons-viewer"
+                    onclick="toggleRecording()"
+                    title="Record (right-click for settings)"
+                >
+                    📽
+                </button>
+            </div>
+            <div class="controls-footer">
+                <span class="controls-title">Use tab to toggle the interface</span>
+            </div>
+        </div>
         <div class="game-container">
             <div class="dialog-container" id="dialogContainer">
                 <div class="dialog-content">
                     <div class="dialog-line speaker-line" id="speakerLine"></div>
                     <div class="dialog-line text-line" id="textLine1"></div>
                     <div class="dialog-line text-line" id="textLine2"></div>
-                </div>
-            </div>
-            <div class="controls" id="controlsContainer">
-                <div class="nav-controls" id="navControls">
-                    <button
-                        class="tcoaal-button-small tcoaal-button-small-header"
-                        onclick="openEditor()"
-                        title="Edit the dialog"
-                    >
-                        Editor
-                    </button>
-                    <button
-                        id="prevButton"
-                        class="tcoaal-button-small tcoaal-button-small-header"
-                        onclick="dialogFramework.previous()"
-                        title="Previous (left arrow)"
-                    >
-                        ⬅
-                    </button>
-                    <div class="debug-info tcoaal-button-small tcoaal-button-small-header" id="debugInfo">0 / 0</div>
-                    <button
-                        id="nextButton"
-                        class="tcoaal-button-small tcoaal-button-small-header"
-                        onclick="dialogFramework.next()"
-                        title="Next (right arrow, click or space)"
-                    >
-                        ➡
-                    </button>
-                    <button
-                        id="resetButton"
-                        class="tcoaal-button-small tcoaal-button-small-header"
-                        onclick="dialogFramework.reset()"
-                        title="Reset"
-                    >
-                        ⟲
-                    </button>
-                </div>
-                <div class="controls-footer">
-                    <span class="controls-title">Use tab to toggle the interface</span>
+                    <div id="dialogArrow"></div>
                 </div>
             </div>
         </div>
@@ -204,13 +256,13 @@
                         >
                             Game assets
                         </button>
-                        <button
+                        <!--<button
                             class="tcoaal-button-small tcoaal-button-small-header js-download"
                             onclick="downloadSequence()"
                             title="Export the current dialog as a .js file"
                         >
                             Export
-                        </button>
+                        </button>-->
                         <button
                             class="tcoaal-button-small tcoaal-button-small-header js-download"
                             onclick="generateShareLink()"
@@ -218,13 +270,13 @@
                         >
                             Share Link
                         </button>
-                        <button
+                        <!--<button
                             class="tcoaal-button-small tcoaal-button-small-header js-upload"
                             onclick="importSequence()"
                             title="Import a dialog from file, will replace the current one"
                         >
                             Import
-                        </button>
+                        </button>-->
                         <!--<button
                             class="tcoaal-button-small tcoaal-button-small-header js-upload"
                             onclick="importFromLink()"
@@ -292,6 +344,10 @@
                             <div class="form-group no-checkbox" style="display: none">
                                 <label for="configShowDebug">Show scene count:</label>
                                 <input checked id="configShowDebug" type="checkbox" />
+                            </div>
+                            <div class="form-group no-checkbox">
+                                <label for="configShowDialogArrow">Show dialog arrow:</label>
+                                <input checked id="configShowDialogArrow" type="checkbox" />
                             </div>
 
                             <div class="form-group" style="display: none">
@@ -421,7 +477,6 @@
         </div>
         <label for="fileInput" style="display: none"></label>
         <input accept=".json" id="fileInput" style="display: none" type="file" />
-        <script src="js/libs/lz-string.min.js"></script>
         <script src="js/filenameMapper.js"></script>
         <script src="js/memoryManager.js"></script>
         <script src="js/dialog.js"></script>
@@ -431,5 +486,8 @@
         <script src="js/editor.js"></script>
         <script src="js/galleryManager.js"></script>
         <script src="js/compositionEditor.js"></script>
+        <script src="js/capture.js"></script>
+        <script src="js/autoplay.js"></script>
+        <script src="js/presets.js"></script>
     </body>
 </html>

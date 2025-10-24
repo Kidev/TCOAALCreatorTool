@@ -7,7 +7,22 @@
 @font-face {
     font-family: "Faustina";
     src: url("./fonts/Faustina-Regular.ttf") format("truetype");
-    font-weight: 800;
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Faustina";
+    src: url("./fonts/Faustina-Bold.ttf") format("truetype");
+    font-weight: bold;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Faustina";
+    src: url("./fonts/Faustina-Italic.ttf") format("truetype");
+    font-weight: normal;
+    font-style: italic;
 }
 
 body {
@@ -87,6 +102,22 @@ body {
     font-size: 25vmin;
 }
 
+#dialogArrow {
+    position: absolute;
+    bottom: 0%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 24px;
+    background-image: var(--dialog-arrow);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    pointer-events: none;
+    z-index: 15;
+    display: none;
+}
+
 @media (max-width: 1200px) {
     .dialog-container {
         width: 62.5vw;
@@ -125,6 +156,18 @@ body {
     box-sizing: border-box;
 }
 
+.dialog-arrow {
+    position: absolute;
+    bottom: 5%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    height: 8%;
+    object-fit: contain;
+    pointer-events: none;
+    z-index: 15;
+}
+
 .dialog-line {
     position: absolute;
     left: 5%;
@@ -140,14 +183,14 @@ body {
 .speaker-line {
     top: 12%;
     color: var(--default);
-    font-weight: 600;
+    font-weight: normal;
     font-size: 15%;
     /*text-shadow: 2px 2px 4px rgba(0,0,0,0.8);*/
 }
 
 .text-line {
     color: var(--default);
-    font-weight: 600;
+    font-weight: normal;
     font-size: 15%;
     /*text-shadow: 1px 1px 2px rgba(0,0,0,0.8);*/
 }
@@ -266,25 +309,72 @@ body {
 }
 
 .controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     position: fixed;
-    top: 0.15vmax;
-    left: 0.15vmax;
+    top: 0;
+    left: 0;
     z-index: 100;
-    background: url("https://i.imgur.com/cH6ms0h.png");
-    background-size: 100% 100%;
-    padding: 3vh 1vw;
-    border-radius: 12px;
     transition: all 0.3s ease;
-    min-width: 280px;
     font-family: "Faustina", serif;
-    /*width: 24vw;
-    height: 8vh;*/
+    flex-wrap: nowrap;
+    border-radius: 0;
 }
 
-.nav-controls > .tcoaal-button-small-header {
-    height: 3vh;
-    width: 5vw;
-    padding: 0;
+.controller-viewer-line0 {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+}
+
+.controller-viewer-line1 {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+}
+
+.controller-viewer-line2 {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+}
+
+.controller-buttons-viewer-select {
+    width: 6vmax;
+    height: 2vmax;
+    align-content: center;
+}
+
+.controller-buttons-viewer {
+    background: var(--accent-color);
+    color: var(--txt-color);
+    border: 1px black solid;
+    border-radius: 0;
+    padding: 0.25vmax 0.5vmax;
+    cursor: pointer;
+    font-size: 1vmax;
+    font-weight: bold;
+    height: 2vmax;
+}
+
+.controller-buttons-viewer.disabled,
+.controller-buttons-viewer:disabled {
+    background: #666;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.5;
+}
+
+.controller-buttons-viewer.active {
+    display: block;
+}
+
+.controller-buttons-viewer:hover {
+    background: var(--accent-color-light);
 }
 
 /*
@@ -294,10 +384,36 @@ body {
 */
 #debugInfo {
     align-content: center;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    cursor: pointer;
+}
+
+#debugInfo.disabled {
+    align-content: center;
+    display: flex;
+    flex-direction: row;
+    background: #666;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.5;
+    justify-content: center;
+}
+
+#homeButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+#homeButton > img {
+    width: 1vmax;
+    height: 1vmax;
 }
 
 .controls.hidden {
-    opacity: 0;
+    opacity: 0 !important;
     pointer-events: none;
     transform: translateY(-10px);
 }
@@ -307,8 +423,8 @@ body {
     border: 1px solid #4a90e2;
     color: var(--default);
     font-size: 0.7vmax;
-    width: 1vw;
-    height: 1vh;
+    width: 2vmax;
+    height: 1vmax;
 }
 
 .scene-jump-select::before {
@@ -316,8 +432,8 @@ body {
     border: 1px solid #4a90e2;
     color: var(--default);
     font-size: 1vmax;
-    width: 2.5vw;
-    height: 1.8vh;
+    width: 2vmax;
+    height: 1vmax;
 }
 
 /*
@@ -476,6 +592,42 @@ body {
         0 0 4px #000000;
 }
 
+.tcoaal-button-menu {
+    padding: 0.5vmax 1vmax;
+    cursor: pointer;
+    background: rgb(68, 68, 68);
+    border: none;
+    border-radius: 4px;
+    color: rgb(221, 221, 221);
+    font-size: 0.75vmax;
+
+    font-family: "Faustina", serif;
+    text-align: center;
+    text-shadow:
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 2px #000000,
+        0 0 3px #000000,
+        0 0 4px #000000;
+}
+
+.tcoaal-button-menu.disabled,
+.tcoaal-button-menu:disabled {
+    background: #666;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.5;
+}
+
+.tcoaal-button-menu:hover {
+    background: #666;
+    transform: none;
+}
+
 .tcoaal-button.disabled,
 .tcoaal-button:hover {
     background: url("https://i.imgur.com/6477Nct.png");
@@ -532,7 +684,7 @@ body {
 }
 
 .debug-info {
-    background: url("https://i.imgur.com/4Ew7ekk.png");
+    /*background: url("https://i.imgur.com/4Ew7ekk.png");*/
     background-size: 100% 100%;
     color: var(--white);
     text-align: center;
@@ -747,7 +899,7 @@ body {
 }
 
 .glitch-char {
-    color: var(--txt-color, var(--black));
+    color: var(--text-color, var(--txt-color));
     transition: color 0s;
     display: inline-block;
     width: 1ch;
@@ -761,7 +913,7 @@ body {
 }
 
 .speaker-line .glitch-char {
-    font-weight: 600;
+    font-weight: normal;
     font-size: inherit;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
     font-family: "Courier New", "Monaco", monospace;
