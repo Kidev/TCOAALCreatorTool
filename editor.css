@@ -471,13 +471,13 @@ button.reset-default:hover {
 }
 
 div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header {
-    background: url("https://i.imgur.com/5DspJvG.png");
+    background: var(--choice-button);
     background-size: 100% 100%;
     padding: 0.5vmax 0.5vmax;
 }
 
 div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header:hover {
-    background: url("https://i.imgur.com/6477Nct.png");
+    background: var(--choice-button-hover);
     background-size: 100% 100%;
     padding: 0.5vmax 0.5vmax;
     color: var(--white);
@@ -491,7 +491,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disabled:hover {
     cursor: not-allowed;
     opacity: 0.5;
-    background: url("https://i.imgur.com/5DspJvG.png");
+    background: var(--choice-button);
     background-size: 100% 100%;
 }
 
@@ -1062,7 +1062,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 }
 
 .editor-overlay.spa-mode.active::before {
-    background-image: url("https://i.imgur.com/pkYWoIM.png");
+    background-image: var(--site-banner);
     background-repeat: no-repeat;
     background-position: top left;
     background-attachment: local;
@@ -1084,7 +1084,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     background-size: cover;
 }
 .editor-overlay.gallery-only-mode.active.gallery-loaded::before {
-    background-image: url("https://i.imgur.com/pkYWoIM.png");
+    background-image: var(--site-banner);
     background-repeat: no-repeat;
     background-position: top left;
     background-attachment: local;
@@ -1092,7 +1092,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     opacity: 1;
 }
 .editor-overlay.gallery-only-mode.active.gallery-loaded.scrolled::before {
-    background-image: url("https://i.imgur.com/pkYWoIM.png");
+    background-image: var(--site-banner);
     background-repeat: no-repeat;
     background-position: top left;
     background-attachment: local;
@@ -2258,7 +2258,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 }
 
 #download-all-button {
-    background: url("https://i.imgur.com/5DspJvG.png");
+    background: var(--choice-button);
     background-size: 100% 100%;
     font-family: "Faustina", serif;
     font-size: 1.5vmin;
@@ -3170,7 +3170,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 }
 
 .composition-editor-open-btn {
-    background: url("https://i.imgur.com/5DspJvG.png");
+    background: var(--choice-button)
     background-size: 100% 100%;
     color: var(--white);
     text-shadow:
@@ -3181,7 +3181,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 }
 
 .composition-editor-open-btn:hover {
-    background: url("https://i.imgur.com/6477Nct.png");
+    background: var(--choice-button-hover);
     background-size: 100% 100%;
     color: var(--white);
 }

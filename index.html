@@ -416,37 +416,39 @@
                             </div>
                         </div>
                         <div class="subsection">
-                            <h3>Glitch Effect</h3>
-                            <button class="reset-default reset-section" onclick="resetGlitchToDefault()">
-                                Reset to default
-                            </button>
-                            <div class="form-group no-checkbox">
-                                <label for="glitchScrambledColor">Scrambled color:</label>
-                                <input id="glitchScrambledColor" type="color" />
-                            </div>
-                            <div class="form-group no-checkbox">
-                                <label for="glitchRealColor">Real color:</label>
-                                <input id="glitchRealColor" type="color" />
-                            </div>
-                            <div class="form-group no-checkbox">
-                                <label for="glitchChangeSpeed">Change speed:</label>
-                                <input id="glitchChangeSpeed" max="500" min="10" type="number" value="50" />
-                            </div>
-                            <div class="form-group no-checkbox">
-                                <label for="glitchRealProbability">Real probability:</label>
-                                <input id="glitchRealProbability" max="100" min="0" type="number" value="5" />
-                            </div>
-                            <div class="form-group no-checkbox">
-                                <label for="glitchAutoStart">Auto start:</label>
-                                <input checked id="glitchAutoStart" type="checkbox" />
-                            </div>
-                            <div class="form-group no-checkbox">
-                                <label for="glitchCharsAllowed">Allowed characters:</label>
-                                <input
-                                    id="glitchCharsAllowed"
-                                    type="text"
-                                    value="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-                                />
+                            <h4 class="collapsible-group-header" style="font-size: 0.95vw;" onclick="toggleSceneGroup(this)">Glitch effect</h4>
+                            <div class="collapsible-group-content" style="display: none;">
+                                <button class="reset-default reset-section" onclick="resetGlitchToDefault()">
+                                    Reset to default
+                                </button>
+                                <div class="form-group no-checkbox">
+                                    <label for="glitchScrambledColor">Scrambled color:</label>
+                                    <input id="glitchScrambledColor" type="color" />
+                                </div>
+                                <div class="form-group no-checkbox">
+                                    <label for="glitchRealColor">Real color:</label>
+                                    <input id="glitchRealColor" type="color" />
+                                </div>
+                                <div class="form-group no-checkbox">
+                                    <label for="glitchChangeSpeed">Change speed:</label>
+                                    <input id="glitchChangeSpeed" max="500" min="10" type="number" value="50" />
+                                </div>
+                                <div class="form-group no-checkbox">
+                                    <label for="glitchRealProbability">Real probability:</label>
+                                    <input id="glitchRealProbability" max="100" min="0" type="number" value="5" />
+                                </div>
+                                <div class="form-group no-checkbox">
+                                    <label for="glitchAutoStart">Auto start:</label>
+                                    <input checked id="glitchAutoStart" type="checkbox" />
+                                </div>
+                                <div class="form-group no-checkbox">
+                                    <label for="glitchCharsAllowed">Allowed characters:</label>
+                                    <input
+                                        id="glitchCharsAllowed"
+                                        type="text"
+                                        value="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>

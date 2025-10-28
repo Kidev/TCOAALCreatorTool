@@ -90,7 +90,7 @@ body {
     max-width: 1600px;
     max-height: 358px;
     aspect-ratio: calc(1600 / 360);
-    background-image: url("https://i.imgur.com/cH6ms0h.png");
+    background-image: var(--dialog-box);
     background-size: 100% 100%;
     background-repeat: no-repeat;
     background-position: center;
@@ -555,7 +555,7 @@ body {
 }*/
 
 .tcoaal-button {
-    background: url("https://i.imgur.com/5DspJvG.png");
+    background: var(--choice-button);
     background-size: 100% 100%;
     font-family: "Faustina", serif;
     text-align: center;
@@ -574,7 +574,7 @@ body {
 }
 
 .tcoaal-button-small {
-    background: url("https://i.imgur.com/4Ew7ekk.png");
+    background: var(--small-choice-button);
     background-size: 100% 100%;
     font-family: "Faustina", serif;
     text-align: center;
@@ -630,13 +630,13 @@ body {
 
 .tcoaal-button.disabled,
 .tcoaal-button:hover {
-    background: url("https://i.imgur.com/6477Nct.png");
+    background: var(--choice-button-hover);
     background-size: 100% 100%;
 }
 
 .tcoaal-button-small.disabled,
 .tcoaal-button-small:hover {
-    background: url("https://i.imgur.com/qDNa4Wr.png");
+    background: var(--small-choice-button-hover);
     background-size: 100% 100%;
 }
 
@@ -684,7 +684,7 @@ body {
 }
 
 .debug-info {
-    /*background: url("https://i.imgur.com/4Ew7ekk.png");*/
+    /*background: var(--small-choice-button-hover);*/
     background-size: 100% 100%;
     color: var(--white);
     text-align: center;
@@ -940,7 +940,7 @@ body {
     align-items: center;
     gap: 2vmax;
     color: var(--txt-color);
-    background: url("https://i.imgur.com/cH6ms0h.png");
+    background: var(--dialog-box);
     background-size: 100% 100%;
 }
 

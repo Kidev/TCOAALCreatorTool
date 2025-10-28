@@ -1420,7 +1420,7 @@ function setupGalleryOnlyMode() {
         <input type="file" id="folderInput" style="display: none;" webkitdirectory directory multiple>
         <div id="importProgressModal" class="import-modal" style="display: none;">
             <div class="import-modal-content">
-                <img src="https://i.imgur.com/E0E2oCJ.png" style="margin: 0 auto 1.5vmax; display: block;">
+                <img src="img/tcoaal-loading.webp" style="margin: 0 auto 1.5vmax; display: block;">
                 <h2>Processing game assets</h2>
                 <div class="import-progress-bar">
                     <div id="importProgressFill" class="import-progress-fill"></div>

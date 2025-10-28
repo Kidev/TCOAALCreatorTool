@@ -244,6 +244,8 @@ async function loadProjectData(data) {
     document.getElementById("glitchCharsAllowed").value = projectData.glitchConfig.charsAllowed;
     document.getElementById("newCharacterColor").value = Color.DEFAULT;
 
+    dialogFramework.setGlitchConfig(projectData.glitchConfig);
+
     updateCharactersList();
 
     const hasGalleryRefs = projectData.scenes.some(
@@ -694,6 +696,28 @@ function addScene() {
 
     projectData.scenes.push(scene);
     const newIndex = projectData.scenes.length - 1;
+
+    const previouslyExpanded = Array.from(expandedScenes);
+    expandedScenes.clear();
+
+    previouslyExpanded.forEach((prevIndex) => {
+        const previewSpeaker = document.getElementById(`previewSpeaker-${prevIndex}`);
+        if (previewSpeaker && previewSpeaker._glitchEffect) {
+            previewSpeaker._glitchEffect.stop();
+            delete previewSpeaker._glitchEffect;
+        }
+        const previewLine1 = document.getElementById(`previewLine1-${prevIndex}`);
+        if (previewLine1 && previewLine1._glitchEffect) {
+            previewLine1._glitchEffect.stop();
+            delete previewLine1._glitchEffect;
+        }
+        const previewLine2 = document.getElementById(`previewLine2-${prevIndex}`);
+        if (previewLine2 && previewLine2._glitchEffect) {
+            previewLine2._glitchEffect.stop();
+            delete previewLine2._glitchEffect;
+        }
+    });
+
     expandedScenes.add(newIndex);
     updateScenesList();
 }
@@ -827,9 +851,9 @@ function createSceneElement(index) {
             previewHTML += `<img src="${getImageSrc(index, "bustRight")}" alt="Bust Right" class="preview-bust right">`;
         }
 
-        if (scene.line1 || scene.line2 || scene.speaker) {
+        if (scene.line1 || scene.line2) {
             previewHTML += `
-        <div class="preview-text" style="background-image: url('https://i.imgur.com/cH6ms0h.png'); background-size: 100% 100%; background-repeat: no-repeat;">
+        <div class="preview-text" style="background-image: url('img/tcoaal-dialog-box.webp'); background-size: 100% 100%; background-repeat: no-repeat;">
             <div class="preview-dialog-content" data-scene-index="${index}">
                 <div class="dialog-line speaker-line preview-speaker-${index}"></div>
                 <div class="dialog-line text-line preview-text1-${index}"></div>
@@ -1248,18 +1272,39 @@ function toggleScene(index) {
             delete window.previewGlitchEffects[index];
         }
     } else {
+        const previouslyExpanded = Array.from(expandedScenes);
+        expandedScenes.clear();
+
+        previouslyExpanded.forEach((prevIndex) => {
+            if (window.previewGlitchEffects && window.previewGlitchEffects[prevIndex]) {
+                window.previewGlitchEffects[prevIndex].forEach((effect) => {
+                    if (effect && effect.destroy) {
+                        effect.destroy();
+                    }
+                });
+                delete window.previewGlitchEffects[prevIndex];
+            }
+        });
+
         expandedScenes.add(index);
     }
     updateScenesList();
 }
 
 function updateSceneValue(index, field, value) {
-    projectData.scenes[index][field] = value;
-
     if (["line1", "line2"].includes(field)) {
-        // Check if preview container exists
+        const scene = projectData.scenes[index];
+
+        const hadLines = !!(scene.line1 || scene.line2);
+
+        projectData.scenes[index][field] = value;
+
+        const hasLines = !!(scene.line1 || scene.line2);
+
+        const needsStructureUpdate = hadLines !== hasLines;
+
         const container = document.querySelector(`[data-scene-index="${index}"]`);
-        if (!container) {
+        if (!container || needsStructureUpdate) {
             const inputId = field === "line1" ? `inputLine1${index}` : `inputLine2${index}`;
             const cursorPosition = document.getElementById(inputId)?.selectionStart || 0;
 
@@ -1272,11 +1317,16 @@ function updateSceneValue(index, field, value) {
                     newInput.setSelectionRange(cursorPosition, cursorPosition);
                 }
             }, 0);
+        } else {
+            setTimeout(() => updatePreviewDialog(index), 0);
         }
-        setTimeout(() => updatePreviewDialog(index), 0);
-    } else if (["speaker", "censorSpeaker", "demonSpeaker"].includes(field)) {
-        updateScenesList(index);
-        setTimeout(() => updatePreviewDialog(index), 0);
+    } else {
+        projectData.scenes[index][field] = value;
+
+        if (["speaker", "censorSpeaker", "demonSpeaker"].includes(field)) {
+            updateScenesList(index);
+            setTimeout(() => updatePreviewDialog(index), 0);
+        }
     }
 }
 
@@ -1768,6 +1818,12 @@ function updateGlitchConfig() {
         autoStart: document.getElementById("glitchAutoStart").checked,
         charsAllowed: document.getElementById("glitchCharsAllowed").value,
     };
+
+    dialogFramework.setGlitchConfig(projectData.glitchConfig);
+
+    expandedScenes.forEach((sceneIndex) => {
+        updatePreviewDialog(sceneIndex);
+    });
 }
 
 function toggleBackgroundMusic(enabled) {
@@ -2165,12 +2221,12 @@ if (document.getElementById("configShowControls")) {
     document.getElementById("configShowControls").addEventListener("change", updateConfig);
     document.getElementById("configShowDebug").addEventListener("change", updateConfig);
     document.getElementById("configShowDialogArrow").addEventListener("change", updateConfig);
-    document.getElementById("glitchScrambledColor").addEventListener("change", updateGlitchConfig);
-    document.getElementById("glitchRealColor").addEventListener("change", updateGlitchConfig);
-    document.getElementById("glitchChangeSpeed").addEventListener("change", updateGlitchConfig);
-    document.getElementById("glitchRealProbability").addEventListener("change", updateGlitchConfig);
+    document.getElementById("glitchScrambledColor").addEventListener("input", updateGlitchConfig);
+    document.getElementById("glitchRealColor").addEventListener("input", updateGlitchConfig);
+    document.getElementById("glitchChangeSpeed").addEventListener("input", updateGlitchConfig);
+    document.getElementById("glitchRealProbability").addEventListener("input", updateGlitchConfig);
     document.getElementById("glitchAutoStart").addEventListener("change", updateGlitchConfig);
-    document.getElementById("glitchCharsAllowed").addEventListener("change", updateGlitchConfig);
+    document.getElementById("glitchCharsAllowed").addEventListener("input", updateGlitchConfig);
 }
 
 if (document.getElementById("charactersList")) {

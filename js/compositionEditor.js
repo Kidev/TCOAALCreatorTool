@@ -1524,6 +1524,8 @@ class CompositionEditor {
 
             container.appendChild(layerDiv);
         });
+
+        this.attachKeyframeDragListeners();
     }
 
     getLayerThumbnail(layer) {
@@ -1598,6 +1600,77 @@ class CompositionEditor {
 
     truncate(str, maxLen) {
         return str.length > maxLen ? str.substring(0, maxLen - 3) + "..." : str;
+    }
+
+    attachKeyframeDragListeners() {
+        const markers = document.querySelectorAll(".timeline-keyframe-marker.timeline-keyframe-current");
+
+        markers.forEach((marker) => {
+            marker.addEventListener("mousedown", (e) => {
+                if (e.button !== 0) return;
+
+                const isSelected = marker.dataset.isSelected === "true";
+                if (!isSelected) return;
+
+                const startX = e.clientX;
+                const startY = e.clientY;
+                let hasMoved = false;
+                let isDragging = false;
+
+                const layerId = marker.dataset.layerId;
+                const keyframeId = marker.dataset.keyframeId;
+                const timeline = marker.closest(".visual-timeline-wrapper");
+                if (!timeline) return;
+
+                const timelineTrack = marker.closest(".visual-timeline-track");
+                if (!timelineTrack) return;
+
+                const maxTime = parseFloat(timeline.dataset.maxTime);
+                const rect = timelineTrack.getBoundingClientRect();
+
+                const onMouseMove = (moveEvent) => {
+                    const deltaX = Math.abs(moveEvent.clientX - startX);
+                    const deltaY = Math.abs(moveEvent.clientY - startY);
+
+                    if (!hasMoved && (deltaX > 3 || deltaY > 3)) {
+                        hasMoved = true;
+                        isDragging = true;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        marker.style.opacity = "0.6";
+                    }
+
+                    if (!isDragging) return;
+
+                    const currentX = moveEvent.clientX;
+                    const relativeX = currentX - rect.left;
+                    const clampedX = Math.max(0, Math.min(relativeX, rect.width));
+                    const percentage = clampedX / rect.width;
+
+                    marker.style.left = `${percentage * 100}%`;
+                };
+
+                const onMouseUp = (upEvent) => {
+                    if (isDragging) {
+                        marker.style.opacity = "";
+
+                        const currentX = upEvent.clientX;
+                        const relativeX = currentX - rect.left;
+                        const clampedX = Math.max(0, Math.min(relativeX, rect.width));
+                        const percentage = clampedX / rect.width;
+                        const newTime = Math.max(0, Math.round(percentage * maxTime));
+
+                        this.updateKeyframeTime(layerId, keyframeId, newTime);
+                    }
+
+                    document.removeEventListener("mousemove", onMouseMove);
+                    document.removeEventListener("mouseup", onMouseUp);
+                };
+
+                document.addEventListener("mousemove", onMouseMove);
+                document.addEventListener("mouseup", onMouseUp);
+            });
+        });
     }
 
     generateVisualTimeline(currentLayer) {
@@ -1709,7 +1782,11 @@ class CompositionEditor {
                 <div class="timeline-keyframe-marker timeline-keyframe-current ${isSelected ? "timeline-keyframe-selected" : ""}"
                      style="left: ${position}%"
                      onclick="event.stopPropagation(); compositionEditor.selectKeyframe('${currentLayer.id}', ${i})"
-                     title="${kfName} at ${kf.time}ms - Click to select">
+                     data-layer-id="${currentLayer.id}"
+                     data-keyframe-id="${kf.id}"
+                     data-keyframe-index="${i}"
+                     data-is-selected="${isSelected}"
+                     title="${kfName} at ${kf.time}ms - Click to select${isSelected ? " | Drag to move" : ""}">
                     <div class="timeline-keyframe-diamond"></div>
                 </div>
             `;
@@ -1718,7 +1795,7 @@ class CompositionEditor {
         html += "</div>";
         html += "</div>";
 
-        return html;
+        return `<div class="visual-timeline-wrapper" data-max-time="${maxTime}">${html}</div>`;
     }
 
     async exportComposition() {
