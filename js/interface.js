@@ -1456,6 +1456,42 @@ function setupGalleryOnlyMode() {
                 </div>
                 <div class="composition-editor-main">
                     <div class="composition-canvas-panel">
+                        <div class="composition-preview-bg-controls">
+                            <label for="previewBackgroundFile" style="display: none; font-size: 0.9vmax; color: var(--txt-color);"></label>
+                            <input
+                                type="file"
+                                id="previewBackgroundFile"
+                                accept="image/*"
+                                style="display: none;"
+                                onchange="compositionEditor.loadPreviewBackground(this.files[0])"
+                            />
+                            <button
+                                id="previewBackgroundSelectBtn"
+                                onclick="document.getElementById('previewBackgroundFile').click()"
+                                style="font-size: 0.8vmax; padding: 4px 8px;"
+                                title="Select background image for preview only"
+                            >
+                                Template
+                            </button>
+                            <button
+                                id="previewBackgroundToggleBtn"
+                                onclick="compositionEditor.togglePreviewBackground()"
+                                style="font-size: 0.8vmax; padding: 4px 8px; display: none;"
+                                title="Hide/Show background"
+                                class="success"
+                            >
+                                ☑
+                            </button>
+                            <button
+                                id="previewBackgroundRemoveBtn"
+                                onclick="compositionEditor.removePreviewBackground()"
+                                style="font-size: 0.8vmax; padding: 4px 8px; display: none;"
+                                title="Remove background"
+                                class="danger"
+                            >
+                                ✕
+                            </button>
+                        </div>
                         <div class="composition-canvas-container">
                             <canvas id="compositionCanvas"></canvas>
                         </div>

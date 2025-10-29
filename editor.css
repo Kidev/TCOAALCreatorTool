@@ -1384,7 +1384,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     padding: 1.5vmax;
     overflow-y: auto;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 0.5vmax;
 }
 
@@ -2432,22 +2432,43 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 
 .composition-canvas-panel {
     flex: 3;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
     background: var(--bg-color-section);
     padding: 1vmax;
+    position: relative;
+}
+
+.composition-canvas-panel > * {
+    grid-column: 1;
+    grid-row: 1;
 }
 
 .composition-canvas-container {
     position: relative;
     width: fit-content;
     height: fit-content;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    justify-self: center;
     border: 2px solid var(--accent-color);
     border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.composition-preview-bg-controls {
+    align-self: start;
+    justify-self: start;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px;
+    border-radius: 4px;
 }
 
 #compositionCanvas {

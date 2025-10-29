@@ -407,7 +407,7 @@ class DialogFramework {
         }
     }
 
-    async playSceneBackgroundMusic(musicPath, volume = 1.0, blobUrl = null) {
+    async playSceneBackgroundMusic(musicPath, volume = 1.0, blobUrl = null, pitch = 1.0, speed = 1.0) {
         if (!musicPath) return;
 
         try {
@@ -440,6 +440,10 @@ class DialogFramework {
             this.backgroundMusicAudio = new Audio(audioSrc);
             this.backgroundMusicAudio.loop = true;
             this.backgroundMusicAudio.volume = Math.max(0, Math.min(1, volume));
+
+            // Apply speed and pitch
+            this.backgroundMusicAudio.playbackRate = speed * pitch;
+            this.backgroundMusicAudio.preservesPitch = false;
 
             const playPromise = this.backgroundMusicAudio.play();
             if (playPromise !== undefined) {
@@ -625,7 +629,7 @@ class DialogFramework {
         }
     }
 
-    async playSound(soundPath, volume = 1.0, soundBlobUrl = null) {
+    async playSound(soundPath, volume = 1.0, soundBlobUrl = null, pitch = 1.0, speed = 1.0) {
         if (!soundPath) return;
 
         try {
@@ -638,6 +642,9 @@ class DialogFramework {
 
             const audioClone = audio.cloneNode();
             audioClone.volume = Math.max(0, Math.min(1, volume));
+
+            audioClone.playbackRate = speed * pitch;
+            audioClone.preservesPitch = false;
 
             const playPromise = audioClone.play();
 
@@ -671,12 +678,10 @@ class DialogFramework {
     }
 
     getCharacterFromSpeaker(speaker) {
-        // Check if it's a direct character name
         if (this.characters[speaker]) {
             return { name: speaker, character: this.characters[speaker] };
         }
 
-        // Check if it's an alias
         if (this.aliasToCharacter[speaker]) {
             const characterName = this.aliasToCharacter[speaker];
             return { name: characterName, character: this.characters[characterName] };
@@ -730,10 +735,14 @@ class DialogFramework {
             sound: options.sound || null,
             soundVolume: options.soundVolume || 1.0,
             soundDelay: options.soundDelay || 0,
+            soundPitch: options.soundPitch || 1.0,
+            soundSpeed: options.soundSpeed || 1.0,
             soundBlobUrl: options.soundBlobUrl || null,
 
             backgroundMusic: options.backgroundMusic || null,
             backgroundMusicVolume: options.backgroundMusicVolume !== undefined ? options.backgroundMusicVolume : 1.0,
+            backgroundMusicPitch: options.backgroundMusicPitch || 1.0,
+            backgroundMusicSpeed: options.backgroundMusicSpeed || 1.0,
             backgroundMusicBlobUrl: options.backgroundMusicBlobUrl || null,
 
             censorSpeaker: options.censorSpeaker !== undefined ? options.censorSpeaker : false,
@@ -913,10 +922,16 @@ class DialogFramework {
             if (scene.soundDelay > 0) {
                 setTimeout(() => {
                     if (this.sceneVersion !== currentVersion) return;
-                    this.playSound(scene.sound, scene.soundVolume, scene.soundBlobUrl);
+                    this.playSound(
+                        scene.sound,
+                        scene.soundVolume,
+                        scene.soundBlobUrl,
+                        scene.soundPitch,
+                        scene.soundSpeed,
+                    );
                 }, scene.soundDelay);
             } else {
-                this.playSound(scene.sound, scene.soundVolume, scene.soundBlobUrl);
+                this.playSound(scene.sound, scene.soundVolume, scene.soundBlobUrl, scene.soundPitch, scene.soundSpeed);
             }
         }
 
@@ -934,6 +949,8 @@ class DialogFramework {
                     currentBgMusic,
                     scene.backgroundMusicVolume,
                     scene.backgroundMusicBlobUrl,
+                    scene.backgroundMusicPitch,
+                    scene.backgroundMusicSpeed,
                 );
             }
         }
@@ -1515,7 +1532,6 @@ class DialogFramework {
 
         glitchContainers.forEach((glitchContainer) => {
             const tagConfig = JSON.parse(glitchContainer.dataset.glitchConfig);
-            // Merge global config with tag-specific config (tag config takes precedence)
             const mergedConfig = { ...this.glitchConfig, ...tagConfig };
             const glitchEffect = new GlitchTextEffect(glitchContainer, mergedConfig);
             this.glitchEffects.push(glitchEffect);

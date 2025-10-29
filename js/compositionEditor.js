@@ -55,6 +55,11 @@ class CompositionEditor {
 
         this.moveAsKeyframeMode = false;
         this.moveAsKeyframeSourceId = null;
+        this.importAsKeyframeMode = false;
+
+        this.previewBackgroundImage = null;
+        this.previewBackgroundBlobUrl = null;
+        this.previewBackgroundVisible = true;
 
         /*this.getAutoOpenTitle = () => {
             return this.autoOpen === true
@@ -326,6 +331,82 @@ class CompositionEditor {
                 cancelAnimationFrame(this.animationFrameId);
                 this.animationFrameId = null;
             }
+        }
+    }
+
+    loadPreviewBackground(file) {
+        if (!file) return;
+
+        if (this.previewBackgroundBlobUrl) {
+            URL.revokeObjectURL(this.previewBackgroundBlobUrl);
+        }
+
+        this.previewBackgroundBlobUrl = URL.createObjectURL(file);
+        const img = new Image();
+
+        img.onload = () => {
+            this.previewBackgroundImage = img;
+            this.previewBackgroundVisible = true;
+            this.updateBackgroundControls();
+            this.render();
+            if (this.isPlayingPreview) {
+                this.renderPreviewFrame();
+            }
+        };
+
+        img.onerror = () => {
+            this.showNotification("Failed to load background image", "error");
+            URL.revokeObjectURL(this.previewBackgroundBlobUrl);
+            this.previewBackgroundBlobUrl = null;
+        };
+
+        img.src = this.previewBackgroundBlobUrl;
+    }
+
+    togglePreviewBackground() {
+        this.previewBackgroundVisible = !this.previewBackgroundVisible;
+        this.updateBackgroundControls();
+        this.render();
+        if (this.isPlayingPreview) {
+            this.renderPreviewFrame();
+        }
+    }
+
+    removePreviewBackground() {
+        if (this.previewBackgroundBlobUrl) {
+            URL.revokeObjectURL(this.previewBackgroundBlobUrl);
+        }
+        this.previewBackgroundImage = null;
+        this.previewBackgroundBlobUrl = null;
+        this.previewBackgroundVisible = true;
+        this.updateBackgroundControls();
+        this.render();
+        if (this.isPlayingPreview) {
+            this.renderPreviewFrame();
+        }
+    }
+
+    updateBackgroundControls() {
+        const toggleBtn = document.getElementById("previewBackgroundToggleBtn");
+        const removeBtn = document.getElementById("previewBackgroundRemoveBtn");
+        const templateBtn = document.getElementById("previewBackgroundSelectBtn");
+
+        if (this.previewBackgroundImage) {
+            if (toggleBtn) {
+                toggleBtn.style.display = "inline-block";
+                toggleBtn.textContent = this.previewBackgroundVisible ? "☑" : "☐";
+                toggleBtn.classList.toggle("success", this.previewBackgroundVisible);
+            }
+            if (removeBtn) {
+                removeBtn.style.display = "inline-block";
+            }
+            if (templateBtn) {
+                templateBtn.style.display = "none";
+            }
+        } else {
+            if (toggleBtn) toggleBtn.style.display = "none";
+            if (removeBtn) removeBtn.style.display = "none";
+            templateBtn.style.display = "";
         }
     }
 
@@ -661,6 +742,10 @@ class CompositionEditor {
         if (!this.ctx || !this.canvas) return;
 
         this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+        if (this.previewBackgroundImage && this.previewBackgroundVisible) {
+            this.ctx.drawImage(this.previewBackgroundImage, 0, 0, this.canvasWidth, this.canvasHeight);
+        }
 
         const sortedLayers = [...this.layers].sort((a, b) => a.zIndex - b.zIndex);
 
@@ -1048,6 +1133,31 @@ class CompositionEditor {
         this.render();
     }
 
+    showImportAsKeyframeMenu(targetLayerId) {
+        const targetLayer = this.layers.find((l) => l.id === targetLayerId);
+        if (!targetLayer) return;
+
+        const otherLayers = this.layers.filter((l) => l.id !== targetLayerId);
+        if (otherLayers.length === 0) {
+            this.showNotification("No other layers available to import from", "warning");
+            return;
+        }
+
+        this.moveAsKeyframeMode = true;
+        this.importAsKeyframeMode = true;
+        this.moveAsKeyframeSourceId = targetLayerId;
+
+        this.showNotification(
+            `<strong>Import as Keyframe Mode</strong><br>Click a layer to import it as a keyframe into "${targetLayer.name}"`,
+            "info",
+            0,
+            "move-as-keyframe-notification",
+        );
+
+        this.updateLayersList();
+        this.render();
+    }
+
     showMoveAsKeyframeMenu(sourceLayerId) {
         const sourceLayer = this.layers.find((l) => l.id === sourceLayerId);
         if (!sourceLayer) return;
@@ -1059,6 +1169,7 @@ class CompositionEditor {
         }
 
         this.moveAsKeyframeMode = true;
+        this.importAsKeyframeMode = false;
         this.moveAsKeyframeSourceId = sourceLayerId;
 
         this.showNotification(
@@ -1074,6 +1185,7 @@ class CompositionEditor {
 
     cancelMoveAsKeyframeMode() {
         this.moveAsKeyframeMode = false;
+        this.importAsKeyframeMode = false;
         this.moveAsKeyframeSourceId = null;
 
         const notification = document.querySelector(".composition-notification.move-as-keyframe-notification");
@@ -1158,12 +1270,15 @@ class CompositionEditor {
     render() {
         if (!this.ctx || !this.canvas) return;
 
-        if (this.layers.length === 0) {
-            this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-            return;
+        this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+        if (this.previewBackgroundImage && this.previewBackgroundVisible) {
+            this.ctx.drawImage(this.previewBackgroundImage, 0, 0, this.canvasWidth, this.canvasHeight);
         }
 
-        this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        if (this.layers.length === 0) {
+            return;
+        }
 
         const sortedLayers = [...this.layers].sort((a, b) => a.zIndex - b.zIndex);
 
@@ -1289,7 +1404,11 @@ class CompositionEditor {
                 } else {
                     layerDiv.classList.add("move-as-keyframe-target");
                     layerDiv.style.cursor = "pointer";
-                    layerDiv.title = "Click to move source layer as keyframe of this layer";
+                    if (this.importAsKeyframeMode) {
+                        layerDiv.title = "Click to import this layer as keyframe into the target";
+                    } else {
+                        layerDiv.title = "Click to move source layer as keyframe of this layer";
+                    }
                 }
             }
 
@@ -1309,7 +1428,11 @@ class CompositionEditor {
                         return;
                     }
 
-                    this.convertLayerToKeyframe(this.moveAsKeyframeSourceId, layer.id);
+                    if (this.importAsKeyframeMode) {
+                        this.convertLayerToKeyframe(layer.id, this.moveAsKeyframeSourceId);
+                    } else {
+                        this.convertLayerToKeyframe(this.moveAsKeyframeSourceId, layer.id);
+                    }
                     return;
                 }
 
@@ -1357,6 +1480,12 @@ class CompositionEditor {
                                 title="Add new keyframe in 1s based on the current one"
                                 style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
                             ⥅
+                        </button>
+                        <button class="layer-control-btn"
+                                onclick="compositionEditor.showImportAsKeyframeMenu('${layer.id}')"
+                                title="Import another layer as a new keyframe in this timeline"
+                                style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
+                            +
                         </button>
                     </div>
                 `;
@@ -1495,18 +1624,6 @@ class CompositionEditor {
                                 ${this.getLayerThumbnail(layer)}
                             </div>
                             <div style="display: flex; gap: 4px;">
-                                ${
-                                    otherLayers.length > 0
-                                        ? `
-                                    <button class="layer-control-btn"
-                                            onclick="compositionEditor.showMoveAsKeyframeMenu('${layer.id}')"
-                                            title="Move this layer into another, by turning it into a keyframe of the target"
-                                            style="font-size: 0.75vmax; padding: 4px 8px;">
-                                        Move to other layer
-                                    </button>
-                                `
-                                        : ""
-                                }
                                 <button class="layer-control-btn"
                                         onclick="compositionEditor.addKeyframe('${layer.id}')"
                                         title="Enable a timeline and adds a keyframe to this layer"

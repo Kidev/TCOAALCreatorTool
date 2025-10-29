@@ -562,12 +562,9 @@ class GalleryManager {
         const previewBox = document.getElementById("previewCropBoxContainer");
         if (show) {
             previewBox.innerHTML = `
-                <button ${show ? "style='padding:0 0.2vmax;margin-left:0.5vmax;width:4vmax;'" : ""} 
+                <button ${show ? "style='padding:0 0.2vmax;margin-left:0.5vmax;width:3.3vmax;'" : ""} 
                     title="${this.globalImageViewMode === "cropped" ? "Preview is cropped to content: click for original" : "Preview is original: click for cropped to content"}"
-                    onclick="window.galleryManager.setGlobalImageViewMode(window.galleryManager.globalImageViewMode === 'original' ? 'cropped' : 'original');window.galleryManager.updateCropButtonInPreviewTitle(${show ? "true" : "false"});">
-
-                    ${this.globalImageViewMode === "cropped" ? "(cropped)" : "(original)"}
-                </button>
+                    onclick="window.galleryManager.setGlobalImageViewMode(window.galleryManager.globalImageViewMode === 'original' ? 'cropped' : 'original');window.galleryManager.updateCropButtonInPreviewTitle(${show ? "true" : "false"});">${this.globalImageViewMode === "cropped" ? "cropped" : "original"}</button>
             `;
         } else {
             previewBox.innerHTML = ``;

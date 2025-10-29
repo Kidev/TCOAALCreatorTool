@@ -646,7 +646,8 @@ function useGalleryAsset(name, category) {
         }
     }
 
-    updateScenesList();
+    // Only update the specific scene to preserve collapsible section states
+    updateScenesList(sceneIndex);
     closeGallery();
 }
 
@@ -681,14 +682,18 @@ function addScene() {
         sound: null,
         soundVolume: 1.0,
         soundDelay: 0,
+        soundPitch: 1.0,
+        soundSpeed: 1.0,
         backgroundMusic: null,
         backgroundMusicVolume: 1.0,
+        backgroundMusicPitch: 1.0,
+        backgroundMusicSpeed: 1.0,
         censorSpeaker: false,
         demonSpeaker: false,
         bustLeft: null,
         bustRight: null,
         bustFade: 0,
-        shake: false,
+        shake: null,
         shakeDelay: 0,
         shakeIntensity: 1,
         shakeDuration: 500,
@@ -753,8 +758,26 @@ function updateScenesList(onlyUpdateIndex = null) {
         const sceneElements = container.querySelectorAll(".scene-item");
         if (sceneElements[onlyUpdateIndex]) {
             const existingItem = sceneElements[onlyUpdateIndex];
+
+            // Capture which collapsible sections were open before replacing
+            const openSections = [];
+            existingItem.querySelectorAll(".collapsible-group-content").forEach((content, idx) => {
+                if (content.style.display !== "none") {
+                    openSections.push(idx);
+                }
+            });
+
             const newItem = createSceneElement(onlyUpdateIndex);
             existingItem.replaceWith(newItem);
+
+            // Restore the open state of collapsible sections
+            const newContents = newItem.querySelectorAll(".collapsible-group-content");
+            openSections.forEach((idx) => {
+                if (newContents[idx]) {
+                    newContents[idx].style.display = "block";
+                }
+            });
+
             if (expandedScenes.has(onlyUpdateIndex)) {
                 setTimeout(() => updatePreviewDialog(onlyUpdateIndex), 0);
             }
@@ -935,7 +958,7 @@ function createSceneElement(index) {
                             ${isValidData(scene.image) ? "checked" : ""}
                             onchange="toggleNull(${index}, 'image', !this.checked)"
                             title="Uncheck to disable this parameter">
-                        <label for="image-checkbox-${index}">Background image:</label>
+                        <label for="image-checkbox-${index}">Background</label>
                         ${createFileSelectHTML(index, "image", scene.image)}
                     </div>
 
@@ -944,7 +967,7 @@ function createSceneElement(index) {
                             ${isValidData(scene.bustLeft) ? "checked" : ""}
                             onchange="toggleNull(${index}, 'bustLeft', !this.checked)"
                             title="Uncheck to disable this parameter">
-                        <label for="bustLeft-checkbox-${index}">Bust left:</label>
+                        <label for="bustLeft-checkbox-${index}">Bust left</label>
                         ${createFileSelectHTML(index, "bustLeft", scene.bustLeft)}
                     </div>
 
@@ -953,7 +976,7 @@ function createSceneElement(index) {
                             ${isValidData(scene.bustRight) ? "checked" : ""}
                             onchange="toggleNull(${index}, 'bustRight', !this.checked)"
                             title="Uncheck to disable this parameter">
-                        <label for="bustRight-checkbox-${index}">Bust right:</label>
+                        <label for="bustRight-checkbox-${index}">Bust right</label>
                         ${createFileSelectHTML(index, "bustRight", scene.bustRight)}
                     </div>
 
@@ -972,35 +995,59 @@ function createSceneElement(index) {
                             ${isValidData(scene.sound) ? "checked" : ""}
                             onchange="toggleNull(${index}, 'sound', !this.checked)"
                             title="Uncheck to disable this parameter">
-                        <label for="sound-checkbox-${index}">Sound:</label>
+                        <label for="sound-checkbox-${index}">Sound effect</label>
                         <div style="display: flex; align-items: center; gap: 0.8vmax; flex: 1;">
                             ${createFileSelectHTML(index, "sound", scene.sound, true)}
                         </div>
                     </div>
-                    <div class="form-group audio">
-                        <label for="inputSoundVolume${index}">Sound volume:</label>
-                        <input id="inputSoundVolume${index}" type="number" value="${scene.soundVolume}" min="0" max="1" step="0.1"
-                            onchange="updateSceneValue(${index}, 'soundVolume', parseFloat(this.value))">
-                    </div>
-                    <div class="form-group audio">
-                        <label for="inputSoundDelay${index}">Sound delay:</label>
-                        <input id="inputSoundDelay${index}" type="number" value="${scene.soundDelay}" min="0" max="10000"
-                            onchange="updateSceneValue(${index}, 'soundDelay', parseInt(this.value))">
+                    <div id="sound-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.sound) ? "" : "display: none;"}">
+                        <div class="form-group audio">
+                            <label for="inputSoundVolume${index}">Volume:</label>
+                            <input id="inputSoundVolume${index}" type="number" value="${scene.soundVolume}" min="0" max="1" step="0.1"
+                                onchange="updateSceneValue(${index}, 'soundVolume', parseFloat(this.value))">
+                        </div>
+                        <div class="form-group audio">
+                            <label for="inputSoundDelay${index}">Delay:</label>
+                            <input id="inputSoundDelay${index}" type="number" value="${scene.soundDelay}" min="0" max="10000"
+                                onchange="updateSceneValue(${index}, 'soundDelay', parseInt(this.value))">
+                        </div>
+                        <div class="form-group audio">
+                            <label for="inputSoundPitch${index}">Pitch:</label>
+                            <input id="inputSoundPitch${index}" type="number" value="${scene.soundPitch || 1.0}" min="0.5" max="2.0" step="0.1"
+                                onchange="updateSceneValue(${index}, 'soundPitch', parseFloat(this.value))">
+                        </div>
+                        <div class="form-group audio">
+                            <label for="inputSoundSpeed${index}">Speed:</label>
+                            <input id="inputSoundSpeed${index}" type="number" value="${scene.soundSpeed || 1.0}" min="0.5" max="2.0" step="0.1"
+                                onchange="updateSceneValue(${index}, 'soundSpeed', parseFloat(this.value))">
+                        </div>
                     </div>
                     <div class="form-group audio">
                         <input type="checkbox" class="null-checkbox" id="backgroundMusic-checkbox-${index}"
                             ${isValidData(scene.backgroundMusic) ? "checked" : ""}
                             onchange="toggleNull(${index}, 'backgroundMusic', !this.checked)"
                             title="Uncheck to disable this parameter">
-                        <label for="backgroundMusic-checkbox-${index}">Background music:</label>
+                        <label for="backgroundMusic-checkbox-${index}">Background</label>
                         <div style="display: flex; align-items: center; gap: 0.8vmax; flex: 1;">
                             ${createFileSelectHTML(index, "backgroundMusic", scene.backgroundMusic, false, true)}
                         </div>
                     </div>
-                    <div class="form-group audio">
-                        <label for="inputBackgroundMusicVolume${index}">Background music volume:</label>
-                        <input id="inputBackgroundMusicVolume${index}" type="number" value="${scene.backgroundMusicVolume}" min="0" max="1" step="0.1"
-                            onchange="updateSceneValue(${index}, 'backgroundMusicVolume', parseFloat(this.value))">
+                    <div id="backgroundMusic-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.backgroundMusic) ? "" : "display: none;"}">
+                        <div class="form-group audio">
+                            <label for="inputBackgroundMusicVolume${index}">Volume:</label>
+                            <input id="inputBackgroundMusicVolume${index}" type="number" value="${scene.backgroundMusicVolume}" min="0" max="1" step="0.1"
+                                onchange="updateSceneValue(${index}, 'backgroundMusicVolume', parseFloat(this.value))">
+                        </div>
+                        <div class="form-group audio">
+                            <label for="inputBackgroundMusicPitch${index}">Pitch:</label>
+                            <input id="inputBackgroundMusicPitch${index}" type="number" value="${scene.backgroundMusicPitch || 1.0}" min="0.5" max="2.0" step="0.1"
+                                onchange="updateSceneValue(${index}, 'backgroundMusicPitch', parseFloat(this.value))">
+                        </div>
+                        <div class="form-group audio">
+                            <label for="inputBackgroundMusicSpeed${index}">Speed:</label>
+                            <input id="inputBackgroundMusicSpeed${index}" type="number" value="${scene.backgroundMusicSpeed || 1.0}" min="0.5" max="2.0" step="0.1"
+                                onchange="updateSceneValue(${index}, 'backgroundMusicSpeed', parseFloat(this.value))">
+                        </div>
                     </div>
                     </div>
                 </div>
@@ -1055,24 +1102,28 @@ function createSceneElement(index) {
                     <h4 class="collapsible-group-header" onclick="toggleSceneGroup(this)">Effects</h4>
                     <div class="collapsible-group-content" style="display: none;">
                     <div class="form-group">
-                        <label for="checkShakeEffect${index}">Shake effect:</label>
-                        <input id="checkShakeEffect${index}" type="checkbox" ${scene.shake ? "checked" : ""}
-                            onchange="updateSceneValue(${index}, 'shake', this.checked)">
+                        <input type="checkbox" class="null-checkbox" id="shake-checkbox-${index}"
+                            ${isValidData(scene.shake) ? "checked" : ""}
+                            onchange="toggleNull(${index}, 'shake', !this.checked)"
+                            title="Uncheck to disable this parameter">
+                        <label for="shake-checkbox-${index}">Shake</label>
                     </div>
-                    <div class="form-group">
-                        <label for="inputShakeDelay${index}">Shake delay:</label>
-                        <input id="inputShakeDelay${index}" type="number" value="${scene.shakeDelay}" min="0" max="10000"
-                            onchange="updateSceneValue(${index}, 'shakeDelay', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputShakeIntensity${index}">Shake intensity:</label>
-                        <input id="inputShakeIntensity${index}" type="number" value="${scene.shakeIntensity}" min="0" max="10" step="0.1"
-                            onchange="updateSceneValue(${index}, 'shakeIntensity', parseFloat(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputShakeDuration${index}">Shake duration:</label>
-                        <input id="inputShakeDuration${index}" type="number" value="${scene.shakeDuration}" min="0" max="5000"
-                            onchange="updateSceneValue(${index}, 'shakeDuration', parseInt(this.value))">
+                    <div id="shake-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.shake) ? "" : "display: none;"}">
+                        <div class="form-group">
+                            <label for="inputShakeDelay${index}">Delay:</label>
+                            <input id="inputShakeDelay${index}" type="number" value="${scene.shakeDelay}" min="0" max="10000"
+                                onchange="updateSceneValue(${index}, 'shakeDelay', parseInt(this.value))">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputShakeIntensity${index}">Intensity:</label>
+                            <input id="inputShakeIntensity${index}" type="number" value="${scene.shakeIntensity}" min="0" max="10" step="0.1"
+                                onchange="updateSceneValue(${index}, 'shakeIntensity', parseFloat(this.value))">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputShakeDuration${index}">Duration:</label>
+                            <input id="inputShakeDuration${index}" type="number" value="${scene.shakeDuration}" min="0" max="5000"
+                                onchange="updateSceneValue(${index}, 'shakeDuration', parseInt(this.value))">
+                        </div>
                     </div>
                     </div>
                 </div>
@@ -1486,6 +1537,13 @@ function toggleSound(sceneIndex) {
 
     currentlyPlayingAudio.volume = projectData.scenes[sceneIndex].soundVolume;
 
+    const speed = projectData.scenes[sceneIndex].soundSpeed || 1.0;
+    currentlyPlayingAudio.playbackRate = speed;
+
+    const pitch = projectData.scenes[sceneIndex].soundPitch || 1.0;
+    currentlyPlayingAudio.playbackRate = speed * pitch;
+    currentlyPlayingAudio.preservesPitch = false;
+
     button.textContent = "⬛ Stop";
     button.classList.add("stop-button");
 
@@ -1554,6 +1612,11 @@ function toggleBackgroundMusicScene(sceneIndex) {
 
     currentlyPlayingAudio.volume = projectData.scenes[sceneIndex].backgroundMusicVolume;
 
+    const speed = projectData.scenes[sceneIndex].backgroundMusicSpeed || 1.0;
+    const pitch = projectData.scenes[sceneIndex].backgroundMusicPitch || 1.0;
+    currentlyPlayingAudio.playbackRate = speed * pitch;
+    currentlyPlayingAudio.preservesPitch = false;
+
     button.textContent = "⬛ Stop";
     button.classList.add("stop-button");
 
@@ -1584,15 +1647,20 @@ function toggleNull(sceneIndex, field, isNull) {
                 currentlyPlayingAudio.pause();
                 currentlyPlayingAudio = null;
             }
+        } else if (field === "shake") {
+            projectData.scenes[sceneIndex][field] = null;
         }
     } else {
-        projectData.scenes[sceneIndex][field] = "";
+        if (field === "shake") {
+            projectData.scenes[sceneIndex][field] = true;
+        } else {
+            projectData.scenes[sceneIndex][field] = "";
+        }
     }
 
     updateNullCheckboxVisibility(sceneIndex, field, isNull);
 
     // Only update the preview for this specific scene, not the entire list
-    // This prevents collapsible groups from collapsing when toggling null checkboxes
     updatePreviewDialog(sceneIndex);
 }
 
@@ -1621,10 +1689,23 @@ function updateNullCheckboxVisibility(sceneIndex, field, isNull) {
         if (playButton) {
             playButton.style.display = isNull ? "none" : "inline-block";
         }
+        const paramsContainer = document.getElementById(`sound-params-${sceneIndex}`);
+        if (paramsContainer) {
+            paramsContainer.style.display = isNull ? "none" : "block";
+        }
     } else if (field === "backgroundMusic") {
         const playButton = document.getElementById(`bgmusic-button-${sceneIndex}`);
         if (playButton) {
             playButton.style.display = isNull ? "none" : "inline-block";
+        }
+        const paramsContainer = document.getElementById(`backgroundMusic-params-${sceneIndex}`);
+        if (paramsContainer) {
+            paramsContainer.style.display = isNull ? "none" : "block";
+        }
+    } else if (field === "shake") {
+        const paramsContainer = document.getElementById(`shake-params-${sceneIndex}`);
+        if (paramsContainer) {
+            paramsContainer.style.display = isNull ? "none" : "block";
         }
     }
 }
@@ -2118,12 +2199,28 @@ function generateCode() {
             sound: '${scene.sound}',
             soundVolume: ${scene.soundVolume},
             soundDelay: ${scene.soundDelay}`;
+            if (scene.soundPitch !== undefined && scene.soundPitch !== 1.0) {
+                code += `,
+            soundPitch: ${scene.soundPitch}`;
+            }
+            if (scene.soundSpeed !== undefined && scene.soundSpeed !== 1.0) {
+                code += `,
+            soundSpeed: ${scene.soundSpeed}`;
+            }
         }
 
         if (scene.backgroundMusic !== null) {
             code += `,
             backgroundMusic: '${scene.backgroundMusic}',
             backgroundMusicVolume: ${scene.backgroundMusicVolume}`;
+            if (scene.backgroundMusicPitch !== undefined && scene.backgroundMusicPitch !== 1.0) {
+                code += `,
+            backgroundMusicPitch: ${scene.backgroundMusicPitch}`;
+            }
+            if (scene.backgroundMusicSpeed !== undefined && scene.backgroundMusicSpeed !== 1.0) {
+                code += `,
+            backgroundMusicSpeed: ${scene.backgroundMusicSpeed}`;
+            }
         }
 
         if (scene.bustLeft !== null) {
@@ -2141,7 +2238,7 @@ function generateCode() {
             bustFade: ${scene.bustFade}`;
         }
 
-        if (scene.shake) {
+        if (scene.shake !== null && scene.shake !== false) {
             code += `,
             shake: true,
             shakeDelay: ${scene.shakeDelay},
