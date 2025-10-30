@@ -104,8 +104,9 @@ body {
 
 #dialogArrow {
     position: absolute;
-    bottom: 0%;
+    scale: 1.5;
     left: 50%;
+    top: 90%;
     transform: translateX(-50%);
     width: 24px;
     height: 24px;
@@ -146,6 +147,12 @@ body {
 .dialog-container.active {
     opacity: 1;
     pointer-events: auto;
+}
+
+.dialog-container.notification-mode {
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .dialog-content {

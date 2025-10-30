@@ -963,6 +963,13 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     justify-content: center;
 }
 
+.preview-text.notification-mode {
+    bottom: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
 .preview-text-str {
     position: relative;
     z-index: 10;
@@ -997,6 +1004,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 }
 
 .preview-dialog-content .dialog-line {
+    position: absolute;
     top: 35%;
     left: 5%;
     right: 5%;
@@ -1031,6 +1039,22 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     font-family: monospace;
     min-width: 1ch;
     font-size: inherit;
+}
+
+.dialog-arrow-preview {
+    position: absolute;
+    bottom: 0%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 24px;
+    background-image: var(--dialog-arrow);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    pointer-events: none;
+    z-index: 15;
+    display: none;
 }
 
 /* OVERLAY & MODAL STYLES */
@@ -1186,6 +1210,13 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     flex-direction: column;
     align-items: center;
     justify-content: center;
+}
+
+.preview-text.notification-mode {
+    bottom: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .preview-text-speaker {

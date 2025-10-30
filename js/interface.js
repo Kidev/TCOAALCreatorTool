@@ -387,6 +387,8 @@ const KEY_MAP = {
     "showDebug": "5",
     "backgroundMusic": "6",
     "backgroundMusicVolume": "7",
+    "backgroundMusicPitch": "X",
+    "backgroundMusicSpeed": "Y",
 
     // Character property keys (NOT character names)
     "color": "8",
@@ -416,6 +418,8 @@ const KEY_MAP = {
     "sound": "s",
     "soundVolume": "t",
     "soundDelay": "u",
+    "soundPitch": "Z",
+    "soundSpeed": "!",
     "censorSpeaker": "v",
     "demonSpeaker": "w",
     "bustLeft": "x",

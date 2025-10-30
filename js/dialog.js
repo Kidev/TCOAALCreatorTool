@@ -1554,6 +1554,8 @@ class DialogFramework {
         const textLine1 = document.getElementById("textLine1");
         const textLine2 = document.getElementById("textLine2");
 
+        this.currentSpeaker = speaker;
+
         this.cleanupGlitchEffects();
 
         speakerLine.className = "dialog-line speaker-line";
@@ -1562,6 +1564,12 @@ class DialogFramework {
         speakerLine.innerHTML = "";
         textLine1.innerHTML = "";
         textLine2.innerHTML = "";
+
+        if (speaker === "Notification") {
+            dialogContainer.classList.add("notification-mode");
+        } else {
+            dialogContainer.classList.remove("notification-mode");
+        }
 
         const characterInfo = this.getCharacterFromSpeaker(speaker);
         if (speaker && characterInfo) {
@@ -2171,11 +2179,36 @@ class DialogFramework {
         const dialogArrow = document.getElementById("dialogArrow");
         if (dialogArrow) {
             dialogArrow.style.display = "block";
+            if (this.currentSpeaker === "Notification") {
+                dialogArrow.style.top = "80%";
+            } else {
+                dialogArrow.style.top = "90%";
+            }
         }
     }
 
     hideDialogArrow() {
         const dialogArrow = document.getElementById("dialogArrow");
+        if (dialogArrow) {
+            dialogArrow.style.display = "none";
+        }
+    }
+
+    showDialogArrowPreview(sceneIndex) {
+        const dialogArrow = document.getElementById(`dialogArrowPreview-${sceneIndex}`);
+        if (dialogArrow) {
+            dialogArrow.style.display = "block";
+            // Position arrow at top for Notification speaker
+            if (this.currentSpeaker === "Notification") {
+                dialogArrow.style.top = "70%";
+            } else {
+                dialogArrow.style.top = "75%";
+            }
+        }
+    }
+
+    hideDialogArrowPreview(sceneIndex) {
+        const dialogArrow = document.getElementById("dialogArrowPreview-${sceneIndex}");
         if (dialogArrow) {
             dialogArrow.style.display = "none";
         }

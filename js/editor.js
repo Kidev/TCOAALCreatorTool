@@ -810,7 +810,14 @@ function createSceneElement(index) {
     const item = document.createElement("div");
     item.className = "scene-item";
 
-    let speakerOptions = '<option style="color: var(--txt-color)" value="">Narrator</option>';
+    let speakerOptions =
+        '<option style="color: var(--txt-color)" value="" ' +
+        (scene.speaker === "" ? "selected" : "") +
+        ">Narrator</option>";
+    speakerOptions +=
+        '<option style="color: var(--txt-color)" value="Notification" ' +
+        (scene.speaker === "Notification" ? "selected" : "") +
+        ">Notification</option>";
 
     Object.keys(projectData.characters).forEach((charName) => {
         const char = projectData.characters[charName];
@@ -829,7 +836,7 @@ function createSceneElement(index) {
 
     let preview1 = scene.line1 ? scene.line1.substring(0, 150) : "";
     let preview2 = scene.line2 ? scene.line2.substring(0, 150) : "";
-    const quote = scene.speaker === "" ? "" : '"';
+    const quote = scene.speaker === "" || scene.speaker === "Notification" ? "" : '"';
     const isExpanded = expandedScenes.has(index);
 
     if (preview1.length > 0) {
@@ -879,8 +886,9 @@ function createSceneElement(index) {
         <div class="preview-text" style="background-image: url('img/tcoaal-dialog-box.webp'); background-size: 100% 100%; background-repeat: no-repeat;">
             <div class="preview-dialog-content" data-scene-index="${index}">
                 <div class="dialog-line speaker-line preview-speaker-${index}"></div>
-                <div class="dialog-line text-line preview-text1-${index}"></div>
-                <div class="dialog-line text-line preview-text2-${index}"></div>
+                <div id="textLine1" class="dialog-line text-line preview-text1-${index}"></div>
+                <div id="textLine2" class="dialog-line text-line preview-text2-${index}"></div>
+                <div id="dialogArrowPreview-${index}" class="dialog-arrow-preview"></div>
             </div>
         </div>`;
         }
@@ -1131,6 +1139,8 @@ function createSceneElement(index) {
         </div>
     `;
 
+    updateConfig();
+
     return item;
 }
 
@@ -1150,7 +1160,14 @@ function updateAllSpeakerDropdowns() {
 
         const currentValue = selectElement.value;
 
-        let speakerOptions = '<option style="color: var(--txt-color)" value="">Narrator</option>';
+        let speakerOptions =
+            '<option style="color: var(--txt-color)" value="" ' +
+            (currentValue === "" ? "selected" : "") +
+            ">Narrator</option>";
+        speakerOptions +=
+            '<option style="color: var(--txt-color)" value="Notification" ' +
+            (currentValue === "Notification" ? "selected" : "") +
+            ">Notification</option>";
 
         Object.keys(projectData.characters).forEach((charName) => {
             const char = projectData.characters[charName];
@@ -1204,6 +1221,17 @@ function updatePreviewDialog(index) {
     speakerElement.innerHTML = "";
     text1Element.innerHTML = "";
     text2Element.innerHTML = "";
+
+    const previewTextContainer = container.closest(".preview-text");
+    if (scene.speaker === "Notification") {
+        if (previewTextContainer) {
+            previewTextContainer.classList.add("notification-mode");
+        }
+    } else {
+        if (previewTextContainer) {
+            previewTextContainer.classList.remove("notification-mode");
+        }
+    }
 
     const characterInfo = dialogFramework.getCharacterFromSpeaker(scene.speaker);
     if (scene.speaker && characterInfo) {
@@ -1266,6 +1294,16 @@ function updatePreviewDialog(index) {
         text2Element.textContent = processedLine2;
     }
 
+    const dialogArrowPreview = document.getElementById(`dialogArrowPreview-${index}`);
+    if (dialogArrowPreview) {
+        dialogArrowPreview.style.display = projectData.config.showDialogArrow ? "block" : "none";
+        if (scene.speaker === "Notification") {
+            dialogArrowPreview.style.top = "70%";
+        } else {
+            dialogArrowPreview.style.top = "75%";
+        }
+    }
+
     updateSceneHeaderPreview(index);
 }
 
@@ -1282,7 +1320,7 @@ function updateSceneHeaderPreview(index) {
     // Same logic as in createSceneElement for preview text
     let preview1 = scene.line1 ? scene.line1.substring(0, 150) : "";
     let preview2 = scene.line2 ? scene.line2.substring(0, 150) : "";
-    const quote = scene.speaker === "" ? "" : '"';
+    const quote = scene.speaker === "" || scene.speaker === "Notification" ? "" : '"';
 
     if (preview1.length > 0) {
         preview1 = quote + preview1;
@@ -1881,12 +1919,19 @@ function updateConfig() {
     projectData.config.showDebug = document.getElementById("configShowDebug").checked;
     projectData.config.showDialogArrow = document.getElementById("configShowDialogArrow").checked;
 
-    if (!document.getElementById("backgroundMusicEnabled").checked) {
+    /*if (!document.getElementById("backgroundMusicEnabled").checked) {
         projectData.config.backgroundMusic = null;
         projectData.config.backgroundMusicVolume = 0.5;
         projectData.config.backgroundMusicBlobUrl = null;
     } else if (projectData.config.backgroundMusicVolume === undefined) {
         projectData.config.backgroundMusicVolume = parseFloat(document.getElementById("backgroundMusicVolume").value);
+    }*/
+
+    for (let scene = 0; scene < projectData.scenes.length; scene++) {
+        const sceneItem = document.getElementById(`dialogArrowPreview-${scene}`);
+        if (sceneItem) {
+            sceneItem.style.display = projectData.config.showDialogArrow ? "block" : "none";
+        }
     }
 }
 
@@ -2304,8 +2349,7 @@ function generateCode() {
         const compositionsArray = Array.from(compositionsToExport.values());
         code += `
 
-        dialogFramework.setCompositions(${JSON.stringify(compositionsArray, null, 8).replace(/\n/g, "\n    ")});
-        `;
+        dialogFramework.setCompositions(${JSON.stringify(compositionsArray, null, 8).replace(/\n/g, "\n    ")});`;
     }
 
     code += `
