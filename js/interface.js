@@ -429,6 +429,10 @@ const KEY_MAP = {
     "shakeDelay": "B",
     "shakeIntensity": "C",
     "shakeDuration": "D",
+    "choices": "@",
+    "choicesList": "#",
+    "correctChoice": "$",
+    "choiceSpeed": "%",
 
     // Composition keys
     "id": "F",
@@ -507,18 +511,18 @@ function decompressKeys(obj, isUnderCharacters = false) {
 }
 
 function removeKeyQuotes(jsonString) {
-    // Remove quotes around single-character keys (our compressed keys: 0-9, a-z, A-Z)
-    // Pattern: "X": where X is a single alphanumeric character
+    // Remove quotes around single-character keys (our compressed keys: 0-9, a-z, A-Z, and special chars)
+    // Pattern: "X": where X is a single character (alphanumeric or allowed special chars)
     // Replace with: X:
-    return jsonString.replace(/"([0-9a-zA-Z])":/g, "$1:");
+    return jsonString.replace(/"([0-9a-zA-Z!@#$%^&*()_+\-=\[\]{};':",./<>?`~|\\])":/g, "$1:");
 }
 
 function addKeyQuotes(jsonString) {
     // Add quotes back around single-character keys before parsing
-    // Pattern: X: where X is a single alphanumeric character (not inside a string)
+    // Pattern: X: where X is a single character (alphanumeric or allowed special chars) (not inside a string)
     // This regex ensures we only match keys, not values
-    // It looks for alphanumeric char followed by colon, but not inside quotes
-    return jsonString.replace(/([{,])([0-9a-zA-Z]):/g, '$1"$2":');
+    // It looks for single char followed by colon, but not inside quotes
+    return jsonString.replace(/([{,])([0-9a-zA-Z!@#$%^&*()_+\-=\[\]{};':",./<>?`~|\\]):/g, '$1"$2":');
 }
 
 function encodeSequenceToURL(projectData) {
@@ -1158,6 +1162,10 @@ function parseSequenceFile(code) {
                 shakeDelay: scene.shakeDelay !== undefined ? scene.shakeDelay : 0,
                 shakeIntensity: scene.shakeIntensity !== undefined ? scene.shakeIntensity : 1,
                 shakeDuration: scene.shakeDuration !== undefined ? scene.shakeDuration : 500,
+                choices: scene.choices === undefined ? null : scene.choices,
+                choicesList: scene.choicesList || null,
+                correctChoice: scene.correctChoice !== undefined ? scene.correctChoice : 0,
+                choiceSpeed: scene.choiceSpeed !== undefined ? scene.choiceSpeed : 500,
             };
 
             parsedData.scenes.push(editorScene);

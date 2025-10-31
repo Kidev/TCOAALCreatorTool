@@ -128,18 +128,21 @@
                 <div class="composition-editor-main">
                     <div class="composition-canvas-panel">
                         <div class="composition-preview-bg-controls">
-                            <label for="previewBackgroundFile" style="display: none;font-size: 0.9vmax; color: var(--txt-color);"></label>
+                            <label
+                                for="previewBackgroundFile"
+                                style="display: none; font-size: 0.9vmax; color: var(--txt-color)"
+                            ></label>
                             <input
                                 type="file"
                                 id="previewBackgroundFile"
                                 accept="image/*"
-                                style="display: none;"
+                                style="display: none"
                                 onchange="compositionEditor.loadPreviewBackground(this.files[0])"
                             />
                             <button
                                 id="previewBackgroundSelectBtn"
                                 onclick="document.getElementById('previewBackgroundFile').click()"
-                                style="font-size: 0.8vmax; padding: 4px 8px;"
+                                style="font-size: 0.8vmax; padding: 4px 8px"
                                 title="Select background image for preview only"
                             >
                                 Template
@@ -147,7 +150,7 @@
                             <button
                                 id="previewBackgroundToggleBtn"
                                 onclick="compositionEditor.togglePreviewBackground()"
-                                style="font-size: 0.8vmax; padding: 4px 8px; display: none;"
+                                style="font-size: 0.8vmax; padding: 4px 8px; display: none"
                                 title="Hide/Show background"
                                 class="success"
                             >
@@ -156,7 +159,7 @@
                             <button
                                 id="previewBackgroundRemoveBtn"
                                 onclick="compositionEditor.removePreviewBackground()"
-                                style="font-size: 0.8vmax; padding: 4px 8px; display: none;"
+                                style="font-size: 0.8vmax; padding: 4px 8px; display: none"
                                 title="Remove background"
                                 class="danger"
                             >
@@ -278,6 +281,7 @@
                     <div id="dialogArrow"></div>
                 </div>
             </div>
+            <div id="choicesContainer" class="choices-container"></div>
         </div>
         <div class="interaction-blocker" id="interactionBlocker"></div>
         <div class="editor-overlay spa-mode" id="editorOverlay" onclick="event.stopPropagation()">
@@ -292,13 +296,13 @@
                         >
                             Game assets
                         </button>
-                        <!--<button
+                        <button
                             class="tcoaal-button-small tcoaal-button-small-header js-download"
                             onclick="downloadSequence()"
                             title="Export the current dialog as a .js file"
                         >
                             Export
-                        </button>-->
+                        </button>
                         <button
                             class="tcoaal-button-small tcoaal-button-small-header js-download"
                             onclick="generateShareLink()"
@@ -452,8 +456,14 @@
                             </div>
                         </div>
                         <div class="subsection">
-                            <h4 class="collapsible-group-header" style="font-size: 0.95vw;" onclick="toggleSceneGroup(this)">Glitch effect</h4>
-                            <div class="collapsible-group-content" style="display: none;">
+                            <h4
+                                class="collapsible-group-header"
+                                style="font-size: 0.95vw"
+                                onclick="toggleSceneGroup(this)"
+                            >
+                                Glitch effect
+                            </h4>
+                            <div class="collapsible-group-content" style="display: none">
                                 <button class="reset-default reset-section" onclick="resetGlitchToDefault()">
                                     Reset to default
                                 </button>

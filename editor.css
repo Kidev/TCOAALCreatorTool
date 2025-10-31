@@ -231,6 +231,16 @@ h6 {
     margin-top: 0.8vmax;
 }
 
+.form-group.choices-list-group {
+    height: 100%;
+    align-items: start;
+    margin-top: 0vmax;
+}
+
+.label-for-choices {
+    padding: 0.8vmax 0;
+}
+
 .input-line-effects-scenes {
     margin-top: -1vmax;
     display: flex;
@@ -2967,13 +2977,13 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     color: var(--txt-color-darker);
 }
 
-/* Move as Keyframe Mode */
+/* MOVE AS KEYFRAME MODE */
 .move-as-keyframe-target {
     border: 2px dashed var(--success-color) !important;
     background: rgba(var(--success-color), 0.1) !important;
 }
 
-/* Notification System */
+/* NOTIFICATION SYSTEM */
 .composition-notification-area {
     display: flex;
     flex-direction: column;
@@ -3222,7 +3232,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 }
 
 .composition-editor-open-btn {
-    background: var(--choice-button)
+    background: var(--choice-button);
     background-size: 100% 100%;
     color: var(--white);
     text-shadow:
@@ -3236,4 +3246,148 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     background: var(--choice-button-hover);
     background-size: 100% 100%;
     color: var(--white);
+}
+
+/* CHOICES UI STYLING */
+.choices-list {
+    display: flex;
+    flex-direction: column;
+    max-width: 30vmax;
+}
+
+.choice-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5vmax;
+    padding: 0.2vmax;
+    border-radius: 0.3vmax;
+}
+
+.choice-item input[type="radio"] {
+    flex-shrink: 0;
+    width: 1vmax;
+    height: 1vmax;
+    cursor: pointer;
+}
+
+.choice-item .radio-spacer {
+    flex-shrink: 0;
+    width: 1vmax;
+    height: 1vmax;
+}
+
+.choice-item .choice-text-input {
+    flex: 1;
+}
+
+/* CHOICES WITH CONTENT NON-SELECTED USE HOVER BACKGROUND */
+.choice-item.has-content .choice-text-input {
+    background: var(--choice-button-hover);
+    border: none;
+    background-size: 100% 100%;
+    text-align: center;
+    text-shadow:
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 2px #000000,
+        0 0 3px #000000;
+}
+
+/* SELECTED CHOICE (CHECKED RADIO) USES MAIN BUTTON BACKGROUND */
+.choice-item.has-content input[type="radio"]:checked ~ .choice-text-input {
+    background: var(--choice-button);
+    background-size: 100% 100%;
+}
+
+.choice-item .remove-choice-button {
+    flex-shrink: 0;
+    width: 2vmax;
+    height: 2vmax;
+    background: var(--danger-color);
+    color: var(--white);
+    border: none;
+    border-radius: 0.3vmax;
+    cursor: pointer;
+    font-size: 1.6vmax;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.choice-item .remove-choice-button:hover {
+    background: var(--danger-color-deep);
+}
+
+.choice-item .add-choice-button-inline {
+    flex-shrink: 0;
+    width: 2vmax;
+    height: 2vmax;
+    background: var(--success-color);
+    color: var(--white);
+    border: none;
+    border-radius: 0.3vmax;
+    cursor: pointer;
+    font-size: 1.6vmax;
+    line-height: 1;
+    /*display: flex;*/
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    visibility: hidden;
+    display: none;
+}
+
+.choice-item .add-choice-button-inline:hover:not(:disabled) {
+    background: var(--success-color-deep);
+}
+
+.choice-item .add-choice-button-inline:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* CHOICES PREVIEW STYLING */
+.choices-preview-container {
+    position: absolute;
+    top: 35%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    display: none;
+    z-index: 100;
+}
+
+.choices-list-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5vmax;
+}
+
+.choice-preview-item {
+    width: 38%;
+    height: 5%;
+    /*display: flex;*/
+    align-items: center;
+    justify-content: center;
+    background: var(--choice-button-hover);
+    background-size: 100% 100%;
+    border: none;
+    color: var(--white);
+    font-size: 0.9vmax;
+    text-align: center;
+    font-family: "Faustina", serif;
+    text-shadow:
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 2px #000000,
+        0 0 3px #000000;
+}
+
+.choice-preview-item.correct {
+    background: var(--choice-button);
+    background-size: 100% 100%;
 }

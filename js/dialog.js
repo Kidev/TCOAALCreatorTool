@@ -198,6 +198,19 @@ class DialogFramework {
         this.backgroundMusicAudio = null;
         this.sceneVersion = 0;
 
+        this.choicesSoundMove = {
+            path: "gallery:Sound effects/se_53.ogg",
+            volume: 0.9,
+            pitch: 0.9,
+            speed: 1.0,
+        };
+        this.choicesSoundClick = {
+            path: "gallery:Sound effects/se_53.ogg",
+            volume: 0.9,
+            pitch: 1.0,
+            speed: 1.0,
+        };
+
         this.initializeEventListeners();
         this.initializeAudio();
         this.updateDebugInfo();
@@ -759,6 +772,11 @@ class DialogFramework {
             shakeDelay: options.shakeDelay !== undefined ? options.shakeDelay : 0,
             shakeIntensity: options.shakeIntensity !== undefined ? options.shakeIntensity : 1,
             shakeDuration: options.shakeDuration !== undefined ? options.shakeDuration : 500,
+
+            choices: options.choices !== undefined ? options.choices : null,
+            choicesList: options.choicesList || null,
+            correctChoice: options.correctChoice !== undefined ? options.correctChoice : 0,
+            choiceSpeed: options.choiceSpeed !== undefined ? options.choiceSpeed : 500,
         };
 
         this.scenes.push(scene);
@@ -909,8 +927,9 @@ class DialogFramework {
             return;
         }
 
-        // Hide dialog arrow at the start of each scene
+        // Hide dialog arrow and choices at the start of each scene
         this.hideDialogArrow();
+        this.hideChoices();
 
         this.sceneVersion++;
         const currentVersion = this.sceneVersion;
@@ -1091,6 +1110,9 @@ class DialogFramework {
                             dialogContainer.classList.add("active");
                         }
                     }
+                } else {
+                    // Show choices even when there's no dialog
+                    this.displayChoicesIfPresent();
                 }
             }, totalDialogDelay);
         } else {
@@ -1110,11 +1132,35 @@ class DialogFramework {
                     }
                 } else {
                     this.hideDialog();
+                    // Show choices even when there's no dialog
+                    this.displayChoicesIfPresent();
                 }
             }, scene.dialogDelayIn || 0);
         }
 
         this.updateDebugInfo();
+    }
+
+    async displayChoicesIfPresent() {
+        const scene = this.scenes[this.currentScene];
+        if (scene && scene.choices && scene.choicesList && scene.choicesList.length > 0) {
+            // Filter out empty choices
+            const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
+            if (validChoices.length > 0) {
+                // Find the correct choice index in the filtered list
+                let adjustedCorrectChoice = 0;
+                let validIndex = 0;
+                for (let i = 0; i <= scene.correctChoice && i < scene.choicesList.length; i++) {
+                    if (scene.choicesList[i] && scene.choicesList[i].trim() !== "") {
+                        if (i === scene.correctChoice) {
+                            adjustedCorrectChoice = validIndex;
+                        }
+                        validIndex++;
+                    }
+                }
+                await this.showChoices(validChoices, adjustedCorrectChoice, scene.choiceSpeed);
+            }
+        }
     }
 
     triggerShake(intensity = 1, duration = 500) {
@@ -1642,6 +1688,27 @@ class DialogFramework {
         if (this.config.showDialogArrow !== false) {
             this.showDialogArrow();
         }
+
+        // Show and animate choices if they exist
+        const scene = this.scenes[this.currentScene];
+        if (scene && scene.choices && scene.choicesList && scene.choicesList.length > 0) {
+            // Filter out empty choices
+            const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
+            if (validChoices.length > 0) {
+                // Find the correct choice index in the filtered list
+                let adjustedCorrectChoice = 0;
+                let validIndex = 0;
+                for (let i = 0; i <= scene.correctChoice && i < scene.choicesList.length; i++) {
+                    if (scene.choicesList[i] && scene.choicesList[i].trim() !== "") {
+                        if (i === scene.correctChoice) {
+                            adjustedCorrectChoice = validIndex;
+                        }
+                        validIndex++;
+                    }
+                }
+                await this.showChoices(validChoices, adjustedCorrectChoice, scene.choiceSpeed);
+            }
+        }
     }
 
     showDialogInstant(speaker, line1, line2, censorSpeaker) {
@@ -1654,6 +1721,71 @@ class DialogFramework {
         setTimeout(() => {
             dialogContainer.style.transition = "";
         }, 10);
+    }
+
+    async showChoices(choicesList, correctChoice, choiceSpeed) {
+        const choicesContainer = document.getElementById("choicesContainer");
+        if (!choicesContainer) return;
+
+        this.hideDialogArrow();
+
+        choicesContainer.innerHTML = "";
+        const choiceElements = [];
+
+        choicesList.forEach((choice, i) => {
+            const choiceElement = document.createElement("div");
+            choiceElement.className = "choice-item";
+            choiceElement.textContent = choice;
+            choicesContainer.appendChild(choiceElement);
+            choiceElements.push(choiceElement);
+        });
+
+        choicesContainer.style.display = "flex";
+
+        await this.animateChoicesSelection(choiceElements, correctChoice, choiceSpeed);
+    }
+
+    async animateChoicesSelection(choiceElements, correctChoice, choiceSpeed) {
+        for (let i = 0; i <= correctChoice; i++) {
+            choiceElements[i].classList.add("selected");
+
+            await this.playSound(
+                this.choicesSoundMove.path,
+                this.choicesSoundMove.volume,
+                null,
+                this.choicesSoundMove.pitch,
+                this.choicesSoundMove.speed,
+            );
+
+            await this.wait(choiceSpeed);
+
+            if (i < correctChoice) {
+                choiceElements[i].classList.remove("selected");
+            }
+        }
+
+        await this.wait(choiceSpeed);
+
+        await this.playSound(
+            this.choicesSoundClick.path,
+            this.choicesSoundClick.volume,
+            null,
+            this.choicesSoundClick.pitch,
+            this.choicesSoundClick.speed,
+        );
+
+        const choicesContainer = document.getElementById("choicesContainer");
+        if (choicesContainer) {
+            choicesContainer.style.display = "none";
+        }
+    }
+
+    hideChoices() {
+        const choicesContainer = document.getElementById("choicesContainer");
+        if (choicesContainer) {
+            choicesContainer.innerHTML = "";
+            choicesContainer.style.display = "none";
+        }
     }
 
     createControlsToggle() {
@@ -2173,6 +2305,7 @@ class DialogFramework {
         const dialogContainer = document.getElementById("dialogContainer");
         dialogContainer.classList.remove("active");
         this.hideDialogArrow();
+        this.hideChoices();
     }
 
     showDialogArrow() {
@@ -2346,6 +2479,20 @@ class DialogFramework {
                 const shakeDelay = scene.shakeDelay || 0;
                 const shakeDuration = scene.shakeDuration || 500;
                 totalDuration = Math.max(totalDuration, shakeDelay + shakeDuration);
+            }
+
+            if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
+                const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
+                if (validChoices.length > 0) {
+                    const correctChoice = scene.correctChoice || 0;
+                    const choiceSpeed = scene.choiceSpeed || 500;
+                    // Animation: (correctChoice + 1) iterations * choiceSpeed + final wait + click sound play time
+                    const choiceAnimationDuration = (correctChoice + 1) * choiceSpeed + choiceSpeed + 200; // +200ms for click sound
+                    totalDuration = Math.max(
+                        totalDuration,
+                        dialogDelay + dialogFadeIn + typingDuration + choiceAnimationDuration,
+                    );
+                }
             }
 
             await this.wait(totalDuration);

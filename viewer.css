@@ -1067,3 +1067,45 @@ body {
     width: auto;
     margin: 1vh 1vw;
 }
+
+/* CHOICES VIEWER STYLING */
+.choices-container {
+    position: absolute;
+    bottom: 2%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 1vh;
+    z-index: 100;
+}
+
+.choices-container .choice-item {
+    width: 38%;
+    height: 5.6vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--choice-button-hover);
+    background-size: 100% 100%;
+    border: none;
+    color: var(--white);
+    font-size: 2.5vh;
+    text-align: center;
+    font-family: "Faustina", serif;
+    text-shadow:
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 2px #000000,
+        0 0 3px #000000,
+        0 0 4px #000000;
+    transition: all 0.2s ease;
+}
+
+.choices-container .choice-item.selected {
+    background: var(--choice-button);
+    background-size: 100% 100%;
+}

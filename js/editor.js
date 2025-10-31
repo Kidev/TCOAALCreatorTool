@@ -893,6 +893,8 @@ function createSceneElement(index) {
         </div>`;
         }
 
+        previewHTML += `<div id="choicesPreview-${index}" class="choices-preview-container"></div>`;
+
         previewHTML += `</div></div>`;
 
         return previewHTML;
@@ -1107,7 +1109,7 @@ function createSceneElement(index) {
                 </div>
 
                 <div class="scene-group effects-assets-group">
-                    <h4 class="collapsible-group-header" onclick="toggleSceneGroup(this)">Effects</h4>
+                    <h4 class="collapsible-group-header" onclick="toggleSceneGroup(this)">Choices and effects</h4>
                     <div class="collapsible-group-content" style="display: none;">
                     <div class="form-group">
                         <input type="checkbox" class="null-checkbox" id="shake-checkbox-${index}"
@@ -1133,6 +1135,37 @@ function createSceneElement(index) {
                                 onchange="updateSceneValue(${index}, 'shakeDuration', parseInt(this.value))">
                         </div>
                     </div>
+                    <div class="form-group">
+                        <input type="checkbox" class="null-checkbox" id="choices-checkbox-${index}"
+                            ${isValidData(scene.choices) ? "checked" : ""}
+                            onchange="toggleNull(${index}, 'choices', !this.checked)"
+                            title="Uncheck to disable this parameter">
+                        <label for="choices-checkbox-${index}">Choices</label>
+                    </div>
+                    <!--<div id="choices-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.choices) ? "" : "display: none;"}">
+                        <div class="form-group">
+                            <label for="inputChoiceSpeed${index}">Choice speed (ms):</label>
+                            <input id="inputChoiceSpeed${index}" type="number" value="${scene.choiceSpeed || 500}" min="0" max="10000"
+                                onchange="updateSceneValue(${index}, 'choiceSpeed', parseInt(this.value))">
+                        </div>
+                        <div id="choices-list-${index}" class="choices-list">
+                            ${renderChoicesList(index, scene.choicesList || [], scene.correctChoice || 0)}
+                        </div>
+                    </div>-->
+                    <div id="choices-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.choices) ? "" : "display: none;"}">
+                        <div class="form-group">
+                            <label for="inputChoiceSpeed${index}">Choice speed (ms):</label>
+                            <input id="inputChoiceSpeed${index}" type="number" value="${scene.choiceSpeed || 500}" min="0" max="10000"
+                                onchange="updateSceneValue(${index}, 'choiceSpeed', parseInt(this.value))">
+                        </div>
+                        <div class="form-group choices-list-group">
+                            <label class="label-for-choices" for="ichoices-list-${index}">Choices:</label>
+                            <div id="choices-list-${index}" class="choices-list">
+                                ${renderChoicesList(index, scene.choicesList || [], scene.correctChoice || 0)}
+                            </div>                       
+                        </div>
+                    </div>
+
                     </div>
                 </div>
             </div>
@@ -1193,6 +1226,9 @@ function updateAllSpeakerDropdowns() {
 function updatePreviewDialog(index) {
     const scene = projectData.scenes[index];
     const container = document.querySelector(`[data-scene-index="${index}"]`);
+
+    updatePreviewChoices(index);
+
     if (!container) return;
 
     const speakerElement = container.querySelector(`.preview-speaker-${index}`);
@@ -1305,6 +1341,36 @@ function updatePreviewDialog(index) {
     }
 
     updateSceneHeaderPreview(index);
+}
+
+function updatePreviewChoices(index) {
+    const scene = projectData.scenes[index];
+    const choicesPreviewContainer = document.getElementById(`choicesPreview-${index}`);
+
+    if (!choicesPreviewContainer) return;
+
+    if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
+        // Filter out empty choices for preview
+        const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
+        if (validChoices.length > 0) {
+            let choicesHTML = '<div class="choices-list-preview">';
+            scene.choicesList.forEach((choice, i) => {
+                if (choice && choice.trim() !== "") {
+                    const isCorrect = scene.correctChoice === i;
+                    choicesHTML += `<div class="choice-preview-item ${isCorrect ? "correct" : ""}">${choice}</div>`;
+                }
+            });
+            choicesHTML += "</div>";
+            choicesPreviewContainer.innerHTML = choicesHTML;
+            choicesPreviewContainer.style.display = "block";
+        } else {
+            choicesPreviewContainer.innerHTML = "";
+            choicesPreviewContainer.style.display = "none";
+        }
+    } else {
+        choicesPreviewContainer.innerHTML = "";
+        choicesPreviewContainer.style.display = "none";
+    }
 }
 
 function updateSceneHeaderPreview(index) {
@@ -1687,16 +1753,41 @@ function toggleNull(sceneIndex, field, isNull) {
             }
         } else if (field === "shake") {
             projectData.scenes[sceneIndex][field] = null;
+        } else if (field === "choices") {
+            projectData.scenes[sceneIndex][field] = null;
+            projectData.scenes[sceneIndex].choicesList = null;
+            projectData.scenes[sceneIndex].correctChoice = null;
+            projectData.scenes[sceneIndex].choiceSpeed = null;
         }
     } else {
         if (field === "shake") {
             projectData.scenes[sceneIndex][field] = true;
+        } else if (field === "choices") {
+            projectData.scenes[sceneIndex][field] = true;
+            projectData.scenes[sceneIndex].choicesList = [""];
+            projectData.scenes[sceneIndex].correctChoice = 0;
+            projectData.scenes[sceneIndex].choiceSpeed = 500;
         } else {
             projectData.scenes[sceneIndex][field] = "";
         }
     }
 
     updateNullCheckboxVisibility(sceneIndex, field, isNull);
+
+    // Re-render the choices list when toggling choices
+    if (field === "choices" && !isNull) {
+        const choicesList = document.getElementById(`choices-list-${sceneIndex}`);
+        if (choicesList) {
+            const scene = projectData.scenes[sceneIndex];
+            choicesList.innerHTML = renderChoicesList(sceneIndex, scene.choicesList || [], scene.correctChoice || 0);
+        }
+
+        // Reset choice speed input to default value
+        const choiceSpeedInput = document.getElementById(`inputChoiceSpeed${sceneIndex}`);
+        if (choiceSpeedInput) {
+            choiceSpeedInput.value = 500;
+        }
+    }
 
     // Only update the preview for this specific scene, not the entire list
     updatePreviewDialog(sceneIndex);
@@ -1745,7 +1836,130 @@ function updateNullCheckboxVisibility(sceneIndex, field, isNull) {
         if (paramsContainer) {
             paramsContainer.style.display = isNull ? "none" : "block";
         }
+    } else if (field === "choices") {
+        const paramsContainer = document.getElementById(`choices-params-${sceneIndex}`);
+        if (paramsContainer) {
+            paramsContainer.style.display = isNull ? "none" : "block";
+        }
     }
+}
+
+function renderChoicesList(sceneIndex, choicesList, correctChoice) {
+    let displayList = choicesList && choicesList.length > 0 ? [...choicesList] : [];
+
+    if (displayList.length === 0 || displayList[displayList.length - 1].trim() !== "") {
+        displayList.push("");
+    }
+
+    let html = "";
+    displayList.forEach((choice, i) => {
+        const hasContent = choice && choice.trim() !== "";
+        const placeholderText = i === 0 ? "first choice" : `choice ${i + 1}`;
+
+        html += `
+            <div class="choice-item ${hasContent ? "has-content" : "empty"}">
+                ${
+                    hasContent
+                        ? `
+                    <input type="radio" name="correct-choice-${sceneIndex}"
+                        ${correctChoice === i ? "checked" : ""}
+                        onchange="updateCorrectChoice(${sceneIndex}, ${i})">
+                `
+                        : '<span class="radio-spacer"></span>'
+                }
+                <input type="text" class="choice-text-input"
+                    value="${choice || ""}"
+                    oninput="updateChoiceText(${sceneIndex}, ${i}, this.value)"
+                    placeholder="${placeholderText}">
+                ${
+                    hasContent
+                        ? `
+                    <button class="remove-choice-button" onclick="removeChoice(${sceneIndex}, ${i})">×</button>
+                `
+                        : `
+                    <button class="add-choice-button-inline" onclick="addChoice(${sceneIndex})" ${displayList.length >= 11 ? "disabled" : ""}>+</button>
+                `
+                }
+            </div>
+        `;
+    });
+    return html;
+}
+
+function addChoice(sceneIndex) {
+    const scene = projectData.scenes[sceneIndex];
+    if (!scene.choicesList) {
+        scene.choicesList = [];
+    }
+
+    if (scene.choicesList.length >= 10) {
+        return;
+    }
+
+    scene.choicesList.push("");
+
+    const choicesList = document.getElementById(`choices-list-${sceneIndex}`);
+    if (choicesList) {
+        choicesList.innerHTML = renderChoicesList(sceneIndex, scene.choicesList, scene.correctChoice || 0);
+    }
+
+    updatePreviewDialog(sceneIndex);
+}
+
+function removeChoice(sceneIndex, choiceIndex) {
+    const scene = projectData.scenes[sceneIndex];
+    if (!scene.choicesList) {
+        return;
+    }
+
+    scene.choicesList.splice(choiceIndex, 1);
+
+    if (scene.correctChoice >= scene.choicesList.length) {
+        scene.correctChoice = Math.max(0, scene.choicesList.length - 1);
+    }
+
+    const choicesList = document.getElementById(`choices-list-${sceneIndex}`);
+    if (choicesList) {
+        choicesList.innerHTML = renderChoicesList(sceneIndex, scene.choicesList, scene.correctChoice || 0);
+    }
+
+    updatePreviewDialog(sceneIndex);
+}
+
+function updateChoiceText(sceneIndex, choiceIndex, text) {
+    const scene = projectData.scenes[sceneIndex];
+    if (!scene.choicesList) {
+        scene.choicesList = [];
+    }
+
+    if (choiceIndex < scene.choicesList.length) {
+        scene.choicesList[choiceIndex] = text;
+    } else if (choiceIndex === scene.choicesList.length) {
+        scene.choicesList.push(text);
+    }
+
+    const activeElement = document.activeElement;
+    const selectionStart = activeElement.selectionStart;
+    const selectionEnd = activeElement.selectionEnd;
+
+    const choicesList = document.getElementById(`choices-list-${sceneIndex}`);
+    if (choicesList) {
+        choicesList.innerHTML = renderChoicesList(sceneIndex, scene.choicesList, scene.correctChoice || 0);
+
+        const inputs = choicesList.querySelectorAll(".choice-text-input");
+        if (inputs[choiceIndex]) {
+            inputs[choiceIndex].focus();
+            inputs[choiceIndex].setSelectionRange(selectionStart, selectionEnd);
+        }
+    }
+
+    updatePreviewDialog(sceneIndex);
+}
+
+function updateCorrectChoice(sceneIndex, choiceIndex) {
+    const scene = projectData.scenes[sceneIndex];
+    scene.correctChoice = choiceIndex;
+    updatePreviewDialog(sceneIndex);
 }
 
 function moveScene(index, direction) {
@@ -2289,6 +2503,29 @@ function generateCode() {
             shakeDelay: ${scene.shakeDelay},
             shakeIntensity: ${scene.shakeIntensity},
             shakeDuration: ${scene.shakeDuration}`;
+        }
+
+        if (scene.choices !== null && scene.choicesList && scene.choicesList.length > 0) {
+            // Filter out empty choices and adjust correctChoice index
+            const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
+            if (validChoices.length > 0) {
+                // Find the adjusted correct choice index in the filtered list
+                let adjustedCorrectChoice = 0;
+                let validIndex = 0;
+                for (let i = 0; i <= scene.correctChoice && i < scene.choicesList.length; i++) {
+                    if (scene.choicesList[i] && scene.choicesList[i].trim() !== "") {
+                        if (i === scene.correctChoice) {
+                            adjustedCorrectChoice = validIndex;
+                        }
+                        validIndex++;
+                    }
+                }
+                code += `,
+            choices: true,
+            choicesList: [${validChoices.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(", ")}],
+            correctChoice: ${adjustedCorrectChoice},
+            choiceSpeed: ${scene.choiceSpeed || 500}`;
+            }
         }
 
         code += `
