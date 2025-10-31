@@ -1721,8 +1721,8 @@ async function handleGalleryOnlyImport() {
                 editorOverlay.classList.add("importing");
                 editorOverlay.classList.remove("initial");
             }
-            document.getElementById("popup-buy-frame").style.display = "none";
-            document.getElementById("popup-buy-frame").style.zindex = "-1";
+            //document.getElementById("popup-buy-frame").style.display = "none";
+            //document.getElementById("popup-buy-frame").style.zindex = "-1";
 
             document.getElementById("github-logo-icon").style.display = "none";
             document.getElementById("github-logo-icon").style.zindex = "-1";
