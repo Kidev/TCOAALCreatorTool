@@ -20,7 +20,7 @@ class MemoryManager {
     constructor() {
         this.db = null;
         this.dbName = "TCOAALAssets";
-        this.dbVersion = 2;
+        this.dbVersion = 3;
         this.isReady = false;
         this.initPromise = this.initDB();
         this.haveDataStored = false;
@@ -61,6 +61,11 @@ class MemoryManager {
                 if (!db.objectStoreNames.contains("localFiles")) {
                     const localFilesStore = db.createObjectStore("localFiles", { keyPath: "filename" });
                     localFilesStore.createIndex("type", "type", { unique: false });
+                }
+
+                // UI assets store: stores extracted UI elements (buttons, arrows, etc.)
+                if (!db.objectStoreNames.contains("uiAssets")) {
+                    const uiAssetsStore = db.createObjectStore("uiAssets", { keyPath: "name" });
                 }
             };
         });
@@ -428,6 +433,57 @@ class MemoryManager {
 
         const transaction = this.db.transaction(["localFiles"], "readonly");
         const store = transaction.objectStore("localFiles");
+
+        return new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async saveUIAsset(name, blob, cssVarName = null, isAnimated = false, animationSpeed = null) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["uiAssets"], "readwrite");
+        const store = transaction.objectStore("uiAssets");
+
+        const assetRecord = {
+            name: name,
+            blob: blob,
+            cssVarName: cssVarName,
+            isAnimated: isAnimated,
+            animationSpeed: animationSpeed,
+            timestamp: Date.now(),
+        };
+
+        return new Promise((resolve, reject) => {
+            const request = store.put(assetRecord);
+            request.onsuccess = () => resolve(assetRecord);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getUIAsset(name) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["uiAssets"], "readonly");
+        const store = transaction.objectStore("uiAssets");
+
+        return new Promise((resolve, reject) => {
+            const request = store.get(name);
+            request.onsuccess = () => {
+                const result = request.result;
+                resolve(result || null);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getAllUIAssets() {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["uiAssets"], "readonly");
+        const store = transaction.objectStore("uiAssets");
 
         return new Promise((resolve, reject) => {
             const request = store.getAll();

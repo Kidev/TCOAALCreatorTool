@@ -192,6 +192,18 @@ async function loadLocalFilesForScenes() {
 async function loadProjectData(data) {
     projectData = JSON.parse(JSON.stringify(data));
 
+    if (projectData.scenes) {
+        projectData.scenes.forEach((scene) => {
+            if (scene.shake === undefined) scene.shake = null;
+            if (scene.choices === undefined) scene.choices = null;
+            if (scene.image === undefined) scene.image = null;
+            if (scene.bustLeft === undefined) scene.bustLeft = null;
+            if (scene.bustRight === undefined) scene.bustRight = null;
+            if (scene.sound === undefined) scene.sound = null;
+            if (scene.backgroundMusic === undefined) scene.backgroundMusic = null;
+        });
+    }
+
     document.getElementById("configShowControls").checked = projectData.config.showControls;
     document.getElementById("configShowDebug").checked = projectData.config.showDebug;
     document.getElementById("configShowDialogArrow").checked =
@@ -697,6 +709,7 @@ function addScene() {
         shakeDelay: 0,
         shakeIntensity: 1,
         shakeDuration: 500,
+        choices: null,
     };
 
     projectData.scenes.push(scene);
@@ -858,7 +871,7 @@ function createSceneElement(index) {
     }
 
     const isValidData = (data) => {
-        return data !== null;
+        return data !== null && data !== undefined;
     };
 
     const createImagePreview = () => {
@@ -883,7 +896,7 @@ function createSceneElement(index) {
 
         if (scene.line1 || scene.line2) {
             previewHTML += `
-        <div class="preview-text" style="background-image: url('img/tcoaal-dialog-box.webp'); background-size: 100% 100%; background-repeat: no-repeat;">
+        <div class="preview-text" style="background-size: 100% 100%; background-repeat: no-repeat;">
             <div class="preview-dialog-content" data-scene-index="${index}">
                 <div class="dialog-line speaker-line preview-speaker-${index}"></div>
                 <div id="textLine1" class="dialog-line text-line preview-text1-${index}"></div>
@@ -1113,12 +1126,12 @@ function createSceneElement(index) {
                     <div class="collapsible-group-content" style="display: none;">
                     <div class="form-group">
                         <input type="checkbox" class="null-checkbox" id="shake-checkbox-${index}"
-                            ${isValidData(scene.shake) ? "checked" : ""}
+                            ${isValidData(scene.shake) && scene.shake === true ? "checked" : ""}
                             onchange="toggleNull(${index}, 'shake', !this.checked)"
                             title="Uncheck to disable this parameter">
                         <label for="shake-checkbox-${index}">Shake</label>
                     </div>
-                    <div id="shake-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.shake) ? "" : "display: none;"}">
+                    <div id="shake-params-${index}" style="margin-left: 2.5vmax; ${scene.shake === true ? "" : "display: none;"}">
                         <div class="form-group">
                             <label for="inputShakeDelay${index}">Delay:</label>
                             <input id="inputShakeDelay${index}" type="number" value="${scene.shakeDelay}" min="0" max="10000"
@@ -1137,7 +1150,7 @@ function createSceneElement(index) {
                     </div>
                     <div class="form-group">
                         <input type="checkbox" class="null-checkbox" id="choices-checkbox-${index}"
-                            ${isValidData(scene.choices) ? "checked" : ""}
+                            ${isValidData(scene.choices) && scene.choices === true ? "checked" : ""}
                             onchange="toggleNull(${index}, 'choices', !this.checked)"
                             title="Uncheck to disable this parameter">
                         <label for="choices-checkbox-${index}">Choices</label>
@@ -1152,7 +1165,7 @@ function createSceneElement(index) {
                             ${renderChoicesList(index, scene.choicesList || [], scene.correctChoice || 0)}
                         </div>
                     </div>-->
-                    <div id="choices-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.choices) ? "" : "display: none;"}">
+                    <div id="choices-params-${index}" style="margin-left: 2.5vmax; ${scene.choices === true ? "" : "display: none;"}">
                         <div class="form-group">
                             <label for="inputChoiceSpeed${index}">Choice speed (ms):</label>
                             <input id="inputChoiceSpeed${index}" type="number" value="${scene.choiceSpeed || 500}" min="0" max="10000"
@@ -1334,9 +1347,9 @@ function updatePreviewDialog(index) {
     if (dialogArrowPreview) {
         dialogArrowPreview.style.display = projectData.config.showDialogArrow ? "block" : "none";
         if (scene.speaker === "Notification") {
-            dialogArrowPreview.style.top = "70%";
+            dialogArrowPreview.classList.toggle("notification-mode", true);
         } else {
-            dialogArrowPreview.style.top = "75%";
+            dialogArrowPreview.classList.toggle("notification-mode", false);
         }
     }
 
@@ -1752,7 +1765,7 @@ function toggleNull(sceneIndex, field, isNull) {
                 currentlyPlayingAudio = null;
             }
         } else if (field === "shake") {
-            projectData.scenes[sceneIndex][field] = null;
+            projectData.scenes[sceneIndex][field] = false;
         } else if (field === "choices") {
             projectData.scenes[sceneIndex][field] = null;
             projectData.scenes[sceneIndex].choicesList = null;
@@ -2718,14 +2731,13 @@ function handleGameImport() {
             importButtons.forEach((btn) => {
                 btn.textContent = "Gallery";
                 btn.onclick = () => {
-                    galleryContext = null; // Reset to browse mode
+                    galleryContext = null;
                     openGallery();
                 };
                 btn.classList.add("gallery-button");
                 btn.classList.remove("game-import");
             });
 
-            // Refresh scene previews to show newly imported assets
             setTimeout(() => {
                 if (typeof updateScenesList === "function") {
                     updateScenesList();
@@ -2736,7 +2748,7 @@ function handleGameImport() {
     folderInput.click();
 }
 
-async function preloadSavedDataAssets() {
+async function preloadSavedDataAssets(shouldCrop = false) {
     if (!window.gameImporterAssets && window.memoryManager) {
         try {
             const storageState = await window.memoryManager.getStorageState();
@@ -2753,7 +2765,8 @@ async function preloadSavedDataAssets() {
                     }
                 }
 
-                if (window.imagesCroppingStarted === false) {
+                // Only trigger cropping if explicitly requested (when opening gallery)
+                if (shouldCrop && window.imagesCroppingStarted === false) {
                     cropAllImages().then(() => (window.imagesCroppingStarted = false));
                 }
             }
@@ -2767,7 +2780,7 @@ async function openGallery() {
     const modal = document.getElementById("galleryModal");
     if (!modal) return;
 
-    await preloadSavedDataAssets();
+    await preloadSavedDataAssets(true);
 
     if (!galleryContext) {
         galleryContext = { mode: "browse" };

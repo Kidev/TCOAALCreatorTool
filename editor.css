@@ -1053,11 +1053,12 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 
 .dialog-arrow-preview {
     position: absolute;
-    bottom: 0%;
+    /*bottom: 0%;*/
     left: 50%;
+    top: 75%;
     transform: translateX(-50%);
-    width: 24px;
-    height: 24px;
+    width: 2vmax;
+    height: 2vmax;
     background-image: var(--dialog-arrow);
     background-size: contain;
     background-repeat: no-repeat;
@@ -1065,6 +1066,10 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     pointer-events: none;
     z-index: 15;
     display: none;
+}
+
+.dialog-arrow-preview.notification-mode {
+    top: 70%;
 }
 
 /* OVERLAY & MODAL STYLES */
@@ -1111,7 +1116,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 }
 
 .editor-overlay.gallery-only-mode.initial.active::before {
-    background-image: url("img/tcoaal-home.webp");
+    background-image: var(--site-home);/*url("img/tcoaal-home.webp");*/
     background-repeat: no-repeat;
     background-position: top center;
     background-attachment: local;
@@ -1220,6 +1225,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    background-image: var(--dialog-box);
 }
 
 .preview-text.notification-mode {
@@ -1266,11 +1272,16 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 1);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 2000;
+    background-image: var(--site-home);
+    background-repeat: no-repeat;
+    background-position: top center;
+    background-attachment: local;
+    background-size: cover;
 }
 
 .gallery-only-mode.importing + .import-modal,
@@ -1279,7 +1290,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 }
 
 .import-modal-content {
-    background: var(--black);
+    background: #00000044;
     padding: 2vmax;
     border-radius: 8px;
     width: 90%;

@@ -49,12 +49,61 @@ const Color = {
     },
 };
 
+window.uiAssets = {
+    choiceButton: null,
+    choiceButtonHover: null,
+    siteLoading: null,
+    dialogArrow: null,
+    dialogBox: null,
+    menuPortraitLeft: null,
+    menuPortraitRight: null,
+};
+
+async function loadAndInjectUIAssets() {
+    if (!window.memoryManager) {
+        console.warn("MemoryManager not initialized, skipping UI assets load");
+        return;
+    }
+
+    try {
+        await window.memoryManager.ensureReady();
+        const allUIAssets = await window.memoryManager.getAllUIAssets();
+
+        //console.log(`Found ${allUIAssets.length} UI assets in IndexedDB`);
+
+        if (allUIAssets.length === 0) {
+            console.warn("No UI assets found in IndexedDB - they will be extracted on next import");
+            return;
+        }
+
+        for (const asset of allUIAssets) {
+            const blobUrl = URL.createObjectURL(asset.blob);
+
+            const camelCaseName = asset.name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+            window.uiAssets[camelCaseName] = {
+                url: blobUrl,
+                cssVar: asset.cssVarName,
+                isAnimated: asset.isAnimated,
+                animationSpeed: asset.animationSpeed,
+            };
+
+            if (asset.cssVarName) {
+                document.documentElement.style.setProperty(asset.cssVarName, `url("${blobUrl}")`);
+                //console.log(`Injected ${asset.cssVarName}`);
+            }
+        }
+
+        //console.log("All UI assets loaded successfully");
+    } catch (error) {
+        console.error("Failed to load UI assets:", error);
+    }
+}
+
 function openEditor() {
     if (typeof dialogFramework !== "undefined") {
         dialogFramework.stopBackgroundMusic();
     }
 
-    // Hide capture and preset buttons in editor mode
     const screenshotBtn = document.getElementById("screenshotButton");
     const recordBtn = document.getElementById("recordButton");
     const presetsBtn = document.getElementById("presetsButton");
@@ -1396,11 +1445,13 @@ function setupGalleryOnlyMode() {
                     </div>
                     <div id="dialog-container-box" class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
                         <div id="dialog-content-box" class="dialog-content">
-                            <div class="dialog-line speaker-line"></div>
-                            <div class="dialog-line text-line" style="top:34%; font-size: 2vmax;">You need to own the game to go further.</div>
-                            <div class="dialog-line text-line" style="top:54%; font-size: 2vmax;">Demons are respectable entities, not filthy thieves.</div>
+                            <div class="dialog-line speaker-line">Ashley</div>
+                            <div class="dialog-line text-line" style="top:34%;color:${Color.PURPLE}">"Well? Well?? What do you think??</div>
+                            <div class="dialog-line text-line" style="top:54%;color:${Color.PURPLE}">Listen to&nbsp;<a target="_blank" rel="noopener" style="color:${Color.PURPLE};" href="https://www.youtube.com/watch?v=DDdyCHu3Qe4&list=PL8FwCzf2tokHnEYuMvpWuQqQpdNBE7e-k" >our songs on YouTube</a>!!"</div>
                         </div>
                     </div>
+                    <img src="${window.uiAssets?.menuPortraitLeft?.url}" class="bust-image left">
+                    <img src="${window.uiAssets?.menuPortraitRight?.url}" class="bust-image right">
                     
                 </div>
                 <div id="gallerySection" class="section" style="display: none; background: none;padding:0;margin:0;box-shadow:none;">
@@ -1432,7 +1483,7 @@ function setupGalleryOnlyMode() {
         <input type="file" id="folderInput" style="display: none;" webkitdirectory directory multiple>
         <div id="importProgressModal" class="import-modal" style="display: none;">
             <div class="import-modal-content">
-                <img src="img/tcoaal-loading.webp" style="margin: 0 auto 1.5vmax; display: block;">
+                <img src="${window.uiAssets?.siteLoading?.url || ""}" style="margin: 0 auto 1.5vmax; display: block;">
                 <h2>Processing game assets</h2>
                 <div class="import-progress-bar">
                     <div id="importProgressFill" class="import-progress-fill"></div>
@@ -1527,7 +1578,7 @@ function setupGalleryOnlyMode() {
                 </div>
             </div>
         </div>
-        <iframe id="popup-buy-frame" src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>`;
+        <!--<iframe id="popup-buy-frame" src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>-->`;
 
     if (!window.gameImporter) {
         const script = document.createElement("script");
@@ -1568,13 +1619,13 @@ function setupGalleryOnlyMode() {
         document.head.appendChild(editorScript);
     }
 
-    const iFrame = document.getElementById("popup-buy-frame");
+    /*const iFrame = document.getElementById("popup-buy-frame");
     requestAnimationFrame(() => {
         iFrame.classList.add("show");
     });
     setTimeout(() => {
         iFrame.classList.remove("show");
-    }, 10000);
+    }, 10000);*/
 
     const downloadButton = document.getElementById("download-all-button");
     downloadButton.style.display = "none";
@@ -1774,12 +1825,14 @@ async function downloadAllAssets() {
 function updateStickyPositions() {
     const header = document.getElementById("editorHeader");
     const dialogBox = document.getElementById("dialog-content-box");
-    const iFrame = document.getElementById("popup-buy-frame");
+    const forcedImportOverlay = document.getElementById("forcedImportOverlay");
+    //const iFrame = document.getElementById("popup-buy-frame");
+    const iFrame2 = document.getElementById("steam-buy-frame");
     if (header) {
         const headerHeight = header.offsetHeight;
         document.documentElement.style.setProperty("--header-height", headerHeight + "px");
     }
-    if (dialogBox) {
+    /*if (dialogBox) {
         const NATIVE_W = 646;
         const NATIVE_H = 190;
         const RATIO_BOX = 0.5;
@@ -1791,6 +1844,23 @@ function updateStickyPositions() {
         const s = Math.min(1, sx, sy);
 
         iFrame.style.transform = `scale(${s})`;
+        if (iFrame2) {
+            iFrame2.style.transform = `scale(${s})`;
+        }
+    }*/
+    if (forcedImportOverlay) {
+        const NATIVE_W = 646;
+        const NATIVE_H = 190;
+        const RATIO_BOX = 0.5;
+        const rect = forcedImportOverlay.getBoundingClientRect();
+
+        const sx = (rect.width * RATIO_BOX) / NATIVE_W;
+        const sy = (rect.height * RATIO_BOX) / NATIVE_H;
+
+        const s = Math.max(Math.min(1, sx, sy), 0.35);
+
+        iFrame2.style.transformOrigin = "top center";
+        iFrame2.style.transform = `scale(${s})`;
     }
 }
 
@@ -1830,6 +1900,93 @@ async function checkSavedDataOnLoad() {
     }
 }
 
+async function checkAssetsAndShowForcedImport() {
+    await window.memoryManager.ensureReady();
+
+    try {
+        const storageState = await window.memoryManager.getStorageState();
+
+        if (storageState === "none") {
+            const urlParams = new URLSearchParams(window.location.search);
+            window.intendedMode = urlParams.get("mode") || "gallery";
+            window.intendedUseParam = urlParams.get("use") || null;
+
+            const overlay = document.getElementById("forcedImportOverlay");
+            if (overlay) {
+                overlay.style.display = "flex";
+                updateStickyPositions();
+            }
+
+            return true;
+        }
+
+        return false;
+    } catch (error) {
+        console.error("Failed to check assets:", error);
+        return false;
+    }
+}
+
+function handleForcedImport() {
+    const folderInput = document.getElementById("folderInput");
+    if (!folderInput) {
+        console.error("Folder input not found");
+        return;
+    }
+
+    folderInput.onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        const overlay = document.getElementById("forcedImportOverlay");
+        if (overlay) {
+            overlay.style.display = "none";
+        }
+
+        const progressModal = document.getElementById("importProgressModal");
+        const fill = document.getElementById("importProgressFill");
+        const text = document.getElementById("importProgressText");
+
+        if (progressModal) {
+            progressModal.style.display = "flex";
+            if (fill) fill.style.width = "0%";
+            if (text) text.textContent = "Processing game files...";
+        }
+
+        if (!window.gameImporter) {
+            window.gameImporter = new GameImporter();
+        }
+
+        window.isForcedImport = true;
+        const success = await window.gameImporter.importGame(files);
+        window.isForcedImport = false;
+
+        if (progressModal) {
+            progressModal.style.display = "none";
+        }
+
+        if (success) {
+            const intendedMode = window.intendedMode || "gallery";
+            const intendedUseParam = window.intendedUseParam;
+
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set("mode", intendedMode);
+            if (intendedUseParam) {
+                newUrl.searchParams.set("use", intendedUseParam);
+            }
+
+            window.location.href = newUrl.toString();
+        } else {
+            if (overlay) {
+                overlay.style.display = "flex";
+            }
+            alert("Failed to import game assets. Please try again.");
+        }
+    };
+
+    folderInput.click();
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
     window.compositionRecontructedCount = 0;
 
@@ -1839,20 +1996,12 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     window.imagesCroppingStarted = false;
 
-    //setTimeout(checkSavedDataOnLoad, 10);
-    /*
-    if (window.memoryManager && !window.gameImporterAssets) {
-        try {
-            const storageState = await window.memoryManager.getStorageState();
-            if (storageState !== "none") {
-                const savedAssets = await window.memoryManager.loadSavedAssets();
-                window.gameImporterAssets = savedAssets;
-                //console.log("Loaded saved game assets on page load");
-            }
-        } catch (error) {
-            console.warn("Failed to load saved assets on page load:", error);
-        }
-    }*/
+    const needsForcedImport = await checkAssetsAndShowForcedImport();
+    if (needsForcedImport) {
+        return;
+    }
+
+    await loadAndInjectUIAssets();
 
     const urlParams = new URLSearchParams(window.location.search);
     let mode = urlParams.get("mode");
@@ -1876,7 +2025,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                         Object.keys(window.gameImporterAssets.audio || {}).length > 0);
 
                 if (hasGalleryRefs && !hasGameAssets) {
-                    // Store decoded data for use after import completes
                     window.pendingSequenceData = decodedData;
 
                     const shouldImport = await showGalleryAssetsModal("viewer");
@@ -1895,7 +2043,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                     dialogFramework.addScene(processedScene);
                 });
 
-                // Reconstruct compositions if present
                 if (decodedData.compositions && decodedData.compositions.length > 0) {
                     await reconstructCompositionsToGallery(decodedData.compositions);
                 }
@@ -1976,7 +2123,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     await checkSavedDataOnLoad();
-    await preloadSavedDataAssets();
+
+    // DO NOT preload assets here it will trigger cropping
+    // Assets are loaded on-demand when gallery is opened (openGallery() calls preloadSavedDataAssets())
 
     if (window.compositionRecontructedCount > 0) {
         const newUrl = new URL(window.location);

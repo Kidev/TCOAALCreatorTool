@@ -2313,9 +2313,9 @@ class DialogFramework {
         if (dialogArrow) {
             dialogArrow.style.display = "block";
             if (this.currentSpeaker === "Notification") {
-                dialogArrow.style.top = "80%";
+                dialogArrow.classList.toggle("notification-mode", true);
             } else {
-                dialogArrow.style.top = "90%";
+                dialogArrow.classList.toggle("notification-mode", false);
             }
         }
     }
@@ -2333,9 +2333,9 @@ class DialogFramework {
             dialogArrow.style.display = "block";
             // Position arrow at top for Notification speaker
             if (this.currentSpeaker === "Notification") {
-                dialogArrow.style.top = "70%";
+                dialogArrow.classList.toggle("notification-mode", true);
             } else {
-                dialogArrow.style.top = "75%";
+                dialogArrow.classList.toggle("notification-mode", false);
             }
         }
     }

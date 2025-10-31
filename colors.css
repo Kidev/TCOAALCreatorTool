@@ -1,11 +1,11 @@
 :root {
-    --green: #669966;
-    --purple: #996699;
+    --green: #86d37a;
+    --purple: #ec83c3;
     --blue: #596891;
     --grey-blue: #8497b3;
-    --yellow: #a6a86e;
+    --yellow: #eeea72;
     --grey: #5b5b5b;
-    --default: #9e9f9a;
+    --default: #d3d0c0;
     --red: #955456;
     --black: #000000;
     --white: #ffffff;
@@ -37,14 +37,15 @@
 }
 
 :root {
+    --github-logo: url('./img/github.webp');
     --site-banner: url("./img/tcoaal-banner.webp");
+    --site-home: url("./img/tcoaal-home.webp");
+    --site-title: url("./img/tcoaal-title.webp");
+    /*--dialog-arrow: url("./img/tcoaal-arrow.gif");
     --choice-button-hover: url("./img/tcoaal-choice-button-hover.webp");
     --choice-button: url("./img/tcoaal-choice-button.webp");
     --small-choice-button-hover: url("./img/tcoaal-choice-button-small-hover.webp");
     --small-choice-button: url("./img/tcoaal-choice-button-small.webp");
     --dialog-box: url("./img/tcoaal-dialog-box.webp");
-    --site-home: url("./img/tcoaal-home.webp");
-    --site-loading: url("./img/tcoaal-loading.webp");
-    --site-title: url("./img/tcoaal-title.webp");
-    --dialog-arrow: url("./img/tcoaal-arrow.gif");
+    --site-loading: url("./img/tcoaal-loading.webp");*/
 }
