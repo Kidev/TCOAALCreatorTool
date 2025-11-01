@@ -1116,7 +1116,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 }
 
 .editor-overlay.gallery-only-mode.initial.active::before {
-    background-image: var(--site-home);/*url("img/tcoaal-home.webp");*/
+    background-image: var(--site-home); /*url("img/tcoaal-home.webp");*/
     background-repeat: no-repeat;
     background-position: top center;
     background-attachment: local;
@@ -1937,7 +1937,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     margin-bottom: 1vmax;
     justify-content: space-around;
     flex-direction: row;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-content: center;
     align-items: center;
 }
@@ -2561,7 +2561,6 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 .composition-layers-list {
     flex: 1;
     overflow-y: auto;
-    padding: 1vmax;
 }
 
 .no-layers-message {
@@ -2571,14 +2570,27 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     padding: 2vmax;
 }
 
+.composition-layer-item-audio {
+    background: var(--bg-color-section);
+    border-top: none;
+    border-right: none;
+    border-left: none;
+    border-bottom: 1px solid var(--accent-color);
+
+    border-radius: 0;
+    padding: 1vmax;
+    margin-bottom: 1vmax;
+    transition: all 0.2s;
+}
+
 .composition-layer-item {
     background: var(--bg-color-section);
     border: 1px solid var(--accent-color);
     border-radius: 6px;
     padding: 1vmax;
-    margin-bottom: 1vmax;
     transition: all 0.2s;
     cursor: pointer;
+    margin: 1vmax;
 }
 
 .composition-layer-item:hover {
@@ -2714,6 +2726,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     border-radius: 4px;
     padding: 0.6vmax;
     margin: 0.6vmax 0;
+    cursor: default;
 }
 
 .keyframe-timeline-label {
@@ -2778,6 +2791,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     background: var(--txt-color-darker);
     opacity: 0.3;
     border-radius: 50%;
+    cursor: help;
 }
 
 .timeline-keyframe-current {
@@ -2802,6 +2816,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     background: var(--success-color);
     border-color: var(--success-color);
     box-shadow: 0 0 8px var(--success-color);
+    cursor: col-resize;
 }
 
 .keyframe-tabs {
@@ -3057,6 +3072,31 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 
 .notification-close:hover {
     opacity: 1;
+}
+
+.notification-nav-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    color: var(--txt-color);
+    font-size: 0.9vmax;
+    cursor: pointer;
+    padding: 0.2vmax 0.5vmax;
+    transition: all 0.2s;
+    min-width: 2vmax;
+    height: 2vmax;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-nav-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.notification-nav-btn:disabled {
+    cursor: not-allowed;
 }
 
 .notification-btn {
@@ -3401,4 +3441,35 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 .choice-preview-item.correct {
     background: var(--choice-button);
     background-size: 100% 100%;
+}
+.volume-slider-container {
+    position: relative;
+    width: 100%;
+}
+
+.volume-slider-container input[type="range"] {
+    width: 100%;
+    height: 12px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.volume-slider-container input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent-color, #4caf50);
+}
+
+.volume-slider-container .volume-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: black;
+    font-size: 12px;
+    font-weight: bold;
+    pointer-events: none;
+    user-select: none;
 }

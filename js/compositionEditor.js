@@ -37,7 +37,7 @@ class CompositionEditor {
             },
             () => {
                 return {
-                    "0": "Add to editor",
+                    "0": "Add to compositor",
                     "1": "Add to editor and view",
                 };
             },
@@ -60,6 +60,19 @@ class CompositionEditor {
         this.previewBackgroundImage = null;
         this.previewBackgroundBlobUrl = null;
         this.previewBackgroundVisible = true;
+
+        this.audioLayer = null;
+        this.audioKeyframes = [];
+        this.selectedAudioKeyframeIndex = 0;
+        this.audioLayerVisible = true;
+        this.audioContext = null;
+        this.currentAudioPlayback = [];
+        this.currentAudioPreview = null;
+        this.isPlayingAudioPreview = false;
+
+        this.notificationQueue = [];
+        this.currentNotificationIndex = 0;
+        this.notificationTimeout = null;
 
         /*this.getAutoOpenTitle = () => {
             return this.autoOpen === true
@@ -446,42 +459,152 @@ class CompositionEditor {
     }
 
     showNotification(message, type = "info", duration = 4000, customClass = "") {
-        this.ensureNotificationArea();
-        const area = document.getElementById("compositionNotificationArea");
-        if (!area) return;
-
-        const notification = document.createElement("div");
-        notification.className = `composition-notification composition-notification-${type} ${customClass}`;
-
         if (customClass === "move-as-keyframe-notification") {
+            this.ensureNotificationArea();
+            const area = document.getElementById("compositionNotificationArea");
+            if (!area) return;
+
+            const notification = document.createElement("div");
+            notification.className = `composition-notification composition-notification-${type} ${customClass}`;
             notification.innerHTML = `
                 <span class="notification-message">${message}</span>
                 <button class="notification-close notification-btn" onclick="compositionEditor.cancelMoveAsKeyframeMode()">Cancel</button>
             `;
-        } else {
-            notification.innerHTML = `
-                <span class="notification-message">${message}</span>
-                <button class="notification-close" onclick="this.parentElement.remove()">✕</button>
-            `;
+            area.appendChild(notification);
+            return;
         }
+
+        this.notificationQueue.push({
+            message,
+            type,
+            duration,
+            timestamp: Date.now(),
+        });
+
+        if (this.notificationQueue.length === 1) {
+            this.currentNotificationIndex = 0;
+            this.displayCurrentNotification();
+        } else {
+            this.currentNotificationIndex = this.notificationQueue.length - 1;
+            this.displayCurrentNotification();
+        }
+    }
+
+    displayCurrentNotification() {
+        this.ensureNotificationArea();
+        const area = document.getElementById("compositionNotificationArea");
+        if (!area || this.notificationQueue.length === 0) return;
+
+        const existing = area.querySelectorAll(".composition-notification:not(.move-as-keyframe-notification)");
+        existing.forEach((n) => n.remove());
+
+        const currentNotif = this.notificationQueue[this.currentNotificationIndex];
+        const totalNotifs = this.notificationQueue.length;
+
+        const notification = document.createElement("div");
+        notification.className = `composition-notification composition-notification-${currentNotif.type}`;
+
+        const hasMultiple = totalNotifs > 1;
+        const canGoPrev = this.currentNotificationIndex > 0;
+        const canGoNext = this.currentNotificationIndex < totalNotifs - 1;
+
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                ${
+                    hasMultiple
+                        ? `
+                    <button class="notification-nav-btn"
+                            onclick="compositionEditor.navigateNotification(-1)"
+                            ${!canGoPrev ? 'disabled style="opacity: 0.3;"' : ""}
+                            title="Previous notification">◀</button>
+                `
+                        : ""
+                }
+                <span class="notification-message" style="flex: 1;">${currentNotif.message}</span>
+                ${
+                    hasMultiple
+                        ? `
+                    <span style="font-size: 0.85em; opacity: 0.8; white-space: nowrap;">${this.currentNotificationIndex + 1}/${totalNotifs}</span>
+                    <button class="notification-nav-btn"
+                            onclick="compositionEditor.navigateNotification(1)"
+                            ${!canGoNext ? 'disabled style="opacity: 0.3;"' : ""}
+                            title="Next notification">▶</button>
+                `
+                        : ""
+                }
+                <button class="notification-close" onclick="compositionEditor.closeCurrentNotification()">✕</button>
+            </div>
+        `;
 
         area.appendChild(notification);
 
-        if (duration > 0) {
-            setTimeout(() => {
-                if (notification.parentElement) {
-                    notification.classList.add("fade-out");
-                    setTimeout(() => notification.remove(), 300);
-                }
-            }, duration);
+        const totalDuration = this.notificationQueue.reduce((sum, n) => sum + (n.duration > 0 ? n.duration : 0), 0);
+
+        if (this.notificationTimeout) {
+            clearTimeout(this.notificationTimeout);
+            this.notificationTimeout = null;
+        }
+
+        if (totalDuration > 0) {
+            this.notificationTimeout = setTimeout(() => {
+                this.clearAllNotifications();
+            }, totalDuration);
+        }
+    }
+
+    navigateNotification(direction) {
+        const newIndex = this.currentNotificationIndex + direction;
+        if (newIndex >= 0 && newIndex < this.notificationQueue.length) {
+            this.currentNotificationIndex = newIndex;
+            this.displayCurrentNotification();
+        }
+    }
+
+    closeCurrentNotification() {
+        if (this.notificationQueue.length === 0) return;
+
+        this.notificationQueue.splice(this.currentNotificationIndex, 1);
+
+        if (this.currentNotificationIndex >= this.notificationQueue.length) {
+            this.currentNotificationIndex = Math.max(0, this.notificationQueue.length - 1);
+        }
+
+        if (this.notificationQueue.length > 0) {
+            this.displayCurrentNotification();
+        } else {
+            const area = document.getElementById("compositionNotificationArea");
+            if (area) {
+                const existing = area.querySelectorAll(".composition-notification:not(.move-as-keyframe-notification)");
+                existing.forEach((n) => n.remove());
+            }
+            if (this.notificationTimeout) {
+                clearTimeout(this.notificationTimeout);
+                this.notificationTimeout = null;
+            }
+        }
+    }
+
+    clearAllNotifications() {
+        this.notificationQueue = [];
+        this.currentNotificationIndex = 0;
+
+        if (this.notificationTimeout) {
+            clearTimeout(this.notificationTimeout);
+            this.notificationTimeout = null;
+        }
+
+        const area = document.getElementById("compositionNotificationArea");
+        if (area) {
+            const existing = area.querySelectorAll(".composition-notification:not(.move-as-keyframe-notification)");
+            existing.forEach((n) => {
+                n.classList.add("fade-out");
+                setTimeout(() => n.remove(), 300);
+            });
         }
     }
 
     clearNotifications() {
-        const area = document.getElementById("compositionNotificationArea");
-        if (area) {
-            area.innerHTML = "";
-        }
+        this.clearAllNotifications();
     }
 
     showLoading(text = "Processing...") {
@@ -617,6 +740,280 @@ class CompositionEditor {
         }
     }
 
+    addAudioKeyframe(assetData) {
+        if (!this.audioLayer) {
+            this.audioLayer = {
+                id: this.generateId(),
+                name: "Audio",
+                type: "audio",
+                visible: true,
+            };
+            this.selectedAudioKeyframeIndex = 0;
+        }
+
+        let time = assetData.time;
+        if (time === undefined || time === null) {
+            if (this.audioKeyframes.length > 0) {
+                const lastTime = Math.max(...this.audioKeyframes.map((kf) => kf.time));
+                time = lastTime + 1000;
+            } else {
+                time = 0;
+            }
+        }
+
+        const keyframe = {
+            id: this.generateId(),
+            name: assetData.name,
+            time: time,
+            speed: assetData.speed || 1.0,
+            pitch: assetData.pitch || 0,
+            assetRef: assetData.assetRef,
+            blobUrl: assetData.blobUrl,
+            duration: 3000,
+        };
+
+        this.audioKeyframes.push(keyframe);
+        this.audioKeyframes.sort((a, b) => a.time - b.time);
+
+        this.selectedAudioKeyframeIndex = this.audioKeyframes.findIndex((kf) => kf.id === keyframe.id);
+
+        const audio = new Audio(assetData.blobUrl);
+        audio.addEventListener("loadedmetadata", () => {
+            keyframe.duration = audio.duration * 1000;
+            this.updateLayersList();
+        });
+
+        this.updateLayersList();
+        this.render();
+
+        return keyframe.id;
+    }
+
+    removeAudioKeyframe(keyframeId) {
+        const index = this.audioKeyframes.findIndex((kf) => kf.id === keyframeId);
+        if (index !== -1) {
+            this.audioKeyframes.splice(index, 1);
+            if (this.audioKeyframes.length === 0) {
+                this.audioLayer = null;
+                this.selectedAudioKeyframeIndex = 0;
+            } else {
+                this.selectedAudioKeyframeIndex = Math.min(
+                    this.selectedAudioKeyframeIndex,
+                    this.audioKeyframes.length - 1,
+                );
+            }
+            this.updateLayersList();
+            this.render();
+        }
+    }
+
+    removeAllAudioKeyframes() {
+        if (confirm("Remove all audio keyframes?")) {
+            this.audioKeyframes = [];
+            this.audioLayer = null;
+            this.selectedAudioKeyframeIndex = 0;
+            this.updateLayersList();
+            this.render();
+        }
+    }
+
+    toggleAudioLayerVisibility() {
+        this.audioLayerVisible = !this.audioLayerVisible;
+        this.updateLayersList();
+        this.render();
+    }
+
+    selectAudioKeyframe(index) {
+        this.selectedAudioKeyframeIndex = index;
+        this.updateLayersList();
+        this.render();
+    }
+
+    startEditingAudioKeyframe(keyframeId) {
+        const displayEl = document.getElementById(`akf-display-${keyframeId}`);
+        const inputEl = document.getElementById(`akf-input-${keyframeId}`);
+
+        if (displayEl && inputEl) {
+            displayEl.style.display = "none";
+            inputEl.style.display = "inline";
+            inputEl.focus();
+            inputEl.select();
+        }
+    }
+
+    saveAudioKeyframeName(keyframeId) {
+        const displayEl = document.getElementById(`akf-display-${keyframeId}`);
+        const inputEl = document.getElementById(`akf-input-${keyframeId}`);
+
+        if (!inputEl || !displayEl) return;
+
+        const keyframe = this.audioKeyframes.find((kf) => kf.id === keyframeId);
+        if (!keyframe) return;
+
+        const newName = inputEl.value.trim();
+        if (newName !== "" && newName.match(/^A\d+$/)) {
+            displayEl.style.display = "inline";
+            inputEl.style.display = "none";
+        } else if (newName !== "") {
+            keyframe.customName = newName;
+            this.updateLayersList();
+        } else {
+            inputEl.value = `A${this.audioKeyframes.indexOf(keyframe) + 1}`;
+            displayEl.style.display = "inline";
+            inputEl.style.display = "none";
+        }
+    }
+
+    updateAudioKeyframeTime(keyframeId, newTime) {
+        const keyframe = this.audioKeyframes.find((kf) => kf.id === keyframeId);
+        if (keyframe) {
+            keyframe.time = Math.max(0, newTime);
+            this.audioKeyframes.sort((a, b) => a.time - b.time);
+            this.selectedAudioKeyframeIndex = this.audioKeyframes.findIndex((kf) => kf.id === keyframeId);
+            this.updateLayersList();
+            this.render();
+        }
+    }
+
+    updateAudioKeyframe(keyframeId, updates) {
+        const keyframe = this.audioKeyframes.find((kf) => kf.id === keyframeId);
+        if (keyframe) {
+            Object.assign(keyframe, updates);
+            if (updates.time !== undefined) {
+                this.audioKeyframes.sort((a, b) => a.time - b.time);
+                this.selectedAudioKeyframeIndex = this.audioKeyframes.findIndex((kf) => kf.id === keyframeId);
+            }
+            this.updateLayersList();
+            this.render();
+        }
+    }
+
+    addAudioKeyframeAtTime(time) {
+        if (this.audioKeyframes.length === 0) return;
+
+        const selectedKf = this.audioKeyframes[this.selectedAudioKeyframeIndex];
+        if (!selectedKf) return;
+
+        let newTime = time;
+        if (newTime === null || newTime === undefined) {
+            const nextIndex = this.selectedAudioKeyframeIndex + 1;
+            if (nextIndex < this.audioKeyframes.length) {
+                const nextTime = this.audioKeyframes[nextIndex].time;
+                newTime = selectedKf.time + Math.max(100, Math.floor((nextTime - selectedKf.time) / 2));
+            } else {
+                newTime = selectedKf.time + 1000;
+            }
+        }
+
+        const newKeyframe = {
+            id: this.generateId(),
+            name: `${selectedKf.name}`,
+            time: newTime,
+            speed: selectedKf.speed,
+            pitch: selectedKf.pitch,
+            assetRef: selectedKf.assetRef,
+            blobUrl: selectedKf.blobUrl,
+            duration: selectedKf.duration || 3000,
+        };
+
+        this.audioKeyframes.splice(this.selectedAudioKeyframeIndex + 1, 0, newKeyframe);
+        this.selectedAudioKeyframeIndex = this.selectedAudioKeyframeIndex + 1;
+
+        this.updateLayersList();
+        this.render();
+        return newKeyframe.id;
+    }
+
+    moveAudioKeyframeUp(index) {
+        if (index >= this.audioKeyframes.length - 1) return;
+
+        const temp = this.audioKeyframes[index];
+        this.audioKeyframes[index] = this.audioKeyframes[index + 1];
+        this.audioKeyframes[index + 1] = temp;
+
+        this.selectedAudioKeyframeIndex = index + 1;
+        this.updateLayersList();
+        this.render();
+    }
+
+    moveAudioKeyframeDown(index) {
+        if (index <= 0) return;
+
+        const temp = this.audioKeyframes[index];
+        this.audioKeyframes[index] = this.audioKeyframes[index - 1];
+        this.audioKeyframes[index - 1] = temp;
+
+        this.selectedAudioKeyframeIndex = index - 1;
+        this.updateLayersList();
+        this.render();
+    }
+
+    toggleAudioLayerVisibility() {
+        this.audioLayerVisible = !this.audioLayerVisible;
+        this.updateLayersList();
+        this.render();
+    }
+
+    deleteAudioLayer() {
+        if (confirm("Delete entire audio timeline?")) {
+            this.audioLayer = null;
+            this.audioKeyframes = [];
+            this.selectedAudioKeyframeIndex = 0;
+            this.audioLayerVisible = true;
+            this.updateLayersList();
+            this.render();
+        }
+    }
+
+    toggleAudioPreview() {
+        if (this.isPlayingAudioPreview) {
+            this.stopAudioPreview();
+        } else {
+            this.playAudioKeyframe();
+        }
+    }
+
+    stopAudioPreview() {
+        if (this.currentAudioPreview) {
+            try {
+                this.currentAudioPreview.pause();
+                this.currentAudioPreview.currentTime = 0;
+            } catch (e) {}
+        }
+        this.isPlayingAudioPreview = false;
+        this.updateLayersList();
+    }
+
+    playAudioKeyframe() {
+        if (this.currentAudioPreview) {
+            try {
+                this.currentAudioPreview.pause();
+                this.currentAudioPreview.currentTime = 0;
+            } catch (e) {}
+        }
+
+        const selectedKf = this.audioKeyframes[this.selectedAudioKeyframeIndex];
+        if (!selectedKf) return;
+
+        this.currentAudioPreview = new Audio(selectedKf.blobUrl);
+        this.currentAudioPreview.playbackRate = selectedKf.speed;
+        this.currentAudioPreview.preservesPitch = false;
+
+        this.currentAudioPreview.onended = () => {
+            this.isPlayingAudioPreview = false;
+            this.updateLayersList();
+        };
+
+        this.currentAudioPreview.play().catch((e) => {
+            console.warn("Audio preview failed:", e);
+            this.isPlayingAudioPreview = false;
+            this.updateLayersList();
+        });
+
+        this.isPlayingAudioPreview = true;
+        this.updateLayersList();
+    }
+
     moveLayerUp(layerId) {
         const index = this.layers.findIndex((l) => l.id === layerId);
         if (index !== -1 && index < this.layers.length - 1) {
@@ -710,6 +1107,23 @@ class CompositionEditor {
     playPreview() {
         this.isPlayingPreview = true;
         this.previewStartTime = Date.now();
+        this.currentAudioPlayback = [];
+
+        if (this.audioKeyframes && this.audioKeyframes.length > 0 && this.audioLayerVisible) {
+            this.audioKeyframes.forEach((kf) => {
+                const audio = new Audio(kf.blobUrl);
+                audio.playbackRate = kf.speed;
+                audio.preservesPitch = false;
+
+                this.currentAudioPlayback.push({
+                    audio: audio,
+                    startTime: kf.time,
+                    started: false,
+                    keyframe: kf,
+                });
+            });
+        }
+
         this.updateLayersList();
         this.renderPreviewFrame();
     }
@@ -720,6 +1134,17 @@ class CompositionEditor {
             cancelAnimationFrame(this.previewAnimationId);
             this.previewAnimationId = null;
         }
+
+        if (this.currentAudioPlayback && this.currentAudioPlayback.length > 0) {
+            this.currentAudioPlayback.forEach((playback) => {
+                try {
+                    playback.audio.pause();
+                    playback.audio.currentTime = 0;
+                } catch (e) {}
+            });
+            this.currentAudioPlayback = [];
+        }
+
         this.updateLayersList();
         this.render();
     }
@@ -737,7 +1162,37 @@ class CompositionEditor {
             }
         }
 
+        if (this.currentAudioPlayback && this.currentAudioPlayback.length > 0) {
+            this.currentAudioPlayback.forEach((playback) => {
+                if (!playback.started && elapsed >= playback.startTime) {
+                    playback.audio.play().catch((e) => console.warn("Audio playback failed:", e));
+                    playback.started = true;
+                }
+            });
+
+            const stillPlaying = this.currentAudioPlayback.some(
+                (playback) => playback.started && !playback.audio.paused && !playback.audio.ended,
+            );
+
+            if (stillPlaying) {
+                const anyAudioDuration = Math.max(
+                    ...this.currentAudioPlayback.map((playback) => {
+                        if (playback.audio.duration && isFinite(playback.audio.duration)) {
+                            return playback.startTime + (playback.audio.duration * 1000) / playback.keyframe.speed;
+                        }
+                        return 0;
+                    }),
+                );
+                maxDuration = Math.max(maxDuration, anyAudioDuration);
+            }
+        }
+
         const currentTime = maxDuration > 0 ? elapsed % maxDuration : 0;
+
+        if (maxDuration > 0 && elapsed >= maxDuration) {
+            this.stopPreview();
+            return;
+        }
 
         if (!this.ctx || !this.canvas) return;
 
@@ -1339,13 +1794,15 @@ class CompositionEditor {
 
         container.innerHTML = "";
 
-        if (this.layers.length === 0) {
+        if (this.layers.length === 0 && !this.audioLayer) {
             container.innerHTML += '<div class="no-layers-message">No layers yet. Add assets from the gallery!</div>';
 
             const gifBtn = document.getElementById("exportGifBtn");
             if (gifBtn) gifBtn.style.display = "none";
             const pngBtn = document.getElementById("exportPngBtn");
             if (pngBtn) pngBtn.style.display = "none";
+            const oggBtn = document.getElementById("exportOggBtn");
+            if (oggBtn) oggBtn.style.display = "none";
             return;
         }
 
@@ -1353,13 +1810,19 @@ class CompositionEditor {
             this.layers.some((l) => l.isAnimated && l.spriteCanvases.length > 0) ||
             this.layers.some((l) => l.hasKeyframes && l.keyframes.length > 1);
 
+        const hasAudioKeyframes = this.audioKeyframes && this.audioKeyframes.length > 0;
+
         const gifBtn = document.getElementById("exportGifBtn");
         if (gifBtn) {
             gifBtn.style.display = hasAnimatedLayers ? "inline-block" : "none";
         }
         const pngBtn = document.getElementById("exportPngBtn");
         if (pngBtn) {
-            pngBtn.style.display = "inline-block";
+            pngBtn.style.display = this.layers.length > 0 ? "inline-block" : "none";
+        }
+        const oggBtn = document.getElementById("exportOggBtn");
+        if (oggBtn) {
+            oggBtn.style.display = hasAudioKeyframes ? "inline-block" : "none";
         }
 
         let playBtn = document.getElementById("previewPlayBtn");
@@ -1376,7 +1839,7 @@ class CompositionEditor {
         }
 
         if (playBtn) {
-            if (hasAnimatedLayers) {
+            if (hasAnimatedLayers || hasAudioKeyframes) {
                 playBtn.style.display = "inline-block";
                 playBtn.textContent = this.isPlayingPreview ? "⏸ Pause" : "▶ Play";
                 playBtn.className = this.isPlayingPreview
@@ -1385,6 +1848,135 @@ class CompositionEditor {
             } else {
                 playBtn.style.display = "none";
             }
+        }
+
+        if (this.audioLayer && this.audioKeyframes.length > 0) {
+            const audioLayerDiv = document.createElement("div");
+            audioLayerDiv.className = "composition-layer-item-audio audio-layer";
+            audioLayerDiv.style.borderRadius = "0";
+            audioLayerDiv.style.borderLeft = "none";
+            audioLayerDiv.style.borderRight = "none";
+            audioLayerDiv.style.borderTop = "none";
+            audioLayerDiv.style.cursor = "default";
+
+            const selectedKf = this.audioKeyframes[this.selectedAudioKeyframeIndex];
+            const selectedIdx = this.selectedAudioKeyframeIndex;
+            const kfName = selectedKf.customName || `A${selectedIdx + 1}`;
+
+            let maxAudioDuration = 0;
+            for (const kf of this.audioKeyframes) {
+                const estimatedDuration = (kf.duration || 3000) / (kf.speed || 1);
+                const endTime = kf.time + estimatedDuration;
+                maxAudioDuration = Math.max(maxAudioDuration, endTime);
+            }
+            const durationMinutes = Math.floor(maxAudioDuration / 60000);
+            const durationSeconds = Math.floor((maxAudioDuration % 60000) / 1000);
+            const durationMs = Math.floor(maxAudioDuration % 1000);
+            const durationText = `${durationMinutes}:${durationSeconds.toString().padStart(2, "0")}.${durationMs.toString().padStart(3, "0")}`;
+
+            let keyframeTimelineHTML = `
+                <div style="display:flex;justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="display:flex;flex-direction: column; flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; font-size: 0.95em;">Audio (${durationText})</div>
+                        <div style="font-size: 0.75em; opacity: 0.7; display: flex; flex-direction: row; flex-wrap: wrap; gap: 2px; margin-top: 4px;">
+                            ${this.audioKeyframes
+                                .map((kf, idx) => {
+                                    const isSelected = idx === this.selectedAudioKeyframeIndex;
+                                    const label = kf.customName || `A${idx + 1}`;
+                                    return `<div onclick="compositionEditor.selectAudioKeyframe(${idx})"
+                                             style="cursor: pointer; padding: 2px 4px; border-radius: 3px; background: ${isSelected ? "var(--green)" : "transparent"}; color: ${isSelected ? "black" : "inherit"}; font-weight: ${isSelected ? "600" : "normal"};"
+                                             title="Click to select ${kf.name} (${label})">
+                                    ${kf.name}
+                                </div>`;
+                                })
+                                .join("")}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="layer-control-btn visibility-btn ${this.audioLayerVisible ? "active" : ""}"
+                                onclick="compositionEditor.toggleAudioLayerVisibility()"
+                                title="${this.audioLayerVisible ? "Mute" : "Play"} the audio track">
+                            ${this.audioLayerVisible ? "☑" : "☐"}
+                        </button>
+                        <button class="layer-control-btn delete-btn"
+                                onclick="compositionEditor.removeAllAudioKeyframes()"
+                                title="Remove all audio keyframes">
+                            🗑
+                        </button>
+                    </div>
+                </div>
+                <div class="keyframe-timeline-section" style="overflow-x: hidden;">`;
+
+            keyframeTimelineHTML +=
+                '<div class="keyframe-header" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">';
+            keyframeTimelineHTML += `
+                <div style="flex: 1; display: flex; align-items: stretch; gap: 4px;">
+                    <button class="keyframe-tab active" ondblclick="event.stopPropagation(); compositionEditor.startEditingAudioKeyframe('${selectedKf.id}')" title="Double-click to rename">
+                        <span id="akf-display-${selectedKf.id}">${kfName}</span>
+                        <input type="text" id="akf-input-${selectedKf.id}" value="${kfName}"
+                               style="display: none; width: 50px; padding: 0.25vmax; font-size: inherit; font-family: inherit; background: var(--bg-color-section-lighter); color: var(--txt-color); border: 1px solid var(--accent-color); border-radius: 2px;"
+                               onkeydown="if(event.key === 'Enter') { event.preventDefault(); compositionEditor.saveAudioKeyframeName('${selectedKf.id}'); }"
+                               onblur="compositionEditor.saveAudioKeyframeName('${selectedKf.id}')"
+                               onclick="event.stopPropagation()">
+                    </button>
+                    <button class="layer-control-btn ${this.isPlayingAudioPreview ? "danger" : ""}"
+                            onclick="compositionEditor.toggleAudioPreview()"
+                            title="${this.isPlayingAudioPreview ? "Pause" : "Play"} this audio"
+                            style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
+                        ${this.isPlayingAudioPreview ? "⏸" : "▶"}
+                    </button>
+                    <button class="layer-control-btn"
+                            onclick="compositionEditor.addAudioKeyframeAtTime()"
+                            title="Add new audio keyframe based on current one"
+                            style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
+                        ⥅
+                    </button>
+                </div>
+            `;
+
+            keyframeTimelineHTML += `
+                <button class="layer-control-btn delete-btn"
+                       onclick="compositionEditor.removeAudioKeyframe('${selectedKf.id}')"
+                       title="Delete current audio keyframe">
+                   ✕
+               </button>
+            `;
+            keyframeTimelineHTML += "</div>";
+
+            keyframeTimelineHTML += this.generateAudioTimeline();
+
+            keyframeTimelineHTML += `
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <div class="layer-position" style="flex: 0 0 20%; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Time (ms)</label>
+                            <input type="number" value="${selectedKf.time}" min="0" step="100"
+                                   onchange="compositionEditor.updateAudioKeyframeTime('${selectedKf.id}', parseInt(this.value))"
+                                   class="position-input">
+                        </div>
+                    </div>
+                    <div class="layer-position" style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Speed</label>
+                            <input type="number" value="${selectedKf.speed}" min="0.25" max="2" step="0.05"
+                                   onchange="compositionEditor.updateAudioKeyframe('${selectedKf.id}', {speed: parseFloat(this.value)})"
+                                   class="position-input" style="width: 100%;">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Pitch</label>
+                            <input type="number" value="${selectedKf.pitch}" min="-12" max="12" step="0.5"
+                                   onchange="compositionEditor.updateAudioKeyframe('${selectedKf.id}', {pitch: parseFloat(this.value)})"
+                                   class="position-input" style="width: 100%;">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            keyframeTimelineHTML += "</div>";
+
+            audioLayerDiv.innerHTML = keyframeTimelineHTML;
+
+            container.appendChild(audioLayerDiv);
         }
 
         const reversedLayers = [...this.layers].reverse();
@@ -1736,6 +2328,8 @@ class CompositionEditor {
 
                 const layerId = marker.dataset.layerId;
                 const keyframeId = marker.dataset.keyframeId;
+                const audioKeyframeId = marker.dataset.audioKeyframeId;
+                const isAudioKeyframe = !!audioKeyframeId;
                 const timeline = marker.closest(".visual-timeline-wrapper");
                 if (!timeline) return;
 
@@ -1777,7 +2371,11 @@ class CompositionEditor {
                         const percentage = clampedX / rect.width;
                         const newTime = Math.max(0, Math.round(percentage * maxTime));
 
-                        this.updateKeyframeTime(layerId, keyframeId, newTime);
+                        if (isAudioKeyframe) {
+                            this.updateAudioKeyframeTime(audioKeyframeId, newTime);
+                        } else {
+                            this.updateKeyframeTime(layerId, keyframeId, newTime);
+                        }
                     }
 
                     document.removeEventListener("mousemove", onMouseMove);
@@ -1797,6 +2395,11 @@ class CompositionEditor {
                 const layerMaxTime = Math.max(...layer.keyframes.map((kf) => kf.time));
                 maxTime = Math.max(maxTime, layerMaxTime);
             }
+        }
+
+        if (this.audioKeyframes && this.audioKeyframes.length > 0) {
+            const audioMaxTime = Math.max(...this.audioKeyframes.map((kf) => kf.time));
+            maxTime = Math.max(maxTime, audioMaxTime);
         }
 
         maxTime = Math.max(maxTime + 1000, 2000);
@@ -1874,6 +2477,17 @@ class CompositionEditor {
             `;
         }
 
+        const totalSubdivisions = Math.ceil(maxTime / 200);
+        for (let i = 1; i < totalSubdivisions; i++) {
+            const time = i * 200;
+            if (time % 1000 !== 0) {
+                const position = (time / maxTime) * 100;
+                html += `
+                    <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                `;
+            }
+        }
+
         for (const layer of this.layers) {
             if (layer.id === currentLayer.id) continue;
             if (!layer.hasKeyframes || layer.keyframes.length === 0) continue;
@@ -1884,6 +2498,22 @@ class CompositionEditor {
                     <div class="timeline-keyframe-marker timeline-keyframe-other"
                          style="left: ${position}%"
                          title="Other layer keyframe at ${kf.time}ms">
+                    </div>
+                `;
+            }
+        }
+
+        if (this.audioKeyframes && this.audioKeyframes.length > 0) {
+            for (const kf of this.audioKeyframes) {
+                const position = (kf.time / maxTime) * 100;
+                const tooltipText = `🔊 ${kf.name}
+Time: ${kf.time}ms
+Speed: ${kf.speed.toFixed(1)}x
+Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
+                html += `
+                    <div style="position: absolute; left: ${position}%; bottom: -18px; transform: translateX(-50%); font-size: 1em; opacity: 0.6; cursor: help; z-index: 3;"
+                         title="${tooltipText}">
+                        ♫
                     </div>
                 `;
             }
@@ -1913,6 +2543,145 @@ class CompositionEditor {
         html += "</div>";
 
         return `<div class="visual-timeline-wrapper" data-max-time="${maxTime}">${html}</div>`;
+    }
+
+    generateAudioTimeline() {
+        let maxTime = 0;
+
+        for (const layer of this.layers) {
+            if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                const layerMaxTime = Math.max(...layer.keyframes.map((kf) => kf.time));
+                maxTime = Math.max(maxTime, layerMaxTime);
+            }
+        }
+
+        if (this.audioKeyframes && this.audioKeyframes.length > 0) {
+            const audioMaxTime = Math.max(...this.audioKeyframes.map((kf) => kf.time));
+            maxTime = Math.max(maxTime, audioMaxTime);
+        }
+
+        maxTime = Math.max(maxTime + 1000, 2000);
+        const maxSeconds = Math.ceil(maxTime / 1000);
+
+        let html = '<div class="visual-timeline-container">';
+
+        html += '<div style="position: relative; min-height: 20px; margin-bottom: 4px;">';
+        for (let i = 0; i < this.audioKeyframes.length; i++) {
+            const kf = this.audioKeyframes[i];
+            const position = (kf.time / maxTime) * 100;
+            const isSelected = i === this.selectedAudioKeyframeIndex;
+            const kfLabel = kf.customName || `A${i + 1}`;
+            const canMoveDown = i > 0;
+            const canMoveUp = i < this.audioKeyframes.length - 1;
+
+            if (isSelected) {
+                html += `
+                    <div style="position: absolute; top: 0; left: ${position}%; transform: translateX(-50%); z-index: 10;">
+                        <div style="position: relative; display: inline-block;">
+                            ${
+                                canMoveDown
+                                    ? `
+                                <button class="keyframe-reorder-btn"
+                                        style="position: absolute; right: 100%; top: 50%; transform: translateY(-50%); margin-right: 2px; font-size: 0.65em; padding: 1px 3px; min-width: 16px; height: 16px; line-height: 1;"
+                                        onclick="event.stopPropagation(); compositionEditor.moveAudioKeyframeDown(${i})"
+                                        title="Swap with previous">
+                                    ⥃
+                                </button>
+                            `
+                                    : ""
+                            }
+                            <span style="cursor: pointer; font-size: 0.75em; white-space: nowrap; font-weight: 600; color: var(--green); text-shadow: 0 0 8px var(--green);"
+                                  onclick="event.stopPropagation(); compositionEditor.selectAudioKeyframe(${i})"
+                                  title="${kf.name}">
+                                ${kfLabel}
+                            </span>
+                            ${
+                                canMoveUp
+                                    ? `
+                                <button class="keyframe-reorder-btn"
+                                        style="position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 2px; font-size: 0.65em; padding: 1px 3px; min-width: 16px; height: 16px; line-height: 1;"
+                                        onclick="event.stopPropagation(); compositionEditor.moveAudioKeyframeUp(${i})"
+                                        title="Swap with next">
+                                    ⥂
+                                </button>
+                            `
+                                    : ""
+                            }
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div style="position: absolute; top: 69px; left: ${position}%; transform: translateX(-50%); cursor: pointer; font-size: 0.75em; white-space: nowrap; color: var(--grey); z-index: 5;"
+                         onclick="event.stopPropagation(); compositionEditor.selectAudioKeyframe(${i})"
+                         title="${kf.name}">
+                        ${kfLabel}
+                    </div>
+                `;
+            }
+        }
+        html += "</div>";
+
+        html += '<div class="visual-timeline-track">';
+
+        for (let sec = 0; sec <= maxSeconds; sec++) {
+            const position = ((sec * 1000) / maxTime) * 100;
+            html += `
+                <div class="timeline-second-marker" style="left: ${position}%">
+                    <div class="timeline-second-tick"></div>
+                    <div class="timeline-second-label" style="${sec === 0 ? "font-weight: 600; opacity: 1;" : ""}">${sec}s</div>
+                </div>
+            `;
+        }
+
+        const totalSubdivisions = Math.ceil(maxTime / 200);
+        for (let i = 1; i < totalSubdivisions; i++) {
+            const time = i * 200;
+            if (time % 1000 !== 0) {
+                const position = (time / maxTime) * 100;
+                html += `
+                    <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                `;
+            }
+        }
+
+        for (const layer of this.layers) {
+            if (!layer.hasKeyframes || layer.keyframes.length === 0) continue;
+
+            for (const kf of layer.keyframes) {
+                const position = (kf.time / maxTime) * 100;
+                html += `
+                    <div class="timeline-keyframe-marker timeline-keyframe-other"
+                         style="left: ${position}%"
+                         title="Image layer keyframe at ${kf.time}ms">
+                    </div>
+                `;
+            }
+        }
+
+        for (let i = 0; i < this.audioKeyframes.length; i++) {
+            const kf = this.audioKeyframes[i];
+            const position = (kf.time / maxTime) * 100;
+            const isSelected = i === this.selectedAudioKeyframeIndex;
+            const kfLabel = `A${i + 1}`;
+
+            html += `
+                <div class="timeline-keyframe-marker timeline-keyframe-current ${isSelected ? "timeline-keyframe-selected" : ""}"
+                     style="left: ${position}%"
+                     onclick="event.stopPropagation(); compositionEditor.selectAudioKeyframe(${i})"
+                     data-audio-keyframe-id="${kf.id}"
+                     data-keyframe-index="${i}"
+                     data-is-selected="${isSelected}"
+                     title="${kf.name} at ${kf.time}ms - Click to select${isSelected ? " | Drag to move" : ""}">
+                    <div class="timeline-keyframe-diamond"></div>
+                </div>
+            `;
+        }
+
+        html += "</div>";
+        html += "</div>";
+
+        return `<div class="visual-timeline-wrapper audio-timeline-wrapper" data-max-time="${maxTime}">${html}</div>`;
     }
 
     async exportComposition() {
@@ -2233,6 +3002,243 @@ class CompositionEditor {
         }
     }
 
+    async saveAudioTrackToGallery(compositionName) {
+        if (!this.audioKeyframes || this.audioKeyframes.length === 0 || !this.audioLayerVisible) {
+            return;
+        }
+
+        try {
+            const wavBlob = await this.renderAudioTrack();
+            if (!wavBlob) {
+                throw new Error("Failed to render audio track");
+            }
+
+            if (window.gameImporterAssets) {
+                if (!window.gameImporterAssets.audio) {
+                    window.gameImporterAssets.audio = {};
+                }
+                if (!window.gameImporterAssets.audio["Misc"]) {
+                    window.gameImporterAssets.audio["Misc"] = {};
+                }
+
+                const fileName = `${compositionName}.wav`;
+                const blobUrl = URL.createObjectURL(wavBlob);
+
+                window.gameImporterAssets.audio["Misc"][fileName] = {
+                    url: blobUrl,
+                    blob: wavBlob,
+                    baseFileName: fileName,
+                };
+
+                if (window.memoryManager) {
+                    try {
+                        const assetData = {
+                            name: fileName,
+                            originalName: fileName,
+                            baseFileName: fileName,
+                            blob: wavBlob,
+                            isSprite: false,
+                            variants: null,
+                        };
+
+                        await window.memoryManager.savePartialAsset(assetData, "audio", "Misc", "audio");
+                    } catch (error) {
+                        console.error("Failed to save audio to IndexedDB:", error);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Failed to save audio track to gallery:", error);
+            throw error;
+        }
+    }
+
+    async renderAudioTrack() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            let maxDuration = 0;
+            for (const kf of this.audioKeyframes) {
+                const response = await fetch(kf.blobUrl);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                const adjustedDuration = (audioBuffer.duration / kf.speed) * 1000;
+                const totalTime = kf.time + adjustedDuration;
+                maxDuration = Math.max(maxDuration, totalTime);
+            }
+
+            for (const layer of this.layers) {
+                if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                    const layerMaxTime = Math.max(...layer.keyframes.map((kf) => kf.time));
+                    maxDuration = Math.max(maxDuration, layerMaxTime);
+                }
+            }
+
+            const durationSeconds = maxDuration / 1000;
+            const offlineContext = new OfflineAudioContext(
+                2,
+                audioContext.sampleRate * durationSeconds,
+                audioContext.sampleRate,
+            );
+
+            for (const kf of this.audioKeyframes) {
+                const response = await fetch(kf.blobUrl);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await offlineContext.decodeAudioData(arrayBuffer);
+
+                const source = offlineContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.playbackRate.value = kf.speed;
+
+                source.connect(offlineContext.destination);
+                source.start(kf.time / 1000);
+            }
+
+            const renderedBuffer = await offlineContext.startRendering();
+            const wavBlob = await this.audioBufferToWav(renderedBuffer);
+
+            return wavBlob;
+        } catch (error) {
+            console.error("Failed to render audio track:", error);
+            return null;
+        }
+    }
+
+    async exportAsOgg(save = true) {
+        if (!this.audioKeyframes || this.audioKeyframes.length === 0) {
+            this.showNotification("No audio keyframes to export", "warning");
+            return;
+        }
+
+        /*this.showNotification(
+            "Audio export with pitch/speed adjustment requires Web Audio API processing. Preparing audio composition...",
+            "info",
+            3000,
+        );*/
+
+        try {
+            this.showNotification("Rendering audio composition...", "info");
+
+            const wavBlob = await this.renderAudioTrack();
+
+            if (!wavBlob) {
+                throw new Error("Failed to render audio track");
+            }
+
+            const compositionName = this.generateDefaultCompositionName();
+            const url = URL.createObjectURL(wavBlob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${compositionName}.wav`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            this.showNotification("Audio exported as WAV (OGG encoding requires additional library)", "success", 4000);
+
+            if (save && window.gameImporterAssets && window.gameImporterAssets.audio) {
+                if (!window.gameImporterAssets.audio["Misc"]) {
+                    window.gameImporterAssets.audio["Misc"] = {};
+                }
+
+                const fileName = `${compositionName}.wav`;
+                const blobUrl = URL.createObjectURL(wavBlob);
+
+                window.gameImporterAssets.audio["Misc"][fileName] = {
+                    url: blobUrl,
+                    blob: wavBlob,
+                    baseFileName: fileName,
+                };
+
+                if (window.memoryManager) {
+                    try {
+                        const assetData = {
+                            name: fileName,
+                            originalName: fileName,
+                            baseFileName: fileName,
+                            blob: wavBlob,
+                            isSprite: false,
+                            variants: null,
+                        };
+
+                        await window.memoryManager.savePartialAsset(assetData, "audio", "Misc", "audio");
+                        this.showNotification("Audio saved to Audio > Misc category and IndexedDB", "success", 3000);
+                    } catch (error) {
+                        console.error("Failed to save audio to IndexedDB:", error);
+                        /*this.showNotification(
+                            "Audio saved to Audio > Misc category (IndexedDB save failed)",
+                            "warning",
+                            3000,
+                        );*/
+                    }
+                } else {
+                    this.showNotification("Audio saved to Audio > Misc category", "success", 3000);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to export audio:", error);
+            this.showNotification("Failed to export audio: " + error.message, "error", 6000);
+        }
+    }
+
+    audioBufferToWav(audioBuffer) {
+        return new Promise((resolve) => {
+            const numberOfChannels = audioBuffer.numberOfChannels;
+            const length = audioBuffer.length * numberOfChannels * 2;
+            const buffer = new ArrayBuffer(44 + length);
+            const view = new DataView(buffer);
+
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            let offset = 0;
+            writeString(offset, "RIFF");
+            offset += 4;
+            view.setUint32(offset, 36 + length, true);
+            offset += 4;
+            writeString(offset, "WAVE");
+            offset += 4;
+            writeString(offset, "fmt ");
+            offset += 4;
+            view.setUint32(offset, 16, true);
+            offset += 4;
+            view.setUint16(offset, 1, true);
+            offset += 2;
+            view.setUint16(offset, numberOfChannels, true);
+            offset += 2;
+            view.setUint32(offset, audioBuffer.sampleRate, true);
+            offset += 4;
+            view.setUint32(offset, audioBuffer.sampleRate * numberOfChannels * 2, true);
+            offset += 4;
+            view.setUint16(offset, numberOfChannels * 2, true);
+            offset += 2;
+            view.setUint16(offset, 16, true);
+            offset += 2;
+            writeString(offset, "data");
+            offset += 4;
+            view.setUint32(offset, length, true);
+            offset += 4;
+
+            const channels = [];
+            for (let i = 0; i < numberOfChannels; i++) {
+                channels.push(audioBuffer.getChannelData(i));
+            }
+
+            let index = offset;
+            for (let i = 0; i < audioBuffer.length; i++) {
+                for (let channel = 0; channel < numberOfChannels; channel++) {
+                    const sample = Math.max(-1, Math.min(1, channels[channel][i]));
+                    view.setInt16(index, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+                    index += 2;
+                }
+            }
+
+            resolve(new Blob([buffer], { type: "audio/wav" }));
+        });
+    }
+
     clearAllLayers() {
         if (this.layers.length > 0 && confirm("Are you sure you want to remove all layers?")) {
             this.layers = [];
@@ -2527,14 +3533,29 @@ class CompositionEditor {
                 }
             }
 
+            if (this.audioKeyframes && this.audioKeyframes.length > 0) {
+                try {
+                    await this.saveAudioTrackToGallery(compositionName);
+                } catch (error) {
+                    console.error("Failed to save audio track:", error);
+                    this.showNotification(
+                        `Composition saved, but audio track save failed: ${error.message}`,
+                        "warning",
+                        5000,
+                    );
+                }
+            }
+
             if (typeof updateGalleryCategories === "function") {
                 updateGalleryCategories();
             }
 
             this.navigateToCompositionInGallery(fileName);
 
+            const audioMessage = this.audioKeyframes && this.audioKeyframes.length > 0 ? ` (with audio track)` : "";
+
             this.showNotification(
-                `Composition "${compositionName}" saved to gallery (Misc category)!`,
+                `Composition "${compositionName}"${audioMessage} saved to gallery (Misc category)!`,
                 "success",
                 5000,
             );
@@ -2611,13 +3632,6 @@ class CompositionEditor {
         }
 
         if (window.location.protocol === "file:") {
-            /*alert(
-                "GIF export requires running from a web server due to browser security restrictions.\n\n" +
-                    "Please either:\n" +
-                    "1. Use a local web server (e.g., 'python -m http.server' or 'npx serve')\n" +
-                    "2. Or use a browser extension to allow local file access\n\n" +
-                    "The composition will be saved as PNG instead.",
-            );*/
             this.showNotification("No GIF renderer loaded", "error");
             return await this.renderToBlob();
         }

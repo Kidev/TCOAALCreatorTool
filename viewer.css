@@ -81,7 +81,6 @@ body {
     opacity: 1;
 }
 
-
 /*
 @media (max-width: 1200px) {
     .dialog-container {
@@ -145,6 +144,14 @@ body {
     display: none;
 }
 
+.dialogArrow-fake-class {
+    position: absolute;
+    top: 85%;
+    left: 50%;
+    width: 2vmax;
+    height: 2vmax;
+}
+
 #dialogArrow.notification-mode {
     top: 80%;
 }
@@ -166,6 +173,11 @@ body {
     width: 100%;
     padding: 0% 0%;
     box-sizing: border-box;
+}
+
+.dialog-content.not-shown-now {
+    display: none;
+    visibility: hidden;
 }
 
 .dialog-arrow {
@@ -200,12 +212,13 @@ body {
     font-size: 2vmax;
     /*font-size: 15%;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.8);*/
-    text-shadow: -1px -1px 0 #000,
-                1px -1px 0 #000,
-                -1px  1px 0 #000,
-                1px  1px 0 #000,
-                0 0 2px rgba(0,0,0,0.9),
-                0 0 3px rgba(0,0,0,0.6);
+    text-shadow:
+        -1px -1px 0 #000,
+        1px -1px 0 #000,
+        -1px 1px 0 #000,
+        1px 1px 0 #000,
+        0 0 2px rgba(0, 0, 0, 0.9),
+        0 0 3px rgba(0, 0, 0, 0.6);
 }
 
 .text-line {
@@ -214,12 +227,13 @@ body {
     font-size: 2vmax;
     /*font-size: 15%;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);*/
-    text-shadow: -1px -1px 0 #000,
-                1px -1px 0 #000,
-                -1px 1px 0 #000,
-                1px 1px 0 #000,
-                0 0 2px rgba(0, 0, 0, 0.9),
-                0 0 3px rgba(0, 0, 0, 0.6);
+    text-shadow:
+        -1px -1px 0 #000,
+        1px -1px 0 #000,
+        -1px 1px 0 #000,
+        1px 1px 0 #000,
+        0 0 2px rgba(0, 0, 0, 0.9),
+        0 0 3px rgba(0, 0, 0, 0.6);
 }
 
 #textLine1 {
@@ -229,8 +243,6 @@ body {
 #textLine2 {
     top: 55%;
 }
-
-
 
 @media (max-width: 490px) {
     .dialog-container {

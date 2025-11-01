@@ -595,10 +595,31 @@ class GalleryManager {
             <div class="audio-player-controls">
             <button class="audio-player-btn" id="audioPlayBtn" onclick="galleryManager.toggleAudioPlay()">▶ Play</button>
             <button class="audio-player-btn" onclick="galleryManager.restartAudio()">⏮ Restart</button>
-            <div style="display:flex;align-items:center;flex-direction:column-reverse;justify-content:flex-start;">
-            <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
-            oninput="galleryManager.setAudioVolume(this.value)" title="100%">
-            <span id="volumeValue" style="min-width:3ch; text-align:right;">100%</span>
+            <div style="display:flex;flex-direction: column; gap: 4px;">
+
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
+                    oninput="galleryManager.setAudioVolume(this.value)" title="Volume: 100%"
+                    style="flex: 1; height: 12px; border-radius: 3px; cursor: pointer;">
+                    <span id="volumeValue" style="font-size: 12px; font-weight: bold; min-width: 80px; text-align: right;">Volume: 100%</span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input id="speedSlider" type="range" min="0.25" max="2" step="0.05" value="1"
+                    oninput="galleryManager.setAudioSpeed(this.value)" title="Speed: 100%"
+                    style="flex: 1; height: 12px; border-radius: 3px; cursor: pointer;">
+                    <span id="speedValue" style="font-size: 12px; font-weight: bold; min-width: 80px; text-align: right;">Speed: 1.0x</span>
+                </div>
+
+
+               <div style="display: flex; align-items: center; gap: 8px;">
+                    <input id="pitchSlider" type="range" min="-12" max="12" step="0.5" value="0"
+                    oninput="galleryManager.setAudioPitch(this.value)" title="Pitch: 0"
+                    style="flex: 1; height: 12px; border-radius: 3px; cursor: pointer;">
+                    <span id="pitchValue" style="font-size: 12px; font-weight: bold; min-width: 80px; text-align: right;">Pitch: +0.0</span>
+                </div>
+
+            
             </div>
             </div>
             <div class="audio-player-progress">
@@ -619,10 +640,19 @@ class GalleryManager {
         if (curTimeEl) curTimeEl.textContent = "0:00";
         if (durEl) durEl.textContent = "0:00";
 
-        controlsDiv.innerHTML = `<div class="asset-filename-title">${this.formatAssetTitle(name, "audio")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>`;
+        controlsDiv.innerHTML = `
+            <div class="asset-filename-title">${this.formatAssetTitle(name, "audio")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
+            <div class="preview-control-group-add-editor">
+                <div class="split-button" id="audioOpenEditorChoiceButton">
+                    <button class="btn main"></button>
+                    <button class="btn arrow">▼</button>
+                    <div class="menu"></div>
+                </div>
+            </div>`;
 
         const audio = new Audio(asset.url);
         this.currentAudio = audio;
+        this.currentAudio.preservesPitch = false;
 
         this._onLoadedMeta = () => {
             if (sessionId !== this._audioSessionId) return;
@@ -646,6 +676,14 @@ class GalleryManager {
 
         const volSlider = document.getElementById("volumeSlider");
         if (volSlider) this.setAudioVolume(volSlider.value);
+
+        if (window.compositionEditor.autoOpenButtonManager) {
+            window.compositionEditor.autoOpenButtonManager.attachTo(
+                document.getElementById("audioOpenEditorChoiceButton"),
+                this,
+                this.addAudioToCompositionEditor,
+            );
+        }
     }
 
     formatAssetTitle(rawName, category = null, type = null) {
@@ -736,7 +774,34 @@ class GalleryManager {
         const pct = Math.round(vol * 100);
 
         if (slider) slider.title = `Volume: ${pct}%`;
-        if (label) label.textContent = `${pct}%`;
+        if (label) label.textContent = `Volume: ${pct}%`;
+    }
+
+    setAudioSpeed(value) {
+        const speed = parseFloat(value).toFixed(1);
+        if (isNaN(speed)) return;
+
+        if (this.currentAudio) {
+            this.currentAudio.playbackRate = speed;
+        }
+
+        const slider = document.getElementById("speedSlider");
+        const label = document.getElementById("speedValue");
+        const pct = Math.round(speed * 100);
+
+        if (slider) slider.title = `${speed}x`;
+        if (label) label.textContent = `Speed: ${speed}x`;
+    }
+
+    setAudioPitch(value) {
+        const pitch = parseFloat(value).toFixed(1);
+        if (isNaN(pitch)) return;
+
+        const slider = document.getElementById("pitchSlider");
+        const label = document.getElementById("pitchValue");
+
+        if (slider) slider.title = `Pitch: ${pitch >= 0 ? "+" : ""}${pitch}`;
+        if (label) label.textContent = `Pitch: ${pitch >= 0 ? "+" : ""}${pitch}`;
     }
 
     toggleSpriteSelection(index) {
@@ -1131,7 +1196,7 @@ class GalleryManager {
         }
     }
 
-    flashSuccessOnButton() {
+    flashSuccessOnButton(audio = false) {
         const btn = document.getElementById("composition-editor-btn");
         if (!btn) return;
 
@@ -1193,6 +1258,44 @@ class GalleryManager {
 
         this.clearSpriteSelection();
         this.flashSuccessOnButton();
+
+        if (window.compositionEditor.autoOpen === true) {
+            window.compositionEditor.open();
+        }
+    }
+
+    addAudioToCompositionEditor() {
+        if (!this.currentAsset || this.currentAsset.type !== "audio") {
+            alert("No audio selected");
+            return;
+        }
+
+        const { name, category, asset } = this.currentAsset;
+
+        const speedSlider = document.getElementById("speedSlider");
+        const pitchSlider = document.getElementById("pitchSlider");
+
+        const speed = speedSlider ? parseFloat(speedSlider.value) : 1.0;
+        const pitch = pitchSlider ? parseFloat(pitchSlider.value) : 0;
+
+        const assetData = {
+            name: name,
+            type: "audio",
+            assetRef: `gallery:${category}/${name}`,
+            blobUrl: asset.url,
+            // time: undefined - let compositionEditor auto-position it
+            speed: speed,
+            pitch: pitch,
+        };
+
+        if (!window.compositionEditor) {
+            console.error("Composition editor not initialized");
+            return;
+        }
+
+        window.compositionEditor.addAudioKeyframe(assetData);
+
+        this.flashSuccessOnButton(true);
 
         if (window.compositionEditor.autoOpen === true) {
             window.compositionEditor.open();

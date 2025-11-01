@@ -32,32 +32,62 @@
     </head>
     <body>
         <div id="forcedImportOverlay" class="forced-import-overlay" style="display: none">
-            <a href="https://github.com/Kidev/TCOAALCreatorTool" target="_blank" rel="noopener" class="mobile-github-link" style="position:absolute;top:0;right:0;" onclick="event.stopPropagation()">
+            <a
+                href="https://github.com/Kidev/TCOAALCreatorTool"
+                target="_blank"
+                rel="noopener"
+                class="mobile-github-link"
+                style="position: absolute; top: 0; right: 0"
+                onclick="event.stopPropagation()"
+            >
                 <svg class="github-icon" viewBox="0 0 24 24">
-                    <path d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z"/>
+                    <path
+                        d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z"
+                    />
                 </svg>
-                <span style="font-size: 1vmax;">View on GitHub</span>
+                <span style="font-size: 1vmax">View on GitHub</span>
             </a>
-            <div class="forced-import-content" style="height: 100vh; justify-content: center; margin-top: 0; position: relative;">
+            <div
+                class="forced-import-content"
+                style="height: 100vh; justify-content: center; margin-top: 0; position: relative"
+            >
                 <!--<img alt="Dialog Creator" class="forced-import-logo" src="img/tcoaal-title.webp" />-->
 
-                <button style="font-size: 2vmax;" class="composition-btn" onclick="handleForcedImport()">
+                <button style="font-size: 2vmax" class="composition-btn" onclick="handleForcedImport()">
                     Import Game Assets
                 </button>
                 <!--<p class="forced-import-message">
                     This tool requires game assets to function.<br />
                     Please import your game folder to continue.
                 </p>-->
-                <p class="forced-import-note" style="display:flex;flex-direction:column;gap:0;margin:0;padding:2vmax;line-height:1;position:absolute;bottom:0;left:50%;transform:translateX(-50%);">
-                    This tool requires the game assets</br>You need to own The Coffin of Andy and Leyley
-                    <iframe id="steam-buy-frame" src="https://store.steampowered.com/widget/2378900/" frameborder="0" width="646" height="190"></iframe>
+                <p
+                    class="forced-import-note"
+                    style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 0;
+                        margin: 0;
+                        padding: 2vmax;
+                        line-height: 1;
+                        position: absolute;
+                        bottom: 0;
+                        left: 50%;
+                        transform: translateX(-50%);
+                    "
+                >
+                    This tool requires the game assets<br />You need to own The Coffin of Andy and Leyley
+                    <iframe
+                        id="steam-buy-frame"
+                        src="https://store.steampowered.com/widget/2378900/"
+                        frameborder="0"
+                        width="646"
+                        height="190"
+                    ></iframe>
                 </p>
-
             </div>
         </div>
         <div id="importProgressModal" class="import-modal" style="display: none">
             <div class="import-modal-content">
-                <h2>Loading</h2>
                 <div class="import-progress-bar">
                     <div id="importProgressFill" class="import-progress-fill"></div>
                 </div>
@@ -115,7 +145,7 @@
         <div id="compositionEditorModal" class="composition-editor-modal" style="display: none">
             <div class="composition-editor-content">
                 <div class="composition-editor-header">
-                    <h2>Image Composition Editor</h2>
+                    <h2>Compositor</h2>
                     <div class="composition-notification-area" id="compositionNotificationArea"></div>
                     <div class="composition-header-actions">
                         <input
@@ -215,6 +245,15 @@
                                     style="display: none"
                                 >
                                     PNG
+                                </button>
+                                <button
+                                    id="exportOggBtn"
+                                    class="preview-control-btn"
+                                    onclick="compositionEditor.exportAsOgg(false)"
+                                    title="Export audio timeline as WAV"
+                                    style="display: none"
+                                >
+                                    WAV
                                 </button>
                             </div>
                         </div>
@@ -321,26 +360,56 @@
                             Game assets
                         </button>
                         <button
+                            class="tcoaal-button-small tcoaal-button-small-header js-upload"
+                            onclick="importSequence()"
+                            title="Import a dialog from file, will replace the current one
+                                Right click to reveal link sharing button"
+                        >
+                            Import file
+                        </button>
+                        <button
                             class="tcoaal-button-small tcoaal-button-small-header js-download"
                             onclick="downloadSequence()"
-                            title="Export the current dialog as a .js file"
+                            title="Export the current dialog as a .js file
+                            Right click to reveal link sharing button"
                         >
-                            Export
+                            Export file
                         </button>
                         <button
                             class="tcoaal-button-small tcoaal-button-small-header js-download"
                             onclick="generateShareLink()"
-                            title="Generate a shareable link with the current dialog encoded in the URL"
+                            title="Generate a shareable link with the current dialog encoded in the URL
+                            Right click to reveal file buttons"
                         >
-                            Share Link
+                            Share link
                         </button>
+
                         <!--<button
-                            class="tcoaal-button-small tcoaal-button-small-header js-upload"
-                            onclick="importSequence()"
-                            title="Import a dialog from file, will replace the current one"
+                                class="tcoaal-button-small tcoaal-button-small-header js-save"
+                                onclick="saveSequence()"
+                                title="Save the current dialog to browser storage"
                         >
-                            Import
+                            Save
+                        </button>
+                        <button
+                                class="tcoaal-button-small tcoaal-button-small-header js-clear danger"
+                                onclick="clearSavedSequence()"
+                                title="Clear saved dialog from browser storage"
+                                style="display: none"
+                                id="clearSavedBtn"
+                        >
+                            Clear Saved
                         </button>-->
+                        <button
+                            class="tcoaal-button-small tcoaal-button-small-header js-save"
+                            onclick="saveSequence()"
+                            oncontextmenu="handleSaveRightClick(event)"
+                            title="Save the current dialog to browser storage
+Right click to erase the saved dialog"
+                        >
+                            Save
+                        </button>
+
                         <!--<button
                             class="tcoaal-button-small tcoaal-button-small-header js-upload"
                             onclick="importFromLink()"
@@ -348,22 +417,6 @@
                         >
                             Import Link
                         </button>-->
-                        <button
-                            class="tcoaal-button-small tcoaal-button-small-header js-save"
-                            onclick="saveSequence()"
-                            title="Save the current dialog to browser storage"
-                        >
-                            Save
-                        </button>
-                        <button
-                            class="tcoaal-button-small tcoaal-button-small-header js-clear danger"
-                            onclick="clearSavedSequence()"
-                            title="Clear saved dialog from browser storage"
-                            style="display: none"
-                            id="clearSavedBtn"
-                        >
-                            Clear Saved
-                        </button>
                     </div>
                 </div>
                 <div class="editor-zone center">

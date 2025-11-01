@@ -1031,6 +1031,32 @@ async function importFromLink() {
     }
 }
 
+function linkToFileIO() {
+    const importBtn = document.querySelector(".js-upload");
+    const exportBtn = document.querySelector('.js-download[onclick="downloadSequence()"]');
+    const linkBtn = document.querySelector('.js-download[onclick="generateShareLink()"]');
+
+    importBtn.style.display = "none";
+    exportBtn.style.display = "none";
+    linkBtn.style.display = "inline-block";
+
+    linkBtn.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        linkBtn.style.display = "none";
+        importBtn.style.display = "inline-block";
+        exportBtn.style.display = "inline-block";
+    });
+
+    [importBtn, exportBtn].forEach((btn) => {
+        btn.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            importBtn.style.display = "none";
+            exportBtn.style.display = "none";
+            linkBtn.style.display = "inline-block";
+        });
+    });
+}
+
 function importSequence() {
     const input = document.createElement("input");
     input.type = "file";
@@ -1369,6 +1395,15 @@ function autoCollapseMobileControls() {
     }
 }
 
+function toggleVisSpeakerMenu() {
+    const ashleyDiv = document.getElementById("dialog-content-box");
+    const andrewDiv = document.getElementById("dialog-content-box2");
+    if (ashleyDiv && andrewDiv) {
+        ashleyDiv.classList.toggle("not-shown-now");
+        andrewDiv.classList.toggle("not-shown-now");
+    }
+}
+
 function setupGalleryOnlyMode() {
     const gameContainer = document.querySelector(".game-container");
     if (gameContainer) {
@@ -1443,11 +1478,18 @@ function setupGalleryOnlyMode() {
                         Clear saved data
                     </button>
                     </div>
-                    <div id="dialog-container-box" class="dialog-container active" style="margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
-                        <div id="dialog-content-box" class="dialog-content">
+                    <div onclick="toggleVisSpeakerMenu()" id="dialog-container-box" class="dialog-container active" style="cursor: context-menu; margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
+                        <div id="dialog-content-box" class="dialog-content not-shown-now">
                             <div class="dialog-line speaker-line">Ashley</div>
                             <div class="dialog-line text-line" style="top:34%;color:${Color.PURPLE}">"Well? Well?? What do you think??</div>
                             <div class="dialog-line text-line" style="top:54%;color:${Color.PURPLE}">Listen to&nbsp;<a target="_blank" rel="noopener" style="color:${Color.PURPLE};" href="https://www.youtube.com/watch?v=DDdyCHu3Qe4&list=PL8FwCzf2tokHnEYuMvpWuQqQpdNBE7e-k" >our songs on YouTube</a>!!"</div>
+                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}">
+                        </div>
+                        <div id="dialog-content-box2" class="dialog-content">
+                            <div class="dialog-line speaker-line">Kidev</div>
+                            <div class="dialog-line text-line" style="top:34%;color:${Color.GREY_BLUE}">"Need help using my tool?</div>
+                            <div class="dialog-line text-line" style="top:54%;color:${Color.GREY_BLUE}">I made a&nbsp; <a target="_blank" rel="noopener" style="color:${Color.GREY_BLUE};" title="work in progress" href="" >tutorial video</a>&nbsp;for you!"</div>
+                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}">
                         </div>
                     </div>
                     <img src="${window.uiAssets?.menuPortraitLeft?.url}" class="bust-image left">
@@ -1495,7 +1537,7 @@ function setupGalleryOnlyMode() {
         <div id="compositionEditorModal" class="composition-editor-modal" style="display: none">
             <div class="composition-editor-content">
                 <div class="composition-editor-header">
-                    <h2>Image Composition Editor</h2>
+                    <h2>Compositor</h2>
                     <div class="composition-notification-area" id="compositionNotificationArea"></div>
                     <div class="composition-header-actions">
                         <input
@@ -1563,11 +1605,32 @@ function setupGalleryOnlyMode() {
                         <div class="composition-layers-header">
                             <div><h3>Layers</h3></div>
                             <div>
-                                <button id="exportGifBtn" class="preview-control-btn" onclick="compositionEditor.exportAsGif()" title="Export composition as GIF" style="display: none;">
+                                <button
+                                    id="exportGifBtn"
+                                    class="preview-control-btn"
+                                    onclick="compositionEditor.exportAsGif()"
+                                    title="Export composition as GIF"
+                                    style="display: none"
+                                >
                                     GIF
                                 </button>
-                                <button id="exportPngBtn" class="preview-control-btn" onclick="compositionEditor.exportComposition()" title="Export composition as PNG" style="display: none;">
+                                <button
+                                    id="exportPngBtn"
+                                    class="preview-control-btn"
+                                    onclick="compositionEditor.exportComposition()"
+                                    title="Export composition as PNG"
+                                    style="display: none"
+                                >
                                     PNG
+                                </button>
+                                <button
+                                    id="exportOggBtn"
+                                    class="preview-control-btn"
+                                    onclick="compositionEditor.exportAsOgg(false)"
+                                    title="Export audio timeline as WAV"
+                                    style="display: none"
+                                >
+                                    WAV
                                 </button>
                             </div>
                         </div>
@@ -1627,6 +1690,8 @@ function setupGalleryOnlyMode() {
         iFrame.classList.remove("show");
     }, 10000);*/
 
+    setTimeout(toggleVisSpeakerMenu, 10000);
+
     const downloadButton = document.getElementById("download-all-button");
     downloadButton.style.display = "none";
 
@@ -1669,6 +1734,13 @@ function reopenWithMode(mode) {
     }
     url.searchParams.set("mode", mode);
     window.location.href = url.toString();
+}
+
+function handleSaveRightClick(e) {
+    e.preventDefault();
+    if (localStorage.getItem("tcoaal_saved_sequence")) {
+        clearSavedSequence();
+    }
 }
 
 function initGalleryScrollHandler() {
@@ -2007,6 +2079,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     let mode = urlParams.get("mode");
     const useParam = urlParams.get("use");
 
+    linkToFileIO();
+
     //console.log("mode=" + mode);
     //console.log("useParam=" + useParam);
 
@@ -2323,8 +2397,8 @@ async function loadGalleryFromSavedData(storageState) {
         if (fill) fill.style.width = "50%";
         if (text) text.textContent = "Setting up gallery...";
 
-        document.getElementById("popup-buy-frame").style.display = "none";
-        document.getElementById("popup-buy-frame").style.zindex = "-1";
+        //document.getElementById("popup-buy-frame")?.style.display = "none";
+        //document.getElementById("popup-buy-frame")?.style.zindex = "-1";
         document.getElementById("github-logo-icon").style.display = "none";
         document.getElementById("github-logo-icon").style.zindex = "-1";
 

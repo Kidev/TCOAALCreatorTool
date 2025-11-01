@@ -2964,18 +2964,18 @@ function updateGalleryCategories() {
         categoryDiv.appendChild(btn);
     });
 
-    if (isImageTab) {
-        const buttonEditor = document.createElement("button");
-        buttonEditor.id = "composition-editor-btn";
-        buttonEditor.className = "gallery-category-btn-editor";
-        buttonEditor.style.fontSize = "1vmax";
-        buttonEditor.style.fontWeight = "bold";
-        buttonEditor.style.border = "1px solid white";
-        buttonEditor.onclick = openCompositionEditor;
-        buttonEditor.title = "Open composition editor to create custom elements";
-        buttonEditor.textContent = "✎ Editor";
-        editorDiv.appendChild(buttonEditor);
-    }
+    //if (isImageTab) {
+    const buttonEditor = document.createElement("button");
+    buttonEditor.id = "composition-editor-btn";
+    buttonEditor.className = "gallery-category-btn-editor";
+    buttonEditor.style.fontSize = "1vmax";
+    buttonEditor.style.fontWeight = "bold";
+    buttonEditor.style.border = "1px solid white";
+    buttonEditor.onclick = openCompositionEditor;
+    buttonEditor.title = "Open compositor to create custom elements";
+    buttonEditor.textContent = "🎞 Compositor";
+    editorDiv.appendChild(buttonEditor);
+    //}
 
     if (categories.length > 0) {
         let targetCategory;

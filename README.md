@@ -100,21 +100,33 @@ The beginning of the game recreated as animation [here](https://tcoaal.kidev.org
     - ⬅ Previous: previous scene
     - ➡ Next: next scene
     - ⟲ Restart: restart the sequence
-    - ▶ Play: auto-play sequence (right-click for settings)
+    - ▶ Play: auto-play sequence _(right-click for settings)_
     - 🗂 Presets: load pre-made demo sequences
     - 📷 Screenshot: capture current frame
-    - 🎥 Record: record video (right-click for settings)
+    - 🎥 Record: record video _(right-click for settings)_
+    - **Save**: quick-save to browser _(right-click to clear)_
+    - **Import file** / **Export file**: _(right-click to access URL sharing)_
     - Editor: open the visual editor
 - **Scene jumping**: Navigate to any scene directly (code only)
 - **Debug info**: Current scene counter
 
-### URL Sharing System
+### URL Sharing & File Management
 
 - **Share Link button**: Generate shareable URLs with your entire project encoded
+  - Accessible via right-click on Import/Export file buttons
+  - Creates compressed URLs with your entire dialog sequence
+  - Perfect for quick sharing and collaboration
+- **File Import/Export**: Save and load dialog sequences as `.js` files
+  - **Export file**: Download your current dialog as a JavaScript file
+  - **Import file**: Load a previously saved dialog file
+  - Right-click these buttons to access URL sharing features
+- **Browser Storage**:
+  - **Save button**: Quick-save to browser localStorage (right-click to clear saved data)
+  - Automatically loads saved dialog on page refresh
+  - Independent from file import/export
 - **Compression**: Advanced key compression + LZ-string compression for smaller URLs
 - **Automatic loading**: URLs with `?use=` parameter auto-load projects
-- **Import from URL**: Paste shared URLs in the editor to import projects
-- **Perfect for**: Sharing creations, backing up work, version control
+- **Perfect for**: Sharing creations, backing up work, version control, collaboration
 
 ### Screenshot & Video Export
 
@@ -171,8 +183,10 @@ php -S localhost:8000
 3. Add characters with the color picker
 4. Build scenes using the visual interface
 5. Click **✔ Save** to apply changes
-6. Use **Share URL** to share/save your work using the URL system
-7. Use **Export** to export your work (_advanced users: uncomment the 'Export' button with your browser Developer tools_)
+6. Save your work:
+   - **Save button**: Quick-save to browser (right-click to clear)
+   - **Export file**: Download as `.js` file for permanent backup
+   - **Share URL**: Right-click Import/Export buttons for URL sharing
 
 ### Method 2: Code Editor
 
@@ -416,6 +430,7 @@ Rich text formatting is fully supported with inline tags:
 ```
 
 **Glitch tag attributes:**
+
 - `color` - Color of the real text (default: uses glitchConfig.realColor)
 - `scrambled` - Color of the scrambled characters (default: uses glitchConfig.scrambledColor)
 - `speed` - Animation speed in milliseconds (default: uses glitchConfig.changeSpeed)
@@ -519,7 +534,9 @@ project/
 └── fonts/                   # Fonts assets
 ```
 
-## Keyboard Shortcuts
+## Keyboard Shortcuts & Mouse Controls
+
+### Keyboard Shortcuts
 
 | Key          | Action                   |
 | ------------ | ------------------------ |
@@ -528,6 +545,16 @@ project/
 | `RightArrow` | Next scene / Skip typing |
 | `LeftArrow`  | Previous scene           |
 | `Tab`        | Show/Hide controls       |
+
+### Right-Click Actions
+
+| Button | Right-Click Action |
+| ------ | ------------------ |
+| **Save** | Clear saved dialog from browser storage |
+| **Import file** | Show URL sharing options |
+| **Export file** | Show URL sharing options |
+| **▶ Play** | Configure auto-play settings (delay, typing speed) |
+| **🎥 Record** | Configure video recording settings (FPS, quality) |
 
 ## Advanced Features
 
@@ -569,32 +596,57 @@ const storyData = [
 storyData.forEach((scene) => dialogFramework.addScene(scene));
 ```
 
-### URL Sharing
+### URL Sharing & File Management
 
+**Accessing share features:**
 ```javascript
-// In the editor: Click "Share Link" button to generate URL
-// The URL contains your entire project compressed
+// In the editor, right-click on "Import file" or "Export file" buttons
+// This reveals the "Share Link" button
+// Click to generate a shareable URL with your project compressed
 
-// To load from URL programmatically:
-// Add ?use=<encoded_data> to the URL
-// The app automatically decodes and loads the project
+// The URL contains your entire project compressed:
+// https://tcoaal.kidev.org/index.html?use=<encoded_data>
+```
 
-// Import from URL in editor:
-// Paste the shared URL in the import dialog
+**File export/import:**
+```javascript
+// Export: Click "Export file" button
+// - Downloads a .js file containing your dialog sequence
+// - Can be edited manually in any text editor
+// - Safe for version control (Git, etc.)
+
+// Import: Click "Import file" button
+// - Select a previously exported .js file
+// - Replaces current dialog sequence
+// - Warns if you have unsaved changes
+```
+
+**Browser storage:**
+```javascript
+// Save: Click "Save" button
+// - Stores dialog in browser localStorage
+// - Automatically loads on page refresh
+// - Quick access, no file downloads
+
+// Clear: Right-click "Save" button
+// - Removes saved dialog from browser storage
+// - Useful for starting fresh
 ```
 
 ### Recording Video
 
 **Recording workflow:**
+
 1. Press `Tab` to show controls (required for audio)
 2. Right-click 🎥 Record button to configure settings:
-   - FPS: 30fps recommended for smooth playback
-   - Quality: Medium balances size and quality
+    - FPS: 30fps recommended for smooth playback
+    - Quality: Medium balances size and quality
 3. Click 🎥 Record to start
 4. Play your sequence (manual or auto-play)
 5. Click 🎥 Record again to stop and download
 
 **Tips:**
+
 - Higher FPS = smoother video but larger file size
 - Use auto-play for consistent timing
 - Tab mode must be visible for audio in recording
@@ -619,17 +671,19 @@ dialogFramework.toggleAutoPlay();
 3. **Audio**: Keep volumes balanced (0.7-0.8 for background)
 4. **Images**: Optimize file sizes for web delivery
 5. **Testing**: Use debug mode during development
-6. **Saving**:
-   - Use "Share Link" for quick saves (stores in URL)
-   - Use "Export" for permanent local backups
+6. **Saving & Backup Strategy**:
+    - **Browser Save**: Quick iterations during creation (right-click to clear)
+    - **Export file**: Permanent backups and version control
+    - **Share Link**: Quick sharing and collaboration (right-click Import/Export buttons)
+    - **Best practice**: Export files regularly for important work
 7. **Recording**:
-   - Always show controls (Tab) when recording for audio
-   - Use auto-play for consistent video timing
-   - 30fps is ideal for most use cases
+    - Always show controls (Tab) when recording for audio
+    - Use auto-play for consistent video timing
+    - 30fps is ideal for most use cases
 8. **URL Sharing**:
-   - Shorter projects = shorter URLs
-   - URLs work as permalinks - bookmark them
-   - Can be shortened further with URL shortening services
+    - Shorter projects = shorter URLs
+    - URLs work as permalinks - bookmark them
+    - Can be shortened further with URL shortening services
 9. **Auto-play**: Test with manual navigation first, then fine-tune auto-play timing
 10. **Dialog box**: You can edit `viewer.css` and change `.dialog-container { background-image: url('') }` to change the dialog box background png
 
@@ -646,15 +700,26 @@ dialogFramework.toggleAutoPlay();
 
 **Audio not playing**: Check browser autoplay policies. When recording video, only the 'Tab' mode can access audio.
 
+**How to access URL sharing**: Right-click on "Import file" or "Export file" buttons to reveal the "Share Link" option
+
+**How to clear saved data**: Right-click on the "Save" button to clear the dialog saved in browser storage
+
+**Lost my work**: Check if you have:
+- Saved data in browser (loads automatically on refresh)
+- An exported `.js` file in your downloads folder
+- A shared URL you copied (contains entire project)
+
 **Glitch effects not working**: Verify glitch config is set and `censorSpeaker: true` is enabled for speaker name glitching
 
 **Share Link URL too long**:
+
 - Reduce number of scenes or text length
 - Use shorter asset paths (relative paths are shorter than full URLs)
 - Consider using a URL shortener service for very long URLs
 - URLs over ~2000 characters may have compatibility issues with some systems
 
 **Video recording issues**:
+
 - No audio: Make sure controls are visible (press `Tab`) before recording
 - Choppy video: Try reducing FPS or closing other applications
 - Large file size: Lower quality settings or reduce FPS
@@ -678,4 +743,4 @@ Some assets, theme and inspiration by **Nemlei**
 Faustina font by Google.  
 [gif.js](https://github.com/jnordberg/gif.js/) by jnordberg.  
 [lz-string](https://github.com/pieroxy/lz-string) by pieroxy  
-Created by Kidev as a fan tool for the community. The tool requires to own the game to work.  
+Created by Kidev as a fan tool for the community. The tool requires to own the game to work.

@@ -21,9 +21,11 @@ class MemoryManager {
         this.db = null;
         this.dbName = "TCOAALAssets";
         this.dbVersion = 3;
+        this.DATA_VERSION = "1.0.1";
         this.isReady = false;
         this.initPromise = this.initDB();
         this.haveDataStored = false;
+        this.versionMismatch = false;
     }
 
     async initDB() {
@@ -35,9 +37,12 @@ class MemoryManager {
                 reject(request.error);
             };
 
-            request.onsuccess = () => {
+            request.onsuccess = async () => {
                 this.db = request.result;
                 this.isReady = true;
+
+                await this.checkDataVersion();
+
                 resolve(this.db);
             };
 
@@ -68,6 +73,108 @@ class MemoryManager {
                     const uiAssetsStore = db.createObjectStore("uiAssets", { keyPath: "name" });
                 }
             };
+        });
+    }
+
+    async checkDataVersion() {
+        try {
+            const storedVersion = await this.loadMetadata("dataVersion");
+
+            const needsMigration = storedVersion && storedVersion !== this.DATA_VERSION;
+
+            let isLegacyInstallation = false;
+            if (!storedVersion) {
+                const assetCount = await this.getAssetCount();
+                if (assetCount > 0) {
+                    console.warn(`Legacy installation detected: ${assetCount} assets found with no data version`);
+                    isLegacyInstallation = true;
+                }
+            }
+
+            if (needsMigration || isLegacyInstallation) {
+                if (needsMigration) {
+                    console.warn(`Data version mismatch: stored ${storedVersion}, current ${this.DATA_VERSION}`);
+                }
+
+                this.versionMismatch = true;
+
+                const compositions = await this.getAllCompositions();
+                const uiAssets = await this.getAllUIAssets();
+
+                await this.clearAssets();
+                await this.clearLocalFiles();
+
+                /*if (compositions && compositions.length > 0) {
+                    for (const comp of compositions) {
+                    }
+                }*/
+
+                await this.saveMetadata("dataVersion", this.DATA_VERSION);
+
+                const reason = isLegacyInstallation ? "Legacy data structure detected" : "Data version mismatch";
+                //console.log(`${reason}. Data migration complete. Game assets need to be re-imported.`);
+            } else if (!storedVersion) {
+                await this.saveMetadata("dataVersion", this.DATA_VERSION);
+            }
+        } catch (error) {
+            console.error("Error checking data version:", error);
+        }
+    }
+
+    async getAssetCount() {
+        await this.ensureReady();
+        const transaction = this.db.transaction(["assets"], "readonly");
+        const store = transaction.objectStore("assets");
+
+        return new Promise((resolve, reject) => {
+            const request = store.count();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async clearAssets() {
+        await this.ensureReady();
+        const transaction = this.db.transaction(["assets"], "readwrite");
+        const store = transaction.objectStore("assets");
+
+        return new Promise((resolve, reject) => {
+            const request = store.clear();
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async clearLocalFiles() {
+        await this.ensureReady();
+        const transaction = this.db.transaction(["localFiles"], "readwrite");
+        const store = transaction.objectStore("localFiles");
+
+        return new Promise((resolve, reject) => {
+            const request = store.clear();
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getAllCompositions() {
+        try {
+            const comps = await this.loadMetadata("compositions");
+            return comps || [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    async getAllUIAssets() {
+        await this.ensureReady();
+        const transaction = this.db.transaction(["uiAssets"], "readonly");
+        const store = transaction.objectStore("uiAssets");
+
+        return new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.error);
         });
     }
 
