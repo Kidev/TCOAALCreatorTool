@@ -16,14 +16,20 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-let projectData = {
+const DEFAULTS = {
+    mainTimings: {
+        dialogFade: 100,
+        imageFade: 100,
+        bustFade: 100,
+        baseDelay: 500,
+    },
     config: {
         showControls: true,
         showDebug: true,
         showDialogArrow: true,
         backgroundMusic: null,
+        backgroundMusicVolume: 1.0,
     },
-    characters: {},
     glitchConfig: {
         scrambledColor: Color.BLACK,
         realColor: Color.DEFAULT,
@@ -32,9 +38,150 @@ let projectData = {
         autoStart: true,
         charsAllowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
     },
-    scenes: [],
-    compositions: [], // Shareable composition descriptors
+    character: {
+        color: Color.DEFAULT,
+        aliases: [],
+    },
+
+    characters: {
+        "Andrew": {
+            color: Color.GREEN,
+            aliases: ["Andy", "Accident", "Disappointment", "Anders"],
+        },
+        "Ashley": {
+            color: Color.PURPLE,
+            aliases: ["Leyley", "Embarrassment", "Mistake"],
+        },
+        "Douglas": {
+            color: Color.BLUE,
+            aliases: ["Dad", "Mr. Graves", "Father"],
+        },
+        "Renee": {
+            color: Color.YELLOW,
+            aliases: ["Mom", "Mrs. Graves", "Mother"],
+        },
+        "Julia": {
+            color: Color.YELLOW,
+            aliases: [],
+        },
+        "Lord Unknown": {
+            color: Color.RED,
+            aliases: ["Something Terrifying", "Something Kind", "Fucking Snoop"],
+        },
+        "? ? ?": {
+            color: Color.RED,
+            aliases: ["The entity"],
+        },
+        "Grandma": {
+            color: Color.GREY_BLUE,
+            aliases: [],
+        },
+        "Grandpa": {
+            color: Color.GREY,
+            aliases: [],
+        },
+        "Others yellow": {
+            color: Color.YELLOW,
+            aliases: ["A man", "Cultist", "Cultists", "Lady", "Kids"],
+        },
+        "Others blue": {
+            color: Color.BLUE,
+            aliases: ["Warden", "TV", "Surgeon"],
+        },
+    },
+    scene: {
+        image: null,
+        speaker: "",
+        line1: "",
+        line2: "",
+        dialogFadeInTime: 0,
+        dialogFadeOutTime: 0,
+        imageFadeInTime: 0,
+        imageFadeOutTime: 0,
+        dialogDelayIn: 0,
+        dialogDelayOut: 0,
+        imageDelayIn: 0,
+        imageDelayOut: 0,
+        sound: null,
+        soundVolume: 1.0,
+        soundDelay: 0,
+        soundPitch: 1.0,
+        soundSpeed: 1.0,
+        backgroundMusic: null,
+        backgroundMusicVolume: 1.0,
+        backgroundMusicPitch: 1.0,
+        backgroundMusicSpeed: 1.0,
+        censorSpeaker: false,
+        demonSpeaker: false,
+        bustLeft: null,
+        bustRight: null,
+        portraitsTimings: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ],
+        shake: null,
+        shakeDelay: 0,
+        shakeIntensity: 1,
+        shakeDuration: 500,
+        choices: null,
+        choicesList: [],
+        correctChoice: 0,
+        choiceSpeed: 500,
+    },
+    composition: {
+        name: "Untitled",
+        width: 1920,
+        height: 1080,
+        layers: [],
+    },
 };
+
+let projectData = {
+    config: { ...DEFAULTS.config },
+    characters: JSON.parse(JSON.stringify(DEFAULTS.characters)), // Start with default TCOAAL characters
+    glitchConfig: { ...DEFAULTS.glitchConfig },
+    scenes: [],
+    compositions: [],
+};
+
+function isDefault(value, defaultValue) {
+    if (value === defaultValue) return true;
+    if (value === null || defaultValue === null) return value === defaultValue;
+    if (typeof value !== typeof defaultValue) return false;
+
+    if (Array.isArray(value) && Array.isArray(defaultValue)) {
+        if (value.length !== defaultValue.length) return false;
+        return value.every((val, idx) => isDefault(val, defaultValue[idx]));
+    }
+
+    if (typeof value === "object" && typeof defaultValue === "object") {
+        const keys1 = Object.keys(value);
+        const keys2 = Object.keys(defaultValue);
+        if (keys1.length !== keys2.length) return false;
+        return keys1.every((key) => isDefault(value[key], defaultValue[key]));
+    }
+
+    return false;
+}
+
+function mergeWithDefaults(data, defaults) {
+    if (data === null || data === undefined) return JSON.parse(JSON.stringify(defaults));
+    if (typeof data !== "object" || typeof defaults !== "object") return data;
+
+    const result = JSON.parse(JSON.stringify(defaults));
+
+    for (const key in data) {
+        if (data[key] !== undefined) {
+            if (typeof data[key] === "object" && !Array.isArray(data[key]) && data[key] !== null && defaults[key]) {
+                result[key] = mergeWithDefaults(data[key], defaults[key]);
+            } else {
+                result[key] = data[key];
+            }
+        }
+    }
+
+    return result;
+}
 
 let imageMap = new Map();
 let soundMap = new Map();
@@ -44,6 +191,64 @@ let currentlyPlayingAudio = null;
 let backgroundMusicFile = null;
 let backgroundMusicBlobUrl = null;
 let previewBackgroundMusic = null;
+
+// Timing presets
+const timingPresets = {
+    "dialog": {
+        "start": {
+            "dialogFadeInTime": DEFAULTS.mainTimings.dialogFade,
+            "dialogFadeOutTime": 0,
+            "dialogDelayIn": DEFAULTS.mainTimings.baseDelay,
+            "dialogDelayOut": 0,
+        },
+        "continue": { "dialogFadeInTime": 0, "dialogFadeOutTime": 0, "dialogDelayIn": 0, "dialogDelayOut": 0 },
+        "end": {
+            "dialogFadeInTime": 0,
+            "dialogFadeOutTime": DEFAULTS.mainTimings.dialogFade,
+            "dialogDelayIn": 0,
+            "dialogDelayOut": 0,
+        },
+        "start-end-with-delay": {
+            "dialogFadeInTime": DEFAULTS.mainTimings.dialogFade,
+            "dialogFadeOutTime": DEFAULTS.mainTimings.dialogFade,
+            "dialogDelayIn": DEFAULTS.mainTimings.baseDelay,
+            "dialogDelayOut": 0,
+        },
+        "start-end-no-delay": {
+            "dialogFadeInTime": DEFAULTS.mainTimings.dialogFade,
+            "dialogFadeOutTime": DEFAULTS.mainTimings.dialogFade,
+            "dialogDelayIn": 0,
+            "dialogDelayOut": 0,
+        },
+    },
+    "background": {
+        "hold": { "imageFadeInTime": 0, "imageFadeOutTime": 0, "imageDelayIn": 0, "imageDelayOut": 0 },
+        "start-end": {
+            "imageFadeInTime": DEFAULTS.mainTimings.imageFade,
+            "imageFadeOutTime": DEFAULTS.mainTimings.imageFade,
+            "imageDelayIn": 0,
+            "imageDelayOut": 0,
+        },
+        "start-before-crossfade": {
+            "imageFadeInTime": DEFAULTS.mainTimings.imageFade,
+            "imageFadeOutTime": -DEFAULTS.mainTimings.imageFade,
+            "imageDelayIn": 0,
+            "imageDelayOut": 0,
+        },
+        "end-after-crossfade": {
+            "imageFadeInTime": -DEFAULTS.mainTimings.imageFade,
+            "imageFadeOutTime": DEFAULTS.mainTimings.imageFade,
+            "imageDelayIn": 0,
+            "imageDelayOut": 0,
+        },
+    },
+    "portrait": {
+        "hold": [0, 0, 0, 0],
+        "enter": [DEFAULTS.mainTimings.bustFade, 0, 0, 0],
+        "exit": [0, DEFAULTS.mainTimings.bustFade, 0, 0],
+        "enter-exit": [DEFAULTS.mainTimings.bustFade, DEFAULTS.mainTimings.bustFade, 0, 0],
+    },
+};
 
 if (!document.getElementById("outputCode")) {
     const hiddenTextarea = document.createElement("textarea");
@@ -64,7 +269,6 @@ async function loadLocalFilesForScenes() {
             const path = scene[field];
             if (!path) continue;
 
-            // Skip if it's a URL or gallery reference (those are handled elsewhere)
             if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("gallery:")) {
                 continue;
             }
@@ -89,14 +293,13 @@ async function loadLocalFilesForScenes() {
                         const blob = await response.blob();
                         const file = new File([blob], filename, { type: blob.type });
                         imageMap.set(`${sceneIndex}-${field}`, file);
-                        // Save to IndexedDB for future use
+
                         await window.memoryManager.saveLocalFile(filename, file, "image");
                         loaded = true;
                     }
                 } catch (error) {}
             }
 
-            // If still not loaded, disable the parameter
             if (!loaded) {
                 projectData.scenes[sceneIndex][field] = null;
             }
@@ -104,7 +307,6 @@ async function loadLocalFilesForScenes() {
 
         const soundPath = scene.sound;
         if (soundPath) {
-            // Skip if it's a URL or gallery reference
             if (
                 soundPath.startsWith("http://") ||
                 soundPath.startsWith("https://") ||
@@ -174,14 +376,13 @@ async function loadLocalFilesForScenes() {
                         const blob = await response.blob();
                         const file = new File([blob], filename, { type: blob.type });
                         backgroundMusicMap.set(sceneIndex, file);
-                        // Save to IndexedDB for future use
+
                         await window.memoryManager.saveLocalFile(filename, file, "audio");
                         loaded = true;
                     }
                 } catch (error) {}
             }
 
-            // If still not loaded, disable the parameter
             if (!loaded) {
                 projectData.scenes[sceneIndex].backgroundMusic = null;
             }
@@ -190,19 +391,24 @@ async function loadLocalFilesForScenes() {
 }
 
 async function loadProjectData(data) {
-    projectData = JSON.parse(JSON.stringify(data));
+    dialogFramework.setConfig(mergeWithDefaults(data.config, DEFAULTS.config));
+    dialogFramework.setGlitchConfig(mergeWithDefaults(data.glitchConfig, DEFAULTS.glitchConfig));
+    projectData.compositions = data.compositions || [];
 
-    if (projectData.scenes) {
-        projectData.scenes.forEach((scene) => {
-            if (scene.shake === undefined) scene.shake = null;
-            if (scene.choices === undefined) scene.choices = null;
-            if (scene.image === undefined) scene.image = null;
-            if (scene.bustLeft === undefined) scene.bustLeft = null;
-            if (scene.bustRight === undefined) scene.bustRight = null;
-            if (scene.sound === undefined) scene.sound = null;
-            if (scene.backgroundMusic === undefined) scene.backgroundMusic = null;
+    // Special merge logic for characters:
+    // 1. Start with default TCOAAL characters
+    // 2. Overwrite with any characters from file (file takes priority)
+    // 3. Characters in defaults but not in file remain
+    let characters = JSON.parse(JSON.stringify(DEFAULTS.characters));
+    if (data.characters) {
+        Object.keys(data.characters).forEach((charName) => {
+            characters[charName] = data.characters[charName];
         });
     }
+
+    dialogFramework.setCharacters(characters);
+
+    projectData.scenes = (data.scenes || []).map((scene) => mergeWithDefaults(scene, DEFAULTS.scene));
 
     document.getElementById("configShowControls").checked = projectData.config.showControls;
     document.getElementById("configShowDebug").checked = projectData.config.showDebug;
@@ -279,9 +485,11 @@ async function loadProjectData(data) {
                 if (window.pendingCompositions && window.pendingCompositions.length > 0) {
                     //console.log(`Processing ${window.pendingCompositions.length} pending compositions after loading assets...`,);
                     const pending = window.pendingCompositions;
-                    window.pendingCompositions = []; // Clear queue to avoid recursion
+                    const pendingSource = window.pendingCompositionsSource || "user";
+                    window.pendingCompositions = [];
+                    window.pendingCompositionsSource = undefined;
                     if (typeof reconstructCompositionsToGallery === "function") {
-                        await reconstructCompositionsToGallery(pending);
+                        await reconstructCompositionsToGallery(pending, pendingSource);
                     }
                 }
             }
@@ -322,7 +530,6 @@ function addCharacter() {
     projectData.characters[name] = { color };
     document.getElementById("newCharacterName").value = "";
 
-    // Update dialogFramework with the new character data
     if (typeof dialogFramework !== "undefined") {
         dialogFramework.setCharacters(projectData.characters);
     }
@@ -337,7 +544,7 @@ function updateCharactersList() {
 
     Object.entries(projectData.characters).forEach(([name, data]) => {
         const aliases = data.aliases || [];
-        const aliasesDisplay = aliases.length > 0 ? aliases.join(", ") : "Click to add aliases";
+        const aliasesDisplay = aliases.length > 0 ? "(" + aliases.join(", ") + ")" : "Add aliases...";
 
         const item = document.createElement("div");
         item.className = "character-item";
@@ -348,7 +555,7 @@ function updateCharactersList() {
         <span class="character-aliases" id="aliases-display-${name}"
               onclick="startEditingAliases('${name}')"
               style="cursor: pointer;"
-              title="Click to edit aliases">(${aliasesDisplay})</span>
+              title="Click to edit aliases">${aliasesDisplay}</span>
         <span class="character-aliases-edit" id="aliases-edit-${name}" style="display: none;">
             <input type="text"
                     id="aliases-input-${name}"
@@ -392,7 +599,6 @@ function saveAliases(characterName) {
 
     updateCharacterAliases(characterName, newAliases);
 
-    // Update dialogFramework with the updated character data
     if (typeof dialogFramework !== "undefined") {
         dialogFramework.setCharacters(projectData.characters);
     }
@@ -414,12 +620,10 @@ function editCharacterAliases(characterName) {
 function updateCharacterColor(name, color) {
     projectData.characters[name].color = color;
 
-    // Update dialogFramework with the updated character data
     if (typeof dialogFramework !== "undefined") {
         dialogFramework.setCharacters(projectData.characters);
     }
 
-    // Update speaker dropdowns to reflect new color
     updateAllSpeakerDropdowns();
 }
 
@@ -431,7 +635,6 @@ function deleteCharacter(name) {
     if (confirm(`Delete character "${name}"?`)) {
         delete projectData.characters[name];
 
-        // Update dialogFramework with the updated character data
         if (typeof dialogFramework !== "undefined") {
             dialogFramework.setCharacters(projectData.characters);
         }
@@ -519,7 +722,7 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, 
         if (isGallery) {
             const match = currentValue.match(/^gallery:([^/]+)\/(.+)$/);
             if (match) {
-                displayName = match[2]; // Just the filename
+                displayName = match[2];
             }
         }
         html += `
@@ -633,13 +836,11 @@ function openGalleryForField(sceneIndex, field, isSound) {
 
 function useGalleryAsset(name, category) {
     if (!galleryContext || galleryContext.mode !== "select") {
-        //console.warn('useGalleryAsset called without selection context');
         return;
     }
 
     const { sceneIndex, field, isSound } = galleryContext;
 
-    // Create portable reference: gallery:category/filename
     const galleryRef = `gallery:${category}/${name}`;
 
     projectData.scenes[sceneIndex][field] = galleryRef;
@@ -658,7 +859,6 @@ function useGalleryAsset(name, category) {
         }
     }
 
-    // Only update the specific scene to preserve collapsible section states
     updateScenesList(sceneIndex);
     closeGallery();
 }
@@ -678,40 +878,7 @@ function clearFile(sceneIndex, field, isSound = false, isBackgroundMusic = false
 }
 
 function addScene() {
-    const scene = {
-        image: null,
-        speaker: "",
-        line1: "",
-        line2: "",
-        dialogFadeInTime: 200,
-        dialogFadeOutTime: 200,
-        imageFadeInTime: 200,
-        imageFadeOutTime: 200,
-        dialogDelayIn: 500,
-        dialogDelayOut: 0,
-        imageDelayIn: 0,
-        imageDelayOut: 0,
-        sound: null,
-        soundVolume: 1.0,
-        soundDelay: 0,
-        soundPitch: 1.0,
-        soundSpeed: 1.0,
-        backgroundMusic: null,
-        backgroundMusicVolume: 1.0,
-        backgroundMusicPitch: 1.0,
-        backgroundMusicSpeed: 1.0,
-        censorSpeaker: false,
-        demonSpeaker: false,
-        bustLeft: null,
-        bustRight: null,
-        bustFade: 0,
-        shake: null,
-        shakeDelay: 0,
-        shakeIntensity: 1,
-        shakeDuration: 500,
-        choices: null,
-    };
-
+    const scene = JSON.parse(JSON.stringify(DEFAULTS.scene));
     projectData.scenes.push(scene);
     const newIndex = projectData.scenes.length - 1;
 
@@ -772,7 +939,6 @@ function updateScenesList(onlyUpdateIndex = null) {
         if (sceneElements[onlyUpdateIndex]) {
             const existingItem = sceneElements[onlyUpdateIndex];
 
-            // Capture which collapsible sections were open before replacing
             const openSections = [];
             existingItem.querySelectorAll(".collapsible-group-content").forEach((content, idx) => {
                 if (content.style.display !== "none") {
@@ -783,7 +949,6 @@ function updateScenesList(onlyUpdateIndex = null) {
             const newItem = createSceneElement(onlyUpdateIndex);
             existingItem.replaceWith(newItem);
 
-            // Restore the open state of collapsible sections
             const newContents = newItem.querySelectorAll(".collapsible-group-content");
             openSections.forEach((idx) => {
                 if (newContents[idx]) {
@@ -815,6 +980,27 @@ function escapeHtml(text) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+function generateTimingPresetOptions(scene, type) {
+    const currentPreset = detectCurrentTimingPreset(scene, type);
+
+    const presetGroup = type === "portraitLeft" || type === "portraitRight" ? "portrait" : type;
+    const presets = timingPresets[presetGroup];
+
+    let options = '<option value="custom"' + (currentPreset === "custom" ? " selected" : "") + ">Custom</option>";
+
+    for (const presetName in presets) {
+        const selected = currentPreset === presetName ? " selected" : "";
+
+        const displayName = presetName
+            .split("-")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+        options += `<option value="${presetName}"${selected}>${displayName}</option>`;
+    }
+
+    return options;
 }
 
 function createSceneElement(index) {
@@ -924,7 +1110,7 @@ function createSceneElement(index) {
         <div class="header-action-buttons">
             <button onclick="moveScene(${index}, -1)" style="display: ${index === 0 ? "none" : "block"}">↑</button>
             <button onclick="moveScene(${index}, 1)" style="display: ${index === projectData.scenes.length - 1 ? "none" : "block"}">↓</button>
-            <button onclick="duplicateScene(${index})">Duplicate</button>
+            <button onclick="duplicateScene(${index})" title="Duplicate scene">⎘</button>
             <button class="danger" onclick="deleteScene(${index})">✕</button>
         </div>
         </div>
@@ -1003,11 +1189,6 @@ function createSceneElement(index) {
                         ${createFileSelectHTML(index, "bustRight", scene.bustRight)}
                     </div>
 
-                    <div class="form-group visuals">
-                        <label for="inputBustFade${index}">Bust fade time:</label>
-                        <input id="inputBustFade${index}" type="number" value="${scene.bustFade}" min="0" max="5000"
-                            onchange="updateSceneValue(${index}, 'bustFade', parseInt(this.value))">
-                    </div>
                 </div>
 
                 <div class="scene-group audio-assets-group">
@@ -1078,46 +1259,126 @@ function createSceneElement(index) {
                 <div class="scene-group timimg-assets-group">
                     <h4 class="collapsible-group-header" onclick="toggleSceneGroup(this)">Timing</h4>
                     <div class="collapsible-group-content" style="display: none;">
-                    <div class="form-group">
-                        <label for="inputDialogFadeIn${index}">Dialog fade in:</label>
-                        <input id="inputDialogFadeIn${index}" type="number" value="${scene.dialogFadeInTime}" min="-5000" max="5000"
-                            onchange="updateSceneValue(${index}, 'dialogFadeInTime', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputDialogFadeOut${index}">Dialog fade out:</label>
-                        <input id="inputDialogFadeOut${index}" type="number" value="${scene.dialogFadeOutTime}" min="-5000" max="5000"
-                            onchange="updateSceneValue(${index}, 'dialogFadeOutTime', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputDialogDelayIn${index}">Dialog delay in:</label>
-                        <input id="inputDialogDelayIn${index}" type="number" value="${scene.dialogDelayIn}" min="0" max="10000"
-                            onchange="updateSceneValue(${index}, 'dialogDelayIn', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputDialogDelayOut${index}">Dialog delay out:</label>
-                        <input id="inputDialogDelayOut${index}" type="number" value="${scene.dialogDelayOut}" min="0" max="10000"
-                            onchange="updateSceneValue(${index}, 'dialogDelayOut', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputImageFadeIn${index}">Image fade in:</label>
-                        <input id="inputImageFadeIn${index}" type="number" value="${scene.imageFadeInTime}" min="-5000" max="5000"
-                            onchange="updateSceneValue(${index}, 'imageFadeInTime', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputImageFadeOut${index}">Image fade out:</label>
-                        <input id="inputImageFadeOut${index}" type="number" value="${scene.imageFadeOutTime}" min="-5000" max="5000"
-                            onchange="updateSceneValue(${index}, 'imageFadeOutTime', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputImageDelayIn${index}">Image delay in:</label>
-                        <input id="inputImageDelayIn${index}" type="number" value="${scene.imageDelayIn}" min="0" max="10000"
-                            onchange="updateSceneValue(${index}, 'imageDelayIn', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label for="inputImageDelayOut${index}">Image delay out:</label>
-                        <input id="inputImageDelayOut${index}" type="number" value="${scene.imageDelayOut}" min="0" max="10000"
-                            onchange="updateSceneValue(${index}, 'imageDelayOut', parseInt(this.value))">
-                    </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1vmax;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 0.5vmax; margin-bottom: 0.5vmax;">
+                                    <h5 style="font-size: 0.9em; font-weight: 600; color: var(--txt-color); opacity: 0.8; margin: 0;">Dialog</h5>
+                                    <select id="timing-preset-dialog-${index}" onchange="applyTimingPreset(${index}, 'dialog', this.value)"
+                                            style="padding: 0.2vmax 0.4vmax; font-size: 0.8em; max-width: 20vmax; background: var(--bg-color-section); color: var(--txt-color); border: 1px solid var(--accent-color); border-radius: 2px;">
+                                        ${generateTimingPresetOptions(scene, "dialog")}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputDialogFadeIn${index}">Fade in:</label>
+                                    <input id="inputDialogFadeIn${index}" type="number" value="${scene.dialogFadeInTime}" min="-5000" max="5000"
+                                        onchange="updateSceneValue(${index}, 'dialogFadeInTime', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputDialogFadeOut${index}">Fade out:</label>
+                                    <input id="inputDialogFadeOut${index}" type="number" value="${scene.dialogFadeOutTime}" min="-5000" max="5000"
+                                        onchange="updateSceneValue(${index}, 'dialogFadeOutTime', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputDialogDelayIn${index}">Delay in:</label>
+                                    <input id="inputDialogDelayIn${index}" type="number" value="${scene.dialogDelayIn}" min="0" max="10000"
+                                        onchange="updateSceneValue(${index}, 'dialogDelayIn', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputDialogDelayOut${index}">Delay out:</label>
+                                    <input id="inputDialogDelayOut${index}" type="number" value="${scene.dialogDelayOut}" min="0" max="10000"
+                                        onchange="updateSceneValue(${index}, 'dialogDelayOut', parseInt(this.value))">
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 0.5vmax; margin-bottom: 0.5vmax;">
+                                    <h5 style="font-size: 0.9em; font-weight: 600; color: var(--txt-color); opacity: 0.8; margin: 0;">Background</h5>
+                                    <select id="timing-preset-background-${index}" onchange="applyTimingPreset(${index}, 'background', this.value)"
+                                            style="padding: 0.2vmax 0.4vmax; font-size: 0.8em; max-width: 20vmax; background: var(--bg-color-section); color: var(--txt-color); border: 1px solid var(--accent-color); border-radius: 2px;">
+                                        ${generateTimingPresetOptions(scene, "background")}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputImageFadeIn${index}">Fade in:</label>
+                                    <input id="inputImageFadeIn${index}" type="number" value="${scene.imageFadeInTime}" min="-5000" max="5000"
+                                        onchange="updateSceneValue(${index}, 'imageFadeInTime', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputImageFadeOut${index}">Fade out:</label>
+                                    <input id="inputImageFadeOut${index}" type="number" value="${scene.imageFadeOutTime}" min="-5000" max="5000"
+                                        onchange="updateSceneValue(${index}, 'imageFadeOutTime', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputImageDelayIn${index}">Delay in:</label>
+                                    <input id="inputImageDelayIn${index}" type="number" value="${scene.imageDelayIn}" min="0" max="10000"
+                                        onchange="updateSceneValue(${index}, 'imageDelayIn', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputImageDelayOut${index}">Delay out:</label>
+                                    <input id="inputImageDelayOut${index}" type="number" value="${scene.imageDelayOut}" min="0" max="10000"
+                                        onchange="updateSceneValue(${index}, 'imageDelayOut', parseInt(this.value))">
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1vmax; margin-top: 1vmax;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 0.5vmax; margin-bottom: 0.5vmax;">
+                                    <h5 style="font-size: 0.9em; font-weight: 600; color: var(--txt-color); opacity: 0.8; margin: 0;">Portrait left</h5>
+                                    <select id="timing-preset-portraitLeft-${index}" onchange="applyTimingPreset(${index}, 'portraitLeft', this.value)"
+                                            style="padding: 0.2vmax 0.4vmax; font-size: 0.8em; max-width: 20vmax; background: var(--bg-color-section); color: var(--txt-color); border: 1px solid var(--accent-color); border-radius: 2px;">
+                                        ${generateTimingPresetOptions(scene, "portraitLeft")}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputPortraitLeftFadeIn${index}">Fade in:</label>
+                                    <input id="inputPortraitLeftFadeIn${index}" type="number" value="${scene.portraitsTimings ? scene.portraitsTimings[0][0] : 0}" min="0" max="5000"
+                                        onchange="updateSceneValue(${index}, 'portraitLeftFadeIn', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputPortraitLeftFadeOut${index}">Fade out:</label>
+                                    <input id="inputPortraitLeftFadeOut${index}" type="number" value="${scene.portraitsTimings ? scene.portraitsTimings[0][1] : 0}" min="0" max="5000"
+                                        onchange="updateSceneValue(${index}, 'portraitLeftFadeOut', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputPortraitLeftDelayIn${index}">Delay in:</label>
+                                    <input id="inputPortraitLeftDelayIn${index}" type="number" value="${scene.portraitsTimings ? scene.portraitsTimings[0][2] : 0}" min="0" max="10000"
+                                        onchange="updateSceneValue(${index}, 'portraitLeftDelayIn', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputPortraitLeftDelayOut${index}">Delay out:</label>
+                                    <input id="inputPortraitLeftDelayOut${index}" type="number" value="${scene.portraitsTimings ? scene.portraitsTimings[0][3] : 0}" min="0" max="10000"
+                                        onchange="updateSceneValue(${index}, 'portraitLeftDelayOut', parseInt(this.value))">
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 0.5vmax; margin-bottom: 0.5vmax;">
+                                    <h5 style="font-size: 0.9em; font-weight: 600; color: var(--txt-color); opacity: 0.8; margin: 0;">Portrait right</h5>
+                                    <select id="timing-preset-portraitRight-${index}" onchange="applyTimingPreset(${index}, 'portraitRight', this.value)"
+                                            style="padding: 0.2vmax 0.4vmax; font-size: 0.8em; max-width: 20vmax; background: var(--bg-color-section); color: var(--txt-color); border: 1px solid var(--accent-color); border-radius: 2px;">
+                                        ${generateTimingPresetOptions(scene, "portraitRight")}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputPortraitRightFadeIn${index}">Fade in:</label>
+                                    <input id="inputPortraitRightFadeIn${index}" type="number" value="${scene.portraitsTimings ? scene.portraitsTimings[1][0] : 0}" min="0" max="5000"
+                                        onchange="updateSceneValue(${index}, 'portraitRightFadeIn', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputPortraitRightFadeOut${index}">Fade out:</label>
+                                    <input id="inputPortraitRightFadeOut${index}" type="number" value="${scene.portraitsTimings ? scene.portraitsTimings[1][1] : 0}" min="0" max="5000"
+                                        onchange="updateSceneValue(${index}, 'portraitRightFadeOut', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputPortraitRightDelayIn${index}">Delay in:</label>
+                                    <input id="inputPortraitRightDelayIn${index}" type="number" value="${scene.portraitsTimings ? scene.portraitsTimings[1][2] : 0}" min="0" max="10000"
+                                        onchange="updateSceneValue(${index}, 'portraitRightDelayIn', parseInt(this.value))">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputPortraitRightDelayOut${index}">Delay out:</label>
+                                    <input id="inputPortraitRightDelayOut${index}" type="number" value="${scene.portraitsTimings ? scene.portraitsTimings[1][3] : 0}" min="0" max="10000"
+                                        onchange="updateSceneValue(${index}, 'portraitRightDelayOut', parseInt(this.value))">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1363,7 +1624,6 @@ function updatePreviewChoices(index) {
     if (!choicesPreviewContainer) return;
 
     if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
-        // Filter out empty choices for preview
         const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
         if (validChoices.length > 0) {
             let choicesHTML = '<div class="choices-list-preview">';
@@ -1396,7 +1656,6 @@ function updateSceneHeaderPreview(index) {
     const previewLinesElement = sceneItem.querySelector(".scene-preview-lines");
     if (!previewLinesElement) return;
 
-    // Same logic as in createSceneElement for preview text
     let preview1 = scene.line1 ? scene.line1.substring(0, 150) : "";
     let preview2 = scene.line2 ? scene.line2.substring(0, 150) : "";
     const quote = scene.speaker === "" || scene.speaker === "Notification" ? "" : '"';
@@ -1429,6 +1688,8 @@ function updateAllPreviewDialogs() {
 }
 
 function toggleScene(index) {
+    const isExpanding = !expandedScenes.has(index);
+
     if (expandedScenes.has(index)) {
         expandedScenes.delete(index);
         if (window.previewGlitchEffects && window.previewGlitchEffects[index]) {
@@ -1457,6 +1718,92 @@ function toggleScene(index) {
         expandedScenes.add(index);
     }
     updateScenesList();
+
+    if (isExpanding) {
+        setTimeout(() => {
+            const scenesList = document.getElementById("scenesList");
+            const editorOverlay = document.getElementById("editorOverlay");
+
+            if (!scenesList || !editorOverlay) return;
+
+            const sceneItems = scenesList.querySelectorAll(".scene-item");
+            const targetScene = sceneItems[index];
+
+            if (targetScene) {
+                const headerHeight =
+                    parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-height")) || 0;
+
+                const sceneRect = targetScene.getBoundingClientRect();
+                const overlayRect = editorOverlay.getBoundingClientRect();
+
+                const targetScrollTop = editorOverlay.scrollTop + (sceneRect.top - overlayRect.top) - headerHeight;
+
+                editorOverlay.scrollTo({
+                    top: targetScrollTop,
+                    behavior: "smooth",
+                });
+            }
+        }, 50);
+    }
+}
+
+function applyTimingPreset(index, type, presetName) {
+    const scene = projectData.scenes[index];
+
+    if (type === "portraitLeft" || type === "portraitRight") {
+        const preset = timingPresets.portrait[presetName];
+        if (!preset) return;
+
+        if (!scene.portraitsTimings) {
+            scene.portraitsTimings = [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+            ];
+        }
+
+        const sideIndex = type === "portraitLeft" ? 0 : 1;
+        scene.portraitsTimings[sideIndex] = [...preset];
+    } else {
+        const preset = timingPresets[type][presetName];
+        if (!preset) return;
+        Object.assign(scene, preset);
+    }
+
+    updateScenesList(index);
+}
+
+function detectCurrentTimingPreset(scene, type) {
+    if (type === "portraitLeft" || type === "portraitRight") {
+        const presets = timingPresets.portrait;
+        if (!scene.portraitsTimings) return "custom";
+
+        const sideIndex = type === "portraitLeft" ? 0 : 1;
+        const currentValues = scene.portraitsTimings[sideIndex];
+
+        for (const [name, preset] of Object.entries(presets)) {
+            const matches = preset.every((val, idx) => currentValues[idx] === val);
+            if (matches) return name;
+        }
+
+        return "custom";
+    }
+
+    const presets = timingPresets[type];
+
+    for (const [name, preset] of Object.entries(presets)) {
+        const matches = Object.keys(preset).every((key) => scene[key] === preset[key]);
+        if (matches) return name;
+    }
+
+    return "custom";
+}
+
+function updateTimingPresetDropdown(index, type) {
+    const scene = projectData.scenes[index];
+    const dropdown = document.getElementById(`timing-preset-${type}-${index}`);
+    if (dropdown) {
+        dropdown.value = detectCurrentTimingPreset(scene, type);
+    }
 }
 
 function updateSceneValue(index, field, value) {
@@ -1495,6 +1842,31 @@ function updateSceneValue(index, field, value) {
             updateScenesList(index);
             setTimeout(() => updatePreviewDialog(index), 0);
         }
+
+        const dialogTimingFields = ["dialogFadeInTime", "dialogFadeOutTime", "dialogDelayIn", "dialogDelayOut"];
+        const backgroundTimingFields = ["imageFadeInTime", "imageFadeOutTime", "imageDelayIn", "imageDelayOut"];
+
+        if (dialogTimingFields.includes(field)) {
+            updateTimingPresetDropdown(index, "dialog");
+        } else if (backgroundTimingFields.includes(field)) {
+            updateTimingPresetDropdown(index, "background");
+        }
+
+        const portraitTimingMatch = field.match(/^portrait(Left|Right)(FadeIn|FadeOut|DelayIn|DelayOut)$/);
+        if (portraitTimingMatch) {
+            const [, side, timing] = portraitTimingMatch;
+            const sideIndex = side === "Left" ? 0 : 1;
+            const timingIndex = { FadeIn: 0, FadeOut: 1, DelayIn: 2, DelayOut: 3 }[timing];
+
+            if (!projectData.scenes[index].portraitsTimings) {
+                projectData.scenes[index].portraitsTimings = [
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0],
+                ];
+            }
+            projectData.scenes[index].portraitsTimings[sideIndex][timingIndex] = value;
+            updateTimingPresetDropdown(index, side === "Left" ? "portraitLeft" : "portraitRight");
+        }
     }
 }
 
@@ -1519,7 +1891,7 @@ function getImageSrc(sceneIndex, field) {
             const [, category, name] = match;
             const asset = window.gameImporterAssets.images[category]?.[name];
             if (asset) {
-                return asset.croppedUrl || asset.url;
+                return asset.url;
             }
         }
         return "";
@@ -1659,7 +2031,16 @@ function toggleSound(sceneIndex) {
 
     const pitch = projectData.scenes[sceneIndex].soundPitch || 1.0;
     currentlyPlayingAudio.playbackRate = speed * pitch;
-    currentlyPlayingAudio.preservesPitch = false;
+
+    if (currentlyPlayingAudio.preservesPitch !== undefined) {
+        currentlyPlayingAudio.preservesPitch = false;
+    }
+    if (currentlyPlayingAudio.mozPreservesPitch !== undefined) {
+        currentlyPlayingAudio.mozPreservesPitch = false;
+    }
+    if (currentlyPlayingAudio.webkitPreservesPitch !== undefined) {
+        currentlyPlayingAudio.webkitPreservesPitch = false;
+    }
 
     button.textContent = "⬛ Stop";
     button.classList.add("stop-button");
@@ -1732,7 +2113,16 @@ function toggleBackgroundMusicScene(sceneIndex) {
     const speed = projectData.scenes[sceneIndex].backgroundMusicSpeed || 1.0;
     const pitch = projectData.scenes[sceneIndex].backgroundMusicPitch || 1.0;
     currentlyPlayingAudio.playbackRate = speed * pitch;
-    currentlyPlayingAudio.preservesPitch = false;
+
+    if (currentlyPlayingAudio.preservesPitch !== undefined) {
+        currentlyPlayingAudio.preservesPitch = false;
+    }
+    if (currentlyPlayingAudio.mozPreservesPitch !== undefined) {
+        currentlyPlayingAudio.mozPreservesPitch = false;
+    }
+    if (currentlyPlayingAudio.webkitPreservesPitch !== undefined) {
+        currentlyPlayingAudio.webkitPreservesPitch = false;
+    }
 
     button.textContent = "⬛ Stop";
     button.classList.add("stop-button");
@@ -1787,7 +2177,6 @@ function toggleNull(sceneIndex, field, isNull) {
 
     updateNullCheckboxVisibility(sceneIndex, field, isNull);
 
-    // Re-render the choices list when toggling choices
     if (field === "choices" && !isNull) {
         const choicesList = document.getElementById(`choices-list-${sceneIndex}`);
         if (choicesList) {
@@ -1795,14 +2184,12 @@ function toggleNull(sceneIndex, field, isNull) {
             choicesList.innerHTML = renderChoicesList(sceneIndex, scene.choicesList || [], scene.correctChoice || 0);
         }
 
-        // Reset choice speed input to default value
         const choiceSpeedInput = document.getElementById(`inputChoiceSpeed${sceneIndex}`);
         if (choiceSpeedInput) {
             choiceSpeedInput.value = 500;
         }
     }
 
-    // Only update the preview for this specific scene, not the entire list
     updatePreviewDialog(sceneIndex);
 }
 
@@ -2405,143 +2792,139 @@ function generateCode() {
     updateConfig();
     updateGlitchConfig();
 
-    let code = `function setupScene() {
-        dialogFramework.setConfig({
-            showControls: ${projectData.config.showControls},
-            showDebug: ${projectData.config.showDebug},
-            showDialogArrow: ${projectData.config.showDialogArrow !== undefined ? projectData.config.showDialogArrow : true}`;
+    let code = `function setupScene() {`;
 
-    if (projectData.config.backgroundMusic) {
-        code += `,
-                backgroundMusic: '${projectData.config.backgroundMusic}'`;
-
-        if (projectData.config.backgroundMusicVolume !== undefined) {
-            code += `,
-                    backgroundMusicVolume: ${projectData.config.backgroundMusicVolume}`;
+    const configEntries = [];
+    Object.keys(projectData.config).forEach((key) => {
+        if (!isDefault(projectData.config[key], DEFAULTS.config[key])) {
+            const value = projectData.config[key];
+            if (typeof value === "string") {
+                configEntries.push(`${key}: '${value}'`);
+            } else {
+                configEntries.push(`${key}: ${value}`);
+            }
         }
+    });
+
+    if (configEntries.length > 0) {
+        code += `
+        dialogFramework.setConfig({
+            ${configEntries.join(",\n            ")}
+        });
+`;
+    }
+
+    // Only output characters that are:
+    // 1. Not in DEFAULTS.characters (custom characters), OR
+    // 2. In DEFAULTS.characters but modified
+    const charactersToExport = [];
+    Object.entries(projectData.characters).forEach(([name, data]) => {
+        const defaultChar = DEFAULTS.characters[name];
+
+        if (!defaultChar) {
+            charactersToExport.push([name, data]);
+            return;
+        }
+
+        const normalizedData = {
+            color: data.color,
+            aliases: Array.isArray(data.aliases) ? [...data.aliases] : [],
+        };
+        const normalizedDefault = {
+            color: defaultChar.color,
+            aliases: Array.isArray(defaultChar.aliases) ? [...defaultChar.aliases] : [],
+        };
+
+        if (!isDefault(normalizedData, normalizedDefault)) {
+            charactersToExport.push([name, data]);
+        }
+    });
+
+    if (charactersToExport.length > 0) {
+        code += `
+        dialogFramework.setCharacters({`;
+
+        charactersToExport.forEach(([name, data], index) => {
+            const charEntries = [];
+
+            charEntries.push(`color: '${data.color}'`);
+
+            if (!isDefault(data.aliases, DEFAULTS.character.aliases)) {
+                charEntries.push(`aliases: [${data.aliases.map((a) => `"${a}"`).join(", ")}]`);
+            }
+
+            code += `
+            '${name}': {
+                ${charEntries.join(",\n                ")}
+            }${index < charactersToExport.length - 1 ? "," : ""}`;
+        });
+
+        code += `
+        });
+`;
+    }
+
+    const glitchEntries = [];
+    Object.keys(projectData.glitchConfig).forEach((key) => {
+        if (!isDefault(projectData.glitchConfig[key], DEFAULTS.glitchConfig[key])) {
+            const value = projectData.glitchConfig[key];
+            if (typeof value === "string") {
+                glitchEntries.push(`${key}: '${value}'`);
+            } else {
+                glitchEntries.push(`${key}: ${value}`);
+            }
+        }
+    });
+
+    if (glitchEntries.length > 0) {
+        code += `
+        dialogFramework.setGlitchConfig({
+            ${glitchEntries.join(",\n            ")}
+        });
+`;
     }
 
     code += `
-        });
-
-        dialogFramework.setCharacters({`;
-
-    Object.entries(projectData.characters).forEach(([name, data], index, array) => {
-        code += `
-            '${name}': {
-                color: '${data.color}',
-                aliases: [\"${data.aliases.join('\", \"')}\"]
-            }${index < array.length - 1 ? "," : ""}`;
-    });
-
-    code += `
-    });
-
-    dialogFramework.setGlitchConfig({
-        scrambledColor: '${projectData.glitchConfig.scrambledColor}',
-        realColor: '${projectData.glitchConfig.realColor}',
-        changeSpeed: ${projectData.glitchConfig.changeSpeed},
-        realProbability: ${projectData.glitchConfig.realProbability},
-        autoStart: ${projectData.glitchConfig.autoStart},
-        charsAllowed: '${projectData.glitchConfig.charsAllowed}'
-    });
-
-    dialogFramework`;
+        dialogFramework`;
 
     projectData.scenes.forEach((scene, index) => {
+        const sceneEntries = [];
+
+        Object.keys(scene).forEach((key) => {
+            if (key.endsWith("BlobUrl")) return;
+
+            const value = scene[key];
+            const defaultValue = DEFAULTS.scene[key];
+
+            if (isDefault(value, defaultValue)) return;
+
+            if (value === null) {
+                sceneEntries.push(`${key}: null`);
+            } else if (typeof value === "string") {
+                sceneEntries.push(`${key}: "${value.replace(/"/g, '\\"')}"`);
+            } else if (typeof value === "boolean") {
+                sceneEntries.push(`${key}: ${value}`);
+            } else if (typeof value === "number") {
+                sceneEntries.push(`${key}: ${value}`);
+            } else if (Array.isArray(value)) {
+                if (key === "choicesList") {
+                    const validChoices = value.filter((c) => c && c.trim() !== "");
+                    if (validChoices.length > 0) {
+                        sceneEntries.push(
+                            `${key}: [${validChoices.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(", ")}]`,
+                        );
+                    }
+                } else {
+                    sceneEntries.push(`${key}: ${JSON.stringify(value)}`);
+                }
+            } else if (typeof value === "object") {
+                sceneEntries.push(`${key}: ${JSON.stringify(value)}`);
+            }
+        });
+
         code += `
         .addScene({
-            image: ${scene.image === null ? "null" : `'${scene.image}'`},
-            speaker: '${scene.speaker}',
-            line1: "${scene.line1 ? scene.line1.replace(/"/g, '\\"') : ""}",
-            line2: "${scene.line2 ? scene.line2.replace(/"/g, '\\"') : ""}",
-            censorSpeaker: ${scene.censorSpeaker},
-            demonSpeaker: ${scene.demonSpeaker || false},
-            dialogFadeInTime: ${scene.dialogFadeInTime},
-            dialogFadeOutTime: ${scene.dialogFadeOutTime},
-            imageFadeInTime: ${scene.imageFadeInTime},
-            imageFadeOutTime: ${scene.imageFadeOutTime},
-            dialogDelayIn: ${scene.dialogDelayIn},
-            dialogDelayOut: ${scene.dialogDelayOut},
-            imageDelayIn: ${scene.imageDelayIn},
-            imageDelayOut: ${scene.imageDelayOut}`;
-
-        if (scene.sound !== null) {
-            code += `,
-            sound: '${scene.sound}',
-            soundVolume: ${scene.soundVolume},
-            soundDelay: ${scene.soundDelay}`;
-            if (scene.soundPitch !== undefined && scene.soundPitch !== 1.0) {
-                code += `,
-            soundPitch: ${scene.soundPitch}`;
-            }
-            if (scene.soundSpeed !== undefined && scene.soundSpeed !== 1.0) {
-                code += `,
-            soundSpeed: ${scene.soundSpeed}`;
-            }
-        }
-
-        if (scene.backgroundMusic !== null) {
-            code += `,
-            backgroundMusic: '${scene.backgroundMusic}',
-            backgroundMusicVolume: ${scene.backgroundMusicVolume}`;
-            if (scene.backgroundMusicPitch !== undefined && scene.backgroundMusicPitch !== 1.0) {
-                code += `,
-            backgroundMusicPitch: ${scene.backgroundMusicPitch}`;
-            }
-            if (scene.backgroundMusicSpeed !== undefined && scene.backgroundMusicSpeed !== 1.0) {
-                code += `,
-            backgroundMusicSpeed: ${scene.backgroundMusicSpeed}`;
-            }
-        }
-
-        if (scene.bustLeft !== null) {
-            code += `,
-            bustLeft: '${scene.bustLeft}'`;
-        }
-
-        if (scene.bustRight !== null) {
-            code += `,
-            bustRight: '${scene.bustRight}'`;
-        }
-
-        if (scene.bustLeft !== null || scene.bustRight !== null) {
-            code += `,
-            bustFade: ${scene.bustFade}`;
-        }
-
-        if (scene.shake !== null && scene.shake !== false) {
-            code += `,
-            shake: true,
-            shakeDelay: ${scene.shakeDelay},
-            shakeIntensity: ${scene.shakeIntensity},
-            shakeDuration: ${scene.shakeDuration}`;
-        }
-
-        if (scene.choices !== null && scene.choicesList && scene.choicesList.length > 0) {
-            // Filter out empty choices and adjust correctChoice index
-            const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
-            if (validChoices.length > 0) {
-                // Find the adjusted correct choice index in the filtered list
-                let adjustedCorrectChoice = 0;
-                let validIndex = 0;
-                for (let i = 0; i <= scene.correctChoice && i < scene.choicesList.length; i++) {
-                    if (scene.choicesList[i] && scene.choicesList[i].trim() !== "") {
-                        if (i === scene.correctChoice) {
-                            adjustedCorrectChoice = validIndex;
-                        }
-                        validIndex++;
-                    }
-                }
-                code += `,
-            choices: true,
-            choicesList: [${validChoices.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(", ")}],
-            correctChoice: ${adjustedCorrectChoice},
-            choiceSpeed: ${scene.choiceSpeed || 500}`;
-            }
-        }
-
-        code += `
+            ${sceneEntries.join(",\n            ")}
         })`;
     });
 
@@ -2549,13 +2932,6 @@ function generateCode() {
 
     const compositionsToExport = new Map();
 
-    if (projectData.compositions && projectData.compositions.length > 0) {
-        projectData.compositions.forEach((comp) => {
-            compositionsToExport.set(comp.id, comp);
-        });
-    }
-
-    // Scan all scenes for gallery:Misc/* references and check if they're compositions
     if (window.gameImporterAssets && window.gameImporterAssets.images["Misc"]) {
         projectData.scenes.forEach((scene) => {
             const fieldsToCheck = [scene.image, scene.bustLeft, scene.bustRight];
@@ -2594,12 +2970,11 @@ function generateCode() {
         });
     }
 
-    // Include compositions if any were found
     if (compositionsToExport.size > 0) {
         const compositionsArray = Array.from(compositionsToExport.values());
         code += `
 
-        dialogFramework.setCompositions(${JSON.stringify(compositionsArray, null, 8).replace(/\n/g, "\n    ")});`;
+        dialogFramework.setCompositions(${JSON.stringify(compositionsArray, null, 8).replace(/\n/g, "\n        ")});`;
     }
 
     code += `
@@ -2714,6 +3089,65 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 
+function handleEditorKeydown(e) {
+    const editorOverlay = document.getElementById("editorOverlay");
+    if (!editorOverlay || editorOverlay.style.display === "none" || !editorOverlay.classList.contains("active")) {
+        return;
+    }
+
+    const activeElement = document.activeElement;
+    if (
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+            activeElement.tagName === "TEXTAREA" ||
+            activeElement.tagName === "SELECT" ||
+            activeElement.isContentEditable)
+    ) {
+        return;
+    }
+
+    if (e.key === "Tab") {
+        e.preventDefault();
+
+        const scenesHeader = Array.from(document.querySelectorAll(".section-header.collapsible")).find(
+            (btn) => btn.textContent.trim() === "Scenes",
+        );
+
+        if (scenesHeader) {
+            const sectionContent = scenesHeader.nextElementSibling;
+
+            if (!scenesHeader.classList.contains("active") || sectionContent.style.display === "none") {
+                scenesHeader.classList.add("active");
+                sectionContent.style.display = "block";
+
+                if (projectData.scenes.length > 0) {
+                    expandedScenes.clear();
+                    toggleScene(0);
+                }
+                return;
+            }
+        }
+
+        if (expandedScenes.size === 0) {
+            if (projectData.scenes.length > 0) {
+                toggleScene(0);
+            }
+            return;
+        }
+
+        const currentIndex = Array.from(expandedScenes)[0];
+        const totalScenes = projectData.scenes.length;
+
+        if (totalScenes === 0) return;
+
+        const nextIndex = (currentIndex + 1) % totalScenes;
+
+        toggleScene(nextIndex);
+    }
+}
+
+document.addEventListener("keydown", handleEditorKeydown);
+
 let currentGalleryTab = "images";
 let currentGalleryCategory = null;
 let galleryContext = null; // { mode: 'browse' | 'select', sceneIndex, field, isSound, currentAssetRef }
@@ -2759,13 +3193,14 @@ async function preloadSavedDataAssets(shouldCrop = false) {
                 if (window.pendingCompositions && window.pendingCompositions.length > 0) {
                     //console.log(`Processing ${window.pendingCompositions.length} pending compositions after loading assets...`,);
                     const pending = window.pendingCompositions;
-                    window.pendingCompositions = []; // Clear queue to avoid recursion
+                    const pendingSource = window.pendingCompositionsSource || "user";
+                    window.pendingCompositions = [];
+                    window.pendingCompositionsSource = undefined;
                     if (typeof reconstructCompositionsToGallery === "function") {
-                        await reconstructCompositionsToGallery(pending);
+                        await reconstructCompositionsToGallery(pending, pendingSource);
                     }
                 }
 
-                // Only trigger cropping if explicitly requested (when opening gallery)
                 if (shouldCrop && window.imagesCroppingStarted === false) {
                     cropAllImages().then(() => (window.imagesCroppingStarted = false));
                 }
@@ -2964,7 +3399,6 @@ function updateGalleryCategories() {
         categoryDiv.appendChild(btn);
     });
 
-    //if (isImageTab) {
     const buttonEditor = document.createElement("button");
     buttonEditor.id = "composition-editor-btn";
     buttonEditor.className = "gallery-category-btn-editor";
@@ -2975,7 +3409,6 @@ function updateGalleryCategories() {
     buttonEditor.title = "Open compositor to create custom elements";
     buttonEditor.textContent = "🎞 Compositor";
     editorDiv.appendChild(buttonEditor);
-    //}
 
     if (categories.length > 0) {
         let targetCategory;
@@ -3005,8 +3438,6 @@ function updateGalleryCategories() {
 
 function selectGalleryCategory(category) {
     currentGalleryCategory = category;
-
-    //console.log(category);
 
     if (window.galleryManager) {
         if (currentGalleryTab === "images") {
@@ -3266,14 +3697,11 @@ async function cropAllImages() {
                             asset.croppedBlob = blob;
                             asset.cropped = true;
 
-                            // Save cropped asset to persistent memory
                             if (window.memoryManager && asset.baseFileName) {
                                 try {
                                     const assetId = window.memoryManager.generateAssetId(asset.baseFileName, name);
                                     await window.memoryManager.saveCompleteAsset(assetId, blob);
-                                } catch (error) {
-                                    //console.warn("Failed to save cropped asset to memory:", name, error);
-                                }
+                                } catch (error) {}
                             }
 
                             const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);

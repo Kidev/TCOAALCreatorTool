@@ -85,6 +85,91 @@ class CompositionEditor {
         return "layer-" + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
     }
 
+    async parseGifDuration(blobUrl) {
+        try {
+            const response = await fetch(blobUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+
+            const header = String.fromCharCode(...bytes.slice(0, 6));
+            if (!header.startsWith("GIF")) {
+                return null;
+            }
+
+            let totalDuration = 0;
+            let frameCount = 0;
+            let pos = 13;
+
+            const packed = bytes[10];
+            if (packed & 0x80) {
+                const globalColorTableSize = 3 * Math.pow(2, (packed & 0x07) + 1);
+                pos += globalColorTableSize;
+            }
+
+            while (pos < bytes.length) {
+                const separator = bytes[pos];
+
+                if (separator === 0x21) {
+                    const label = bytes[pos + 1];
+                    if (label === 0xf9) {
+                        const delay = bytes[pos + 4] | (bytes[pos + 5] << 8);
+                        totalDuration += delay * 10; // delay is in 1/100 seconds
+                        frameCount++;
+                    }
+
+                    pos += 2;
+                    let blockSize = bytes[pos];
+                    pos++;
+                    while (blockSize !== 0) {
+                        pos += blockSize;
+                        blockSize = bytes[pos];
+                        pos++;
+                    }
+                } else if (separator === 0x2c) {
+                    pos += 9;
+                    const packed = bytes[pos];
+                    pos++;
+                    if (packed & 0x80) {
+                        const localColorTableSize = 3 * Math.pow(2, (packed & 0x07) + 1);
+                        pos += localColorTableSize;
+                    }
+
+                    pos++;
+                    let blockSize = bytes[pos];
+                    pos++;
+                    while (blockSize !== 0) {
+                        pos += blockSize;
+                        if (pos >= bytes.length) break;
+                        blockSize = bytes[pos];
+                        pos++;
+                    }
+                } else if (separator === 0x3b) {
+                    break;
+                } else {
+                    pos++;
+                }
+            }
+
+            return frameCount > 1 ? totalDuration : null;
+        } catch (error) {
+            console.error("Error parsing GIF:", error);
+            return null;
+        }
+    }
+
+    calculateAnimationDuration(keyframeOrLayer) {
+        if (keyframeOrLayer.type === "sprite" && keyframeOrLayer.isAnimated && keyframeOrLayer.spriteIndices) {
+            const frameCount = keyframeOrLayer.spriteIndices.length;
+            const speed = keyframeOrLayer.animationSpeed || 250;
+            return frameCount * speed;
+        }
+
+        if (keyframeOrLayer.gifDuration) {
+            return keyframeOrLayer.gifDuration;
+        }
+        return null;
+    }
+
     calculateRequiredCanvasSize() {
         let maxRight = 0;
         let maxBottom = 0;
@@ -701,11 +786,16 @@ class CompositionEditor {
         } else if (layer.blobUrl) {
             this.layers.push(layer);
             const img = new Image();
-            img.onload = () => {
+            img.onload = async () => {
                 layer.image = img;
                 layer.imageLoaded = true;
                 layer.width = layer.width || img.width;
                 layer.height = layer.height || img.height;
+
+                const gifDuration = await this.parseGifDuration(layer.blobUrl);
+                if (gifDuration) {
+                    layer.gifDuration = gifDuration;
+                }
 
                 if (this.layers.length === 1 && layer.x === 0 && layer.y === 0) {
                     layer.x = 0;
@@ -744,7 +834,7 @@ class CompositionEditor {
         if (!this.audioLayer) {
             this.audioLayer = {
                 id: this.generateId(),
-                name: "Audio",
+                name: "Audio track",
                 type: "audio",
                 visible: true,
             };
@@ -996,8 +1086,21 @@ class CompositionEditor {
         if (!selectedKf) return;
 
         this.currentAudioPreview = new Audio(selectedKf.blobUrl);
-        this.currentAudioPreview.playbackRate = selectedKf.speed;
-        this.currentAudioPreview.preservesPitch = false;
+
+        const speed = selectedKf.speed || 1.0;
+        const pitchSemitones = selectedKf.pitch || 0;
+        const pitchRatio = Math.pow(2, pitchSemitones / 12);
+        this.currentAudioPreview.playbackRate = speed * pitchRatio;
+
+        if (this.currentAudioPreview.preservesPitch !== undefined) {
+            this.currentAudioPreview.preservesPitch = false;
+        }
+        if (this.currentAudioPreview.mozPreservesPitch !== undefined) {
+            this.currentAudioPreview.mozPreservesPitch = false;
+        }
+        if (this.currentAudioPreview.webkitPreservesPitch !== undefined) {
+            this.currentAudioPreview.webkitPreservesPitch = false;
+        }
 
         this.currentAudioPreview.onended = () => {
             this.isPlayingAudioPreview = false;
@@ -1112,8 +1215,21 @@ class CompositionEditor {
         if (this.audioKeyframes && this.audioKeyframes.length > 0 && this.audioLayerVisible) {
             this.audioKeyframes.forEach((kf) => {
                 const audio = new Audio(kf.blobUrl);
-                audio.playbackRate = kf.speed;
-                audio.preservesPitch = false;
+
+                const speed = kf.speed || 1.0;
+                const pitchSemitones = kf.pitch || 0;
+                const pitchRatio = Math.pow(2, pitchSemitones / 12);
+                audio.playbackRate = speed * pitchRatio;
+
+                if (audio.preservesPitch !== undefined) {
+                    audio.preservesPitch = false;
+                }
+                if (audio.mozPreservesPitch !== undefined) {
+                    audio.mozPreservesPitch = false;
+                }
+                if (audio.webkitPreservesPitch !== undefined) {
+                    audio.webkitPreservesPitch = false;
+                }
 
                 this.currentAudioPlayback.push({
                     audio: audio,
@@ -1157,8 +1273,11 @@ class CompositionEditor {
         let maxDuration = 0;
         for (const layer of this.layers) {
             if (layer.hasKeyframes && layer.keyframes.length > 0) {
-                const layerMax = Math.max(...layer.keyframes.map((kf) => kf.time));
-                maxDuration = Math.max(maxDuration, layerMax);
+                for (const kf of layer.keyframes) {
+                    const animDuration = this.calculateAnimationDuration(kf);
+                    const keyframeEnd = kf.time + (animDuration || 0);
+                    maxDuration = Math.max(maxDuration, keyframeEnd);
+                }
             }
         }
 
@@ -1218,12 +1337,23 @@ class CompositionEditor {
 
             if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
                 if (renderData.isAnimated) {
-                    const now = Date.now();
-                    if (now - layer.lastAnimationTime >= layer.animationSpeed) {
-                        layer.currentSpriteIndex = (layer.currentSpriteIndex + 1) % renderData.spriteIndices.length;
-                        layer.lastAnimationTime = now;
+                    let spriteFrameIndex;
+
+                    if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                        const firstKeyframeTime = layer.keyframes[0].time;
+                        const timeInAnimation = currentTime - firstKeyframeTime;
+                        const animSpeed = layer.animationSpeed || 250;
+                        spriteFrameIndex = Math.floor(timeInAnimation / animSpeed) % renderData.spriteIndices.length;
+                    } else {
+                        const now = Date.now();
+                        if (now - layer.lastAnimationTime >= layer.animationSpeed) {
+                            layer.currentSpriteIndex = (layer.currentSpriteIndex + 1) % renderData.spriteIndices.length;
+                            layer.lastAnimationTime = now;
+                        }
+                        spriteFrameIndex = layer.currentSpriteIndex;
                     }
-                    const spriteIndex = renderData.spriteIndices[layer.currentSpriteIndex];
+
+                    const spriteIndex = renderData.spriteIndices[spriteFrameIndex];
                     const spriteCanvas = renderData.spriteCanvases[spriteIndex];
                     if (spriteCanvas) {
                         this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
@@ -1240,7 +1370,39 @@ class CompositionEditor {
             }
         }
 
+        this.updatePlayheadPositions(elapsed);
+
         this.previewAnimationId = requestAnimationFrame(() => this.renderPreviewFrame());
+    }
+
+    updatePlayheadPositions(currentTime) {
+        const playheads = document.querySelectorAll(".timeline-playhead");
+        playheads.forEach((playhead) => {
+            const timeline = playhead.closest(".visual-timeline-wrapper");
+            if (!timeline) return;
+
+            const maxTime = parseFloat(timeline.dataset.maxTime);
+            if (!maxTime) return;
+
+            const percentage = (currentTime / maxTime) * 100;
+            playhead.style.left = `${Math.min(percentage, 100)}%`;
+        });
+    }
+
+    updateLayerTypeFromKeyframes(layer) {
+        if (layer.hasKeyframes && layer.keyframes && layer.keyframes.length > 0) {
+            let maxTime = 0;
+            for (const kf of layer.keyframes) {
+                const animDuration = this.calculateAnimationDuration(kf);
+                const keyframeEnd = kf.time + (animDuration || 0);
+                maxTime = Math.max(maxTime, keyframeEnd);
+            }
+
+            const durationMinutes = Math.floor(maxTime / 60000);
+            const durationSeconds = Math.floor((maxTime % 60000) / 1000);
+            const durationMs = Math.floor(maxTime % 1000);
+            layer.type = `${durationMinutes}:${durationSeconds.toString().padStart(2, "0")}.${durationMs.toString().padStart(3, "0")}`;
+        }
     }
 
     addKeyframe(layerId, time = null) {
@@ -1266,36 +1428,28 @@ class CompositionEditor {
                 spriteVariant: layer.spriteVariant,
                 width: layer.width,
                 height: layer.height,
+                gifDuration: layer.gifDuration || null,
             };
 
-            const secondKeyframe = {
-                id: this.generateId(),
-                name: "KF 2",
-                time: 1000,
-                x: layer.x,
-                y: layer.y,
-                assetRef: null,
-                blobUrl: null,
-                image: null,
-                imageLoaded: false,
-                type: layer.type,
-                spriteIndices: null,
-                isAnimated: null,
-                animationSpeed: null,
-                spriteCanvases: null,
-                spriteVariant: null,
-                width: layer.width,
-                height: layer.height,
-            };
-
-            layer.keyframes.push(initialKeyframe, secondKeyframe);
+            layer.keyframes.push(initialKeyframe);
             layer.hasKeyframes = true;
-            layer.selectedKeyframeIndex = 1;
+            layer.selectedKeyframeIndex = 0;
+
+            const existingLayerNumbers = this.layers
+                .map((l) => {
+                    const match = l.name.match(/^Layer (\d+)$/);
+                    return match ? parseInt(match[1]) : 0;
+                })
+                .filter((n) => n > 0);
+            const nextLayerNumber = existingLayerNumbers.length > 0 ? Math.max(...existingLayerNumbers) + 1 : 1;
+            layer.name = `Layer ${nextLayerNumber}`;
+
+            this.updateLayerTypeFromKeyframes(layer);
 
             this.updateCanvasSize();
             this.updateLayersList();
             this.render();
-            return secondKeyframe.id;
+            return initialKeyframe.id;
         }
 
         const selectedKeyframe = layer.keyframes[layer.selectedKeyframeIndex];
@@ -1343,11 +1497,14 @@ class CompositionEditor {
             spriteVariant: sourceKeyframe.spriteVariant,
             width: sourceKeyframe.width,
             height: sourceKeyframe.height,
+            gifDuration: sourceKeyframe.gifDuration || null,
         };
 
         layer.keyframes.splice(layer.selectedKeyframeIndex + 1, 0, newKeyframe);
 
         layer.selectedKeyframeIndex = layer.selectedKeyframeIndex + 1;
+
+        this.updateLayerTypeFromKeyframes(layer);
 
         this.updateCanvasSize();
         this.updateLayersList();
@@ -1363,30 +1520,80 @@ class CompositionEditor {
         if (index === -1) return;
 
         if (layer.keyframes.length === 1) {
-            this.showNotification("Cannot remove the only keyframe. Use the delete layer button instead.", "warning");
+            this.showNotification(
+                "Cannot remove the only keyframe. Use the eject button to convert it to a simple layer.",
+                "warning",
+            );
             return;
         }
 
         layer.keyframes.splice(index, 1);
 
-        if (layer.keyframes.length === 1) {
-            const kf = layer.keyframes[0];
+        layer.selectedKeyframeIndex = Math.min(layer.selectedKeyframeIndex, layer.keyframes.length - 1);
+
+        this.updateLayerTypeFromKeyframes(layer);
+
+        this.updateCanvasSize();
+        this.updateLayersList();
+        this.render();
+    }
+
+    ejectKeyframe(layerId, keyframeId) {
+        const layer = this.layers.find((l) => l.id === layerId);
+        if (!layer || !layer.hasKeyframes) return;
+
+        const index = layer.keyframes.findIndex((kf) => kf.id === keyframeId);
+        if (index === -1) return;
+
+        const keyframe = layer.keyframes[index];
+
+        const filename = keyframe.assetRef.split("/").pop();
+
+        const newLayer = {
+            id: this.generateId(),
+            //name: `${layer.name}: ${keyframe.name}`,
+            name: `${filename}`,
+            x: keyframe.x,
+            y: keyframe.y,
+            width: keyframe.width,
+            height: keyframe.height,
+            zIndex: this.layers.length,
+            visible: true,
+            assetRef: keyframe.assetRef,
+            blobUrl: keyframe.blobUrl,
+            image: keyframe.image,
+            imageLoaded: keyframe.imageLoaded,
+            type: keyframe.type,
+            spriteIndices: keyframe.spriteIndices || [],
+            isAnimated: keyframe.isAnimated || false,
+            animationSpeed: keyframe.animationSpeed || 250,
+            spriteCanvases: keyframe.spriteCanvases || [],
+            spriteVariant: keyframe.spriteVariant || null,
+            currentSpriteIndex: 0,
+            lastAnimationTime: Date.now(),
+            hasKeyframes: false,
+            keyframes: [],
+            selectedKeyframeIndex: 0,
+            gifDuration: keyframe.gifDuration || null,
+        };
+
+        this.layers.unshift(newLayer);
+
+        layer.keyframes.splice(index, 1);
+
+        if (layer.keyframes.length >= 1) {
+            layer.selectedKeyframeIndex = Math.min(layer.selectedKeyframeIndex, layer.keyframes.length - 1);
+            this.updateLayerTypeFromKeyframes(layer);
+        } else {
             layer.hasKeyframes = false;
-            layer.x = kf.x;
-            layer.y = kf.y;
-            layer.assetRef = kf.assetRef;
-            layer.blobUrl = kf.blobUrl;
-            layer.image = kf.image;
-            layer.imageLoaded = kf.imageLoaded;
             layer.keyframes = [];
             layer.selectedKeyframeIndex = 0;
-        } else {
-            layer.selectedKeyframeIndex = Math.min(layer.selectedKeyframeIndex, layer.keyframes.length - 1);
         }
 
         this.updateCanvasSize();
         this.updateLayersList();
         this.render();
+        this.showNotification(`Keyframe ejected as layer "${newLayer.name}"`, "success", 3000);
     }
 
     selectKeyframe(layerId, keyframeIndex) {
@@ -1438,6 +1645,7 @@ class CompositionEditor {
         const movedIndex = layer.keyframes.findIndex((kf) => kf.id === movedKeyframeId);
         layer.selectedKeyframeIndex = movedIndex !== -1 ? movedIndex : 0;
 
+        this.updateLayerTypeFromKeyframes(layer);
         this.updateLayersList();
         this.render();
     }
@@ -1482,6 +1690,7 @@ class CompositionEditor {
         const movedIndex = layer.keyframes.findIndex((kf) => kf.id === movedKeyframeId);
         layer.selectedKeyframeIndex = movedIndex !== -1 ? movedIndex : 0;
 
+        this.updateLayerTypeFromKeyframes(layer);
         this.updateLayersList();
         this.render();
     }
@@ -1523,6 +1732,38 @@ class CompositionEditor {
 
     renameKeyframe(layerId, keyframeId) {
         this.startEditingKeyframe(layerId, keyframeId);
+    }
+
+    startEditingLayerName(layerId) {
+        const displayEl = document.getElementById(`layer-display-${layerId}`);
+        const inputEl = document.getElementById(`layer-input-${layerId}`);
+
+        if (displayEl && inputEl) {
+            displayEl.style.display = "none";
+            inputEl.style.display = "inline";
+            inputEl.focus();
+            inputEl.select();
+        }
+    }
+
+    saveLayerName(layerId) {
+        const displayEl = document.getElementById(`layer-display-${layerId}`);
+        const inputEl = document.getElementById(`layer-input-${layerId}`);
+
+        if (!inputEl || !displayEl) return;
+
+        const layer = this.layers.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        const newName = inputEl.value.trim();
+        if (newName !== "") {
+            layer.name = newName;
+            this.updateLayersList();
+        } else {
+            inputEl.value = layer.name || "Layer";
+            displayEl.style.display = "inline";
+            inputEl.style.display = "none";
+        }
     }
 
     updateKeyframeTime(layerId, keyframeId, newTime) {
@@ -1569,6 +1810,8 @@ class CompositionEditor {
         }
 
         layer.selectedKeyframeIndex = newIndex;
+
+        this.updateLayerTypeFromKeyframes(layer);
 
         this.updateLayersList();
         this.render();
@@ -1666,6 +1909,7 @@ class CompositionEditor {
 
         const newKeyframe = {
             id: this.generateId(),
+            name: `KF ${targetLayer.keyframes.length + 1}`,
             time: maxTime + 1000,
             x: sourceLayer.x,
             y: sourceLayer.y,
@@ -1681,10 +1925,13 @@ class CompositionEditor {
             spriteVariant: sourceLayer.spriteVariant,
             width: sourceLayer.width,
             height: sourceLayer.height,
+            gifDuration: sourceLayer.gifDuration || null,
         };
 
         targetLayer.keyframes.push(newKeyframe);
         targetLayer.keyframes.sort((a, b) => a.time - b.time);
+
+        this.updateLayerTypeFromKeyframes(targetLayer);
 
         this.removeLayer(sourceLayerId);
 
@@ -1803,6 +2050,8 @@ class CompositionEditor {
             if (pngBtn) pngBtn.style.display = "none";
             const oggBtn = document.getElementById("exportOggBtn");
             if (oggBtn) oggBtn.style.display = "none";
+            const pBtn = document.getElementById("previewPlayBtn");
+            if (pBtn) pBtn.style.display = "none";
             return;
         }
 
@@ -1834,7 +2083,8 @@ class CompositionEditor {
                 playBtn.className = "preview-control-btn success";
                 playBtn.title = "Play animation preview";
                 playBtn.onclick = () => this.togglePreview();
-                layersHeader.insertBefore(playBtn, layersHeader.firstChild);
+                //layersHeader.insertBefore(playBtn, layersHeader.firstChild);
+                layersHeader.appendChild(playBtn);
             }
         }
 
@@ -1877,7 +2127,8 @@ class CompositionEditor {
             let keyframeTimelineHTML = `
                 <div style="display:flex;justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <div style="display:flex;flex-direction: column; flex: 1; min-width: 0;">
-                        <div style="font-weight: 600; font-size: 0.95em;">Audio (${durationText})</div>
+                        <div class="layer-name" style="font-weight: 600; font-size: 0.95em;">${this.audioLayer.name}</div>
+                        <div class="layer-type" style="font-size: 0.75em; opacity: 0.7;">${durationText}</div>
                         <div style="font-size: 0.75em; opacity: 0.7; display: flex; flex-direction: row; flex-wrap: wrap; gap: 2px; margin-top: 4px;">
                             ${this.audioKeyframes
                                 .map((kf, idx) => {
@@ -1885,7 +2136,7 @@ class CompositionEditor {
                                     const label = kf.customName || `A${idx + 1}`;
                                     return `<div onclick="compositionEditor.selectAudioKeyframe(${idx})"
                                              style="cursor: pointer; padding: 2px 4px; border-radius: 3px; background: ${isSelected ? "var(--green)" : "transparent"}; color: ${isSelected ? "black" : "inherit"}; font-weight: ${isSelected ? "600" : "normal"};"
-                                             title="Click to select ${kf.name} (${label})">
+                                             title="${kf.name} (${label})">
                                     ${kf.name}
                                 </div>`;
                                 })
@@ -1919,12 +2170,6 @@ class CompositionEditor {
                                onblur="compositionEditor.saveAudioKeyframeName('${selectedKf.id}')"
                                onclick="event.stopPropagation()">
                     </button>
-                    <button class="layer-control-btn ${this.isPlayingAudioPreview ? "danger" : ""}"
-                            onclick="compositionEditor.toggleAudioPreview()"
-                            title="${this.isPlayingAudioPreview ? "Pause" : "Play"} this audio"
-                            style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
-                        ${this.isPlayingAudioPreview ? "⏸" : "▶"}
-                    </button>
                     <button class="layer-control-btn"
                             onclick="compositionEditor.addAudioKeyframeAtTime()"
                             title="Add new audio keyframe based on current one"
@@ -1943,7 +2188,38 @@ class CompositionEditor {
             `;
             keyframeTimelineHTML += "</div>";
 
-            keyframeTimelineHTML += this.generateAudioTimeline();
+            const audioTimelineHTML = this.generateAudioTimeline();
+            keyframeTimelineHTML += audioTimelineHTML;
+
+            let maxTime = 0;
+            for (const layer of this.layers) {
+                if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                    for (const kf of layer.keyframes) {
+                        const animDuration = this.calculateAnimationDuration(kf);
+                        const keyframeEnd = kf.time + (animDuration || 0);
+                        maxTime = Math.max(maxTime, keyframeEnd);
+                    }
+                }
+            }
+            if (this.audioKeyframes && this.audioKeyframes.length > 0) {
+                for (const kf of this.audioKeyframes) {
+                    const audioEnd = kf.time + (kf.duration || 0);
+                    maxTime = Math.max(maxTime, audioEnd);
+                }
+            }
+            maxTime = Math.max(maxTime + 1000, 2000);
+
+            const selectedKfPosition = (selectedKf.time / maxTime) * 100;
+            keyframeTimelineHTML += `
+                <div style="position: relative; height: 30px; margin-bottom: 8px;">
+                    <button class="layer-control-btn ${this.isPlayingAudioPreview ? "danger" : ""}"
+                            onclick="compositionEditor.toggleAudioPreview()"
+                            title="${this.isPlayingAudioPreview ? "Pause" : "Play"} this audio"
+                            style="position: absolute; left: ${selectedKfPosition}%; transform: translateX(-50%); font-size: 0.25vmax; padding: 0.1vmax; font-weight: normal;border-radius: 0;background: none;">
+                        ${this.isPlayingAudioPreview ? "⏸" : "▶"}
+                    </button>
+                </div>
+            `;
 
             keyframeTimelineHTML += `
                 <div style="display: flex; gap: 8px; margin-top: 8px;">
@@ -2034,11 +2310,20 @@ class CompositionEditor {
             const renderData = this.getLayerRenderData(layer);
 
             let layerDisplayName = layer.name;
-            if (renderData.type === "sprite" && renderData.spriteIndices && renderData.spriteIndices.length > 0) {
+            /*if (
+                layer.hasKeyframes &&
+                renderData.type === "sprite" &&
+                renderData.spriteIndices &&
+                renderData.spriteIndices.length > 0
+            ) {
                 const spriteIndex = renderData.isAnimated
                     ? renderData.spriteIndices[layer.currentSpriteIndex]
                     : renderData.spriteIndices[0];
-                layerDisplayName = `${layer.name} [${spriteIndex}]`;
+                layerDisplayName = `${layer.name} [${renderData.spriteIndices.join("-")}]`;
+            }*/
+            let typeDetailed = renderData.type;
+            if (renderData.type === "sprite" && renderData.spriteIndices && renderData.spriteIndices.length > 0) {
+                typeDetailed = `Animated sprites [${renderData.spriteIndices.join("-")}]`;
             }
 
             let keyframeTimelineHTML = "";
@@ -2080,6 +2365,15 @@ class CompositionEditor {
                             +
                         </button>
                     </div>
+                `;
+
+                keyframeTimelineHTML += `
+                    <button class="layer-control-btn"
+                           onclick="compositionEditor.ejectKeyframe('${layer.id}', '${selectedKf.id}')"
+                           title="Eject keyframe as a new simple image layer"
+                           style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
+                        ⏏
+                    </button>
                 `;
 
                 if (layer.keyframes.length > 1) {
@@ -2152,10 +2446,24 @@ class CompositionEditor {
                     const isSelected = idx === layer.selectedKeyframeIndex;
                     const kfRenderData = this.getKeyframeRenderData(layer, idx);
                     const thumb = this.getLayerThumbnailFromRenderData(kfRenderData);
+
+                    let tooltipText = "";
+                    if (kf.assetRef) {
+                        const filename = kf.assetRef.split("/").pop();
+                        tooltipText += filename;
+
+                        if (kf.spriteIndices && kf.spriteIndices.length > 0) {
+                            tooltipText += `[${kf.spriteIndices.join("-")}]`;
+                        }
+                        tooltipText += ` (${kf.name})`;
+                    } else {
+                        tooltipText += kf.name;
+                    }
+
                     thumbnailsHTML += `
                         <div style="border: 2px solid ${isSelected ? "var(--green)" : "transparent"}; border-radius: 6px; padding: 2px; ${isSelected ? "box-shadow: 0 0 8px var(--green);" : ""} cursor: pointer;"
                              onclick="compositionEditor.selectKeyframe('${layer.id}', ${idx})"
-                             title="Click to select this keyframe">
+                             title="${tooltipText}">
                             ${thumb}
                         </div>
                     `;
@@ -2170,11 +2478,33 @@ class CompositionEditor {
             layerDiv.innerHTML = `
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-right: 8px;">
                     <div class="layer-info" style="flex: 1; min-width: 0;">
-                        <div class="layer-name" title="${layerDisplayName}" style="font-weight: 600; font-size: 0.95em;">${this.truncate(layerDisplayName, 40)}</div>
-                        <div class="layer-type" style="font-size: 0.75em; opacity: 0.7;">${layer.type}${layer.isAnimated ? " (animated)" : ""}${layer.hasKeyframes ? " (keyframed)" : ""}</div>
+                        <div class="layer-name" title="${layerDisplayName}" style="font-weight: 600; font-size: 0.95em; ${layer.hasKeyframes ? "cursor: text;" : ""}" ${layer.hasKeyframes ? `ondblclick="compositionEditor.startEditingLayerName('${layer.id}')"` : ""}>
+                            <span id="layer-display-${layer.id}">${this.truncate(layerDisplayName, 40)}</span>
+                            ${
+                                layer.hasKeyframes
+                                    ? `<input type="text"
+                                       id="layer-input-${layer.id}"
+                                       value="${layer.name}"
+                                       style="display: none; width: 150px; padding: 0.25vmax; font-size: inherit; font-family: inherit; background: var(--bg-color-section-lighter); color: var(--txt-color); border: 1px solid var(--accent-color); border-radius: 2px;"
+                                       onkeydown="if(event.key === 'Enter') { event.preventDefault(); compositionEditor.saveLayerName('${layer.id}'); }"
+                                       onblur="compositionEditor.saveLayerName('${layer.id}')"
+                                       onclick="event.stopPropagation()">`
+                                    : ""
+                            }
+                        </div>
+                        <div class="layer-type" style="font-size: 0.75em; opacity: 0.7;">${layer.hasKeyframes ? layer.type : typeDetailed}</div>
                     </div>
+                    ${
+                        !layer.hasKeyframes
+                            ? `<div style="display: flex; gap: 3px;padding-right: 6px;">
+                                                <button class="layer-control-btn"
+                                                        onclick="compositionEditor.addKeyframe('${layer.id}')"
+                                                        title="Add a timeline and a keyframe to this layer"
+                                                ">⏱</button></div>`
+                            : ""
+                    }
                     <div class="layer-top-actions" style="display: flex; gap: 6px; align-items: center;">
-                        <div style="display: flex; gap: 3px; border-right: 1px solid var(--txt-color); padding-right: 6px;">
+                        <div style="display: flex; gap: 3px; border-right: 1px solid var(--txt-color); padding-right: 6px; ${!layer.hasKeyframes ? `border-left: 1px solid var(--txt-color);padding-left: 6px;` : ""}">
                             <button class="layer-control-btn"
                                     onclick="compositionEditor.moveLayerUp('${layer.id}')"
                                     title="Move layer forward (higher z-index)"
@@ -2214,14 +2544,6 @@ class CompositionEditor {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <div>
                                 ${this.getLayerThumbnail(layer)}
-                            </div>
-                            <div style="display: flex; gap: 4px;">
-                                <button class="layer-control-btn"
-                                        onclick="compositionEditor.addKeyframe('${layer.id}')"
-                                        title="Enable a timeline and adds a keyframe to this layer"
-                                        style="font-size: 0.75vmax; padding: 4px 8px;">
-                                    Enable keyframes
-                                </button>
                             </div>
                         </div>
                         ${positionHTML}
@@ -2357,25 +2679,38 @@ class CompositionEditor {
                     const relativeX = currentX - rect.left;
                     const clampedX = Math.max(0, Math.min(relativeX, rect.width));
                     const percentage = clampedX / rect.width;
+                    const newTime = Math.max(0, Math.round(percentage * maxTime));
 
-                    marker.style.left = `${percentage * 100}%`;
+                    if (isAudioKeyframe) {
+                        const kfIndex = this.audioKeyframes.findIndex((kf) => kf.id === audioKeyframeId);
+                        if (kfIndex !== -1) {
+                            this.audioKeyframes[kfIndex].time = newTime;
+                            this.audioKeyframes.sort((a, b) => a.time - b.time);
+                            this.selectedAudioKeyframeIndex = this.audioKeyframes.findIndex(
+                                (kf) => kf.id === audioKeyframeId,
+                            );
+                        }
+                    } else {
+                        const layer = this.layers.find((l) => l.id === layerId);
+                        if (layer && layer.hasKeyframes) {
+                            const kfIndex = layer.keyframes.findIndex((kf) => kf.id === keyframeId);
+                            if (kfIndex !== -1) {
+                                layer.keyframes[kfIndex].time = newTime;
+                                layer.keyframes.sort((a, b) => a.time - b.time);
+                                layer.selectedKeyframeIndex = layer.keyframes.findIndex((kf) => kf.id === keyframeId);
+                                this.updateLayerTypeFromKeyframes(layer);
+                            }
+                        }
+                    }
+
+                    this.updateLayersList();
                 };
 
                 const onMouseUp = (upEvent) => {
                     if (isDragging) {
                         marker.style.opacity = "";
 
-                        const currentX = upEvent.clientX;
-                        const relativeX = currentX - rect.left;
-                        const clampedX = Math.max(0, Math.min(relativeX, rect.width));
-                        const percentage = clampedX / rect.width;
-                        const newTime = Math.max(0, Math.round(percentage * maxTime));
-
-                        if (isAudioKeyframe) {
-                            this.updateAudioKeyframeTime(audioKeyframeId, newTime);
-                        } else {
-                            this.updateKeyframeTime(layerId, keyframeId, newTime);
-                        }
+                        this.render();
                     }
 
                     document.removeEventListener("mousemove", onMouseMove);
@@ -2392,14 +2727,19 @@ class CompositionEditor {
         let maxTime = 0;
         for (const layer of this.layers) {
             if (layer.hasKeyframes && layer.keyframes.length > 0) {
-                const layerMaxTime = Math.max(...layer.keyframes.map((kf) => kf.time));
-                maxTime = Math.max(maxTime, layerMaxTime);
+                for (const kf of layer.keyframes) {
+                    const animDuration = this.calculateAnimationDuration(kf);
+                    const keyframeEnd = kf.time + (animDuration || 0);
+                    maxTime = Math.max(maxTime, keyframeEnd);
+                }
             }
         }
 
         if (this.audioKeyframes && this.audioKeyframes.length > 0) {
-            const audioMaxTime = Math.max(...this.audioKeyframes.map((kf) => kf.time));
-            maxTime = Math.max(maxTime, audioMaxTime);
+            for (const kf of this.audioKeyframes) {
+                const audioEnd = kf.time + (kf.duration || 0);
+                maxTime = Math.max(maxTime, audioEnd);
+            }
         }
 
         maxTime = Math.max(maxTime + 1000, 2000);
@@ -2435,7 +2775,7 @@ class CompositionEditor {
                             }
                             <span style="cursor: pointer; font-size: 0.75em; white-space: nowrap; font-weight: 600; color: var(--green); text-shadow: 0 0 8px var(--green);"
                                   onclick="event.stopPropagation(); compositionEditor.selectKeyframe('${currentLayer.id}', ${i})"
-                                  title="Click to select ${kfName}">
+                                  title="${kfName}">
                                 ${kfName}
                             </span>
                             ${
@@ -2457,7 +2797,7 @@ class CompositionEditor {
                 html += `
                     <div style="position: absolute; top: 69px; left: ${position}%; transform: translateX(-50%); cursor: pointer; font-size: 0.75em; white-space: nowrap; color: var(--grey); z-index: 5;"
                          onclick="event.stopPropagation(); compositionEditor.selectKeyframe('${currentLayer.id}', ${i})"
-                         title="Click to select ${kfName}">
+                         title="${kfName}">
                         ${kfName}
                     </div>
                 `;
@@ -2467,24 +2807,72 @@ class CompositionEditor {
 
         html += '<div class="visual-timeline-track">';
 
-        for (let sec = 0; sec <= maxSeconds; sec++) {
-            const position = ((sec * 1000) / maxTime) * 100;
-            html += `
-                <div class="timeline-second-marker" style="left: ${position}%">
-                    <div class="timeline-second-tick"></div>
-                    <div class="timeline-second-label" style="${sec === 0 ? "font-weight: 600; opacity: 1;" : ""}">${sec}s</div>
-                </div>
-            `;
-        }
+        if (maxTime <= 10000) {
+            for (let sec = 0; sec <= maxSeconds; sec++) {
+                const position = ((sec * 1000) / maxTime) * 100;
+                html += `
+                    <div class="timeline-second-marker" style="left: ${position}%">
+                        <div class="timeline-second-tick"></div>
+                        <div class="timeline-second-label" style="${sec === 0 ? "font-weight: 600; opacity: 1;" : ""}">${sec}s</div>
+                    </div>
+                `;
+            }
+            const totalSubdivisions = Math.ceil(maxTime / 200);
+            for (let i = 1; i < totalSubdivisions; i++) {
+                const time = i * 200;
+                if (time % 1000 !== 0) {
+                    const position = (time / maxTime) * 100;
+                    html += `
+                        <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                    `;
+                }
+            }
+        } else if (maxTime <= 60000) {
+            const maxMarkers = Math.ceil(maxTime / 5000);
+            for (let i = 0; i <= maxMarkers; i++) {
+                const time = i * 5000;
+                const position = (time / maxTime) * 100;
+                const seconds = time / 1000;
+                html += `
+                    <div class="timeline-second-marker" style="left: ${position}%">
+                        <div class="timeline-second-tick"></div>
+                        <div class="timeline-second-label" style="${i === 0 ? "font-weight: 600; opacity: 1;" : ""}">${seconds}s</div>
+                    </div>
+                `;
+            }
 
-        const totalSubdivisions = Math.ceil(maxTime / 200);
-        for (let i = 1; i < totalSubdivisions; i++) {
-            const time = i * 200;
-            if (time % 1000 !== 0) {
+            const totalSubdivisions = Math.ceil(maxTime / 1000);
+            for (let i = 1; i < totalSubdivisions; i++) {
+                const time = i * 1000;
+                if (time % 5000 !== 0) {
+                    const position = (time / maxTime) * 100;
+                    html += `
+                        <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                    `;
+                }
+            }
+        } else {
+            const maxMinutes = Math.ceil(maxTime / 60000);
+            for (let min = 0; min <= maxMinutes; min++) {
+                const time = min * 60000;
                 const position = (time / maxTime) * 100;
                 html += `
-                    <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                    <div class="timeline-second-marker" style="left: ${position}%">
+                        <div class="timeline-second-tick"></div>
+                        <div class="timeline-second-label" style="${min === 0 ? "font-weight: 600; opacity: 1;" : ""}">${min}m</div>
+                    </div>
                 `;
+            }
+
+            const totalSubdivisions = Math.ceil(maxTime / 10000);
+            for (let i = 1; i < totalSubdivisions; i++) {
+                const time = i * 10000;
+                if (time % 60000 !== 0) {
+                    const position = (time / maxTime) * 100;
+                    html += `
+                        <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                    `;
+                }
             }
         }
 
@@ -2506,6 +2894,17 @@ class CompositionEditor {
         if (this.audioKeyframes && this.audioKeyframes.length > 0) {
             for (const kf of this.audioKeyframes) {
                 const position = (kf.time / maxTime) * 100;
+
+                if (kf.duration) {
+                    const durationWidth = (kf.duration / maxTime) * 100;
+                    html += `
+                        <div class="timeline-audio-duration-line"
+                             style="left: ${position}%; width: ${durationWidth}%"
+                             title="Audio duration: ${(kf.duration / 1000).toFixed(2)}s">
+                        </div>
+                    `;
+                }
+
                 const tooltipText = `🔊 ${kf.name}
 Time: ${kf.time}ms
 Speed: ${kf.speed.toFixed(1)}x
@@ -2525,6 +2924,20 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             const isSelected = i === currentLayer.selectedKeyframeIndex;
             const kfName = kf.name || `KF ${i + 1}`;
 
+            const animDuration = this.calculateAnimationDuration(kf);
+            if (animDuration) {
+                const durationWidth = (animDuration / maxTime) * 100;
+                const durationType = kf.type === "sprite" ? "Animation" : "GIF";
+                const durationColor = isSelected ? "var(--success-color)" : "var(--grey)";
+                html += `
+                    <div class="timeline-duration-line"
+                         style="left: ${position}%; width: ${durationWidth}%; background: ${durationColor}; opacity: ${isSelected ? "0.7" : "0.3"};"
+                         title="${durationType} duration: ${(animDuration / 1000).toFixed(2)}s">
+                    </div>
+                `;
+            }
+
+            //title="${kfName} at ${kf.time}ms - Click to select${isSelected ? " | Drag to move" : ""}">
             html += `
                 <div class="timeline-keyframe-marker timeline-keyframe-current ${isSelected ? "timeline-keyframe-selected" : ""}"
                      style="left: ${position}%"
@@ -2533,11 +2946,13 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                      data-keyframe-id="${kf.id}"
                      data-keyframe-index="${i}"
                      data-is-selected="${isSelected}"
-                     title="${kfName} at ${kf.time}ms - Click to select${isSelected ? " | Drag to move" : ""}">
+                     title="${kfName} at ${kf.time}ms">
                     <div class="timeline-keyframe-diamond"></div>
                 </div>
             `;
         }
+
+        html += `<div class="timeline-playhead ${this.isPlayingPreview ? "active" : ""}" data-playhead="visual-${currentLayer.id}" style="left: 0%"></div>`;
 
         html += "</div>";
         html += "</div>";
@@ -2550,14 +2965,19 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
         for (const layer of this.layers) {
             if (layer.hasKeyframes && layer.keyframes.length > 0) {
-                const layerMaxTime = Math.max(...layer.keyframes.map((kf) => kf.time));
-                maxTime = Math.max(maxTime, layerMaxTime);
+                for (const kf of layer.keyframes) {
+                    const animDuration = this.calculateAnimationDuration(kf);
+                    const keyframeEnd = kf.time + (animDuration || 0);
+                    maxTime = Math.max(maxTime, keyframeEnd);
+                }
             }
         }
 
         if (this.audioKeyframes && this.audioKeyframes.length > 0) {
-            const audioMaxTime = Math.max(...this.audioKeyframes.map((kf) => kf.time));
-            maxTime = Math.max(maxTime, audioMaxTime);
+            for (const kf of this.audioKeyframes) {
+                const audioEnd = kf.time + (kf.duration || 0);
+                maxTime = Math.max(maxTime, audioEnd);
+            }
         }
 
         maxTime = Math.max(maxTime + 1000, 2000);
@@ -2624,24 +3044,72 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
         html += '<div class="visual-timeline-track">';
 
-        for (let sec = 0; sec <= maxSeconds; sec++) {
-            const position = ((sec * 1000) / maxTime) * 100;
-            html += `
-                <div class="timeline-second-marker" style="left: ${position}%">
-                    <div class="timeline-second-tick"></div>
-                    <div class="timeline-second-label" style="${sec === 0 ? "font-weight: 600; opacity: 1;" : ""}">${sec}s</div>
-                </div>
-            `;
-        }
+        if (maxTime <= 10000) {
+            for (let sec = 0; sec <= maxSeconds; sec++) {
+                const position = ((sec * 1000) / maxTime) * 100;
+                html += `
+                    <div class="timeline-second-marker" style="left: ${position}%">
+                        <div class="timeline-second-tick"></div>
+                        <div class="timeline-second-label" style="${sec === 0 ? "font-weight: 600; opacity: 1;" : ""}">${sec}s</div>
+                    </div>
+                `;
+            }
+            const totalSubdivisions = Math.ceil(maxTime / 200);
+            for (let i = 1; i < totalSubdivisions; i++) {
+                const time = i * 200;
+                if (time % 1000 !== 0) {
+                    const position = (time / maxTime) * 100;
+                    html += `
+                        <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                    `;
+                }
+            }
+        } else if (maxTime <= 60000) {
+            const maxMarkers = Math.ceil(maxTime / 5000);
+            for (let i = 0; i <= maxMarkers; i++) {
+                const time = i * 5000;
+                const position = (time / maxTime) * 100;
+                const seconds = time / 1000;
+                html += `
+                    <div class="timeline-second-marker" style="left: ${position}%">
+                        <div class="timeline-second-tick"></div>
+                        <div class="timeline-second-label" style="${i === 0 ? "font-weight: 600; opacity: 1;" : ""}">${seconds}s</div>
+                    </div>
+                `;
+            }
 
-        const totalSubdivisions = Math.ceil(maxTime / 200);
-        for (let i = 1; i < totalSubdivisions; i++) {
-            const time = i * 200;
-            if (time % 1000 !== 0) {
+            const totalSubdivisions = Math.ceil(maxTime / 1000);
+            for (let i = 1; i < totalSubdivisions; i++) {
+                const time = i * 1000;
+                if (time % 5000 !== 0) {
+                    const position = (time / maxTime) * 100;
+                    html += `
+                        <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                    `;
+                }
+            }
+        } else {
+            const maxMinutes = Math.ceil(maxTime / 60000);
+            for (let min = 0; min <= maxMinutes; min++) {
+                const time = min * 60000;
                 const position = (time / maxTime) * 100;
                 html += `
-                    <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                    <div class="timeline-second-marker" style="left: ${position}%">
+                        <div class="timeline-second-tick"></div>
+                        <div class="timeline-second-label" style="${min === 0 ? "font-weight: 600; opacity: 1;" : ""}">${min}m</div>
+                    </div>
                 `;
+            }
+
+            const totalSubdivisions = Math.ceil(maxTime / 10000);
+            for (let i = 1; i < totalSubdivisions; i++) {
+                const time = i * 10000;
+                if (time % 60000 !== 0) {
+                    const position = (time / maxTime) * 100;
+                    html += `
+                        <div style="position: absolute; left: ${position}%; top: 0; width: 1px; height: 8px; background: var(--txt-color); opacity: 0.2;"></div>
+                    `;
+                }
             }
         }
 
@@ -2665,6 +3133,16 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             const isSelected = i === this.selectedAudioKeyframeIndex;
             const kfLabel = `A${i + 1}`;
 
+            if (isSelected && kf.duration) {
+                const durationWidth = (kf.duration / maxTime) * 100;
+                html += `
+                    <div class="timeline-duration-line"
+                         style="left: ${position}%; width: ${durationWidth}%"
+                         title="Audio duration: ${(kf.duration / 1000).toFixed(2)}s">
+                    </div>
+                `;
+            }
+
             html += `
                 <div class="timeline-keyframe-marker timeline-keyframe-current ${isSelected ? "timeline-keyframe-selected" : ""}"
                      style="left: ${position}%"
@@ -2672,11 +3150,13 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                      data-audio-keyframe-id="${kf.id}"
                      data-keyframe-index="${i}"
                      data-is-selected="${isSelected}"
-                     title="${kf.name} at ${kf.time}ms - Click to select${isSelected ? " | Drag to move" : ""}">
+                     title="${kf.name} at ${kf.time}ms">
                     <div class="timeline-keyframe-diamond"></div>
                 </div>
             `;
         }
+
+        html += `<div class="timeline-playhead ${this.isPlayingPreview ? "active" : ""}" data-playhead="audio" style="left: 0%"></div>`;
 
         html += "</div>";
         html += "</div>";
@@ -2728,13 +3208,16 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         }
 
         const firstKeyframeTime = layer.keyframes[0].time;
-        const lastKeyframeTime = layer.keyframes[layer.keyframes.length - 1].time;
+        const lastKeyframe = layer.keyframes[layer.keyframes.length - 1];
+        const lastKeyframeTime = lastKeyframe.time;
+        const lastKeyframeDuration = this.calculateAnimationDuration(lastKeyframe) || 0;
+        const lastKeyframeEndTime = lastKeyframeTime + lastKeyframeDuration;
 
         if (time < firstKeyframeTime) {
             return null;
         }
 
-        if (time > lastKeyframeTime) {
+        if (time > lastKeyframeEndTime) {
             return null;
         }
 
@@ -2754,7 +3237,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             };
         }
 
-        if (time === lastKeyframeTime) {
+        if (time >= lastKeyframeTime) {
             const lastKf = layer.keyframes[layer.keyframes.length - 1];
 
             let assetKeyframe = lastKf;
@@ -2836,8 +3319,8 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
     async exportAsGif() {
         if (!this.canvas) return;
 
-        if (typeof GIF === "undefined") {
-            this.showNotification("No GIF renderer loaded", "error");
+        if (typeof gifenc === "undefined") {
+            this.showNotification("No GIF encoder loaded", "error");
             return;
         }
 
@@ -2851,16 +3334,20 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             return;
         }
 
-        if (window.location.protocol === "file:") {
-            console.error("GIF generation requires a web server");
-            return;
-        }
-
         let totalDuration = 0;
         let frameDelay = 100;
 
         if (keyframedLayers.length > 0) {
-            totalDuration = Math.max(...keyframedLayers.map((l) => Math.max(...l.keyframes.map((kf) => kf.time))));
+            totalDuration = Math.max(
+                ...keyframedLayers.map((l) =>
+                    Math.max(
+                        ...l.keyframes.map((kf) => {
+                            const animDuration = this.calculateAnimationDuration(kf);
+                            return kf.time + (animDuration || 0);
+                        }),
+                    ),
+                ),
+            );
             frameDelay = 33;
         }
 
@@ -2888,35 +3375,23 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
         this.showLoading(`Initializing GIF encoder...`);
 
-        let gif;
         try {
-            gif = new GIF({
-                workers: 1,
-                quality: 10,
-                width: this.canvasWidth,
-                height: this.canvasHeight,
-                workerScript: "js/libs/gif.worker.js",
-            });
-        } catch (error) {
-            this.hideLoading();
-            console.error("Failed to initialize GIF encoder:", error);
-            return;
-        }
+            const encoder = gifenc.GIFEncoder();
 
-        const frameCanvas = document.createElement("canvas");
-        frameCanvas.width = this.canvasWidth;
-        frameCanvas.height = this.canvasHeight;
-        const frameCtx = frameCanvas.getContext("2d", { alpha: true, willReadFrequently: false });
+            const frameCanvas = document.createElement("canvas");
+            frameCanvas.width = this.canvasWidth;
+            frameCanvas.height = this.canvasHeight;
+            const frameCtx = frameCanvas.getContext("2d", { alpha: true, willReadFrequently: false });
 
-        const sortedLayers = [...this.layers].sort((a, b) => a.zIndex - b.zIndex);
+            const sortedLayers = [...this.layers].sort((a, b) => a.zIndex - b.zIndex);
 
-        this.updateLoadingProgress(0, totalFrames);
+            this.updateLoadingProgress(0, totalFrames);
 
-        const renderFrames = async () => {
+            let palette = null;
+
             for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
                 if (frameIndex % 5 === 0 || frameIndex === totalFrames - 1) {
                     this.updateLoadingProgress(frameIndex + 1, totalFrames);
-
                     await new Promise((resolve) => setTimeout(resolve, 0));
                 }
 
@@ -2946,7 +3421,18 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                         renderData.spriteCanvases.length > 0
                     ) {
                         if (renderData.isAnimated) {
-                            const spriteFrameIndex = frameIndex % renderData.spriteIndices.length;
+                            let spriteFrameIndex;
+
+                            if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                                const firstKeyframeTime = layer.keyframes[0].time;
+                                const timeInAnimation = currentTime - firstKeyframeTime;
+                                const animSpeed = layer.animationSpeed || 250;
+                                spriteFrameIndex =
+                                    Math.floor(timeInAnimation / animSpeed) % renderData.spriteIndices.length;
+                            } else {
+                                spriteFrameIndex = frameIndex % renderData.spriteIndices.length;
+                            }
+
                             const spriteIndex = renderData.spriteIndices[spriteFrameIndex];
                             const spriteCanvas = renderData.spriteCanvases[spriteIndex];
                             if (spriteCanvas) {
@@ -2964,41 +3450,45 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                     }
                 }
 
-                gif.addFrame(frameCtx, { copy: true, delay: frameDelay });
+                const imageData = frameCtx.getImageData(0, 0, this.canvasWidth, this.canvasHeight);
+
+                if (!palette) {
+                    palette = gifenc.quantize(imageData.data, 256, { format: "rgba4444", oneBitAlpha: true });
+                }
+
+                const indexed = gifenc.applyPalette(imageData.data, palette, "rgba4444");
+
+                const frameOptions = {
+                    palette,
+                    delay: frameDelay,
+                    transparent: true,
+                    transparentIndex: 0,
+                    first: frameIndex === 0,
+                };
+
+                encoder.writeFrame(indexed, this.canvasWidth, this.canvasHeight, frameOptions);
             }
-        };
 
-        await renderFrames();
+            this.showLoading("Finalizing GIF...");
+            encoder.finish();
 
-        gif.on("finished", (blob) => {
+            const buffer = encoder.bytes();
+            const blob = new Blob([buffer], { type: "image/gif" });
+
             this.hideLoading();
+
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
             a.download = `composition_animated_${Date.now()}.gif`;
             a.click();
             URL.revokeObjectURL(url);
+
             this.showNotification("GIF exported successfully!", "success");
-        });
-
-        gif.on("error", (error) => {
-            this.hideLoading();
-            console.error("GIF rendering error:", error);
-            this.showNotification("Failed to generate GIF. Error: " + error.message, "error", 6000);
-        });
-
-        gif.on("progress", (progress) => {
-            this.showLoading(`Encoding GIF... ${Math.round(progress * 100)}%</br>This can take some time`);
-        });
-
-        this.showLoading("Rendering frames...");
-
-        try {
-            gif.render();
         } catch (error) {
             this.hideLoading();
-            console.error("Failed to start GIF rendering:", error);
-            this.showNotification("Failed to start GIF rendering. Error: " + error.message, "error", 6000);
+            console.error("Failed to create GIF:", error);
+            this.showNotification("Failed to generate GIF. Error: " + error.message, "error", 6000);
         }
     }
 
@@ -3069,8 +3559,11 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
             for (const layer of this.layers) {
                 if (layer.hasKeyframes && layer.keyframes.length > 0) {
-                    const layerMaxTime = Math.max(...layer.keyframes.map((kf) => kf.time));
-                    maxDuration = Math.max(maxDuration, layerMaxTime);
+                    for (const kf of layer.keyframes) {
+                        const animDuration = this.calculateAnimationDuration(kf);
+                        const keyframeEnd = kf.time + (animDuration || 0);
+                        maxDuration = Math.max(maxDuration, keyframeEnd);
+                    }
                 }
             }
 
@@ -3239,8 +3732,8 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         });
     }
 
-    clearAllLayers() {
-        if (this.layers.length > 0 && confirm("Are you sure you want to remove all layers?")) {
+    clearAllLayers(skipConfirm = false) {
+        if (skipConfirm || (this.layers.length > 0 && confirm("Are you sure you want to remove all layers?"))) {
             this.layers = [];
             this.selectedLayerId = null;
             this.updateLayersList();
@@ -3326,6 +3819,10 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                         keyframeDescriptor.isAnimated = kf.isAnimated;
                         keyframeDescriptor.animationSpeed = kf.animationSpeed;
                         keyframeDescriptor.spriteVariant = kf.spriteVariant;
+                    }
+
+                    if (kf.gifDuration) {
+                        keyframeDescriptor.gifDuration = kf.gifDuration;
                     }
 
                     keyframeDescriptors.push(keyframeDescriptor);
@@ -3507,9 +4004,16 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             window.gameImporterAssets.images["Misc"][fileName] = {
                 url: blobUrl,
                 blob: blob,
+                name: fileName,
+                originalName: fileName,
+                baseFileName: fileName,
+                isSprite: false,
                 cropped: false,
+                originalPath: "compositions",
+                variants: null,
                 isComposition: true,
                 compositionId: descriptor.id,
+                compositionDescriptor: descriptor,
                 isAnimated: shouldExportAsGif,
             };
 
@@ -3571,8 +4075,11 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
     }
 
     async renderToBlob() {
+        this.showLoading("Rendering composition...");
+
         return new Promise((resolve) => {
             if (!this.canvas) {
+                this.hideLoading();
                 resolve(null);
                 return;
             }
@@ -3609,6 +4116,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             }
 
             exportCanvas.toBlob((blob) => {
+                this.hideLoading();
                 resolve(blob);
             }, "image/png");
         });
@@ -3617,8 +4125,8 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
     async renderToGifBlob() {
         if (!this.canvas) return null;
 
-        if (typeof GIF === "undefined") {
-            this.showNotification("No GIF renderer loaded", "error");
+        if (typeof gifenc === "undefined") {
+            this.showNotification("No GIF encoder loaded", "error");
             return null;
         }
 
@@ -3631,16 +4139,20 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             return null;
         }
 
-        if (window.location.protocol === "file:") {
-            this.showNotification("No GIF renderer loaded", "error");
-            return await this.renderToBlob();
-        }
-
         let totalDuration = 0;
         let frameDelay = 100;
 
         if (keyframedLayers.length > 0) {
-            totalDuration = Math.max(...keyframedLayers.map((l) => Math.max(...l.keyframes.map((kf) => kf.time))));
+            totalDuration = Math.max(
+                ...keyframedLayers.map((l) =>
+                    Math.max(
+                        ...l.keyframes.map((kf) => {
+                            const animDuration = this.calculateAnimationDuration(kf);
+                            return kf.time + (animDuration || 0);
+                        }),
+                    ),
+                ),
+            );
             frameDelay = 33;
         }
 
@@ -3666,91 +4178,113 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
         const totalFrames = Math.ceil(totalDuration / frameDelay);
 
-        this.showLoading(`Rendering GIF for gallery...</br>This can take some time`);
+        this.showLoading(`Initializing GIF encoder...`);
+        this.updateLoadingProgress(0, totalFrames);
 
-        return new Promise((resolve, reject) => {
-            try {
-                const gif = new GIF({
-                    workers: 1,
-                    quality: 10,
-                    width: this.canvasWidth,
-                    height: this.canvasHeight,
-                    workerScript: "js/libs/gif.worker.js",
-                });
+        try {
+            const encoder = gifenc.GIFEncoder();
 
-                const frameCanvas = document.createElement("canvas");
-                frameCanvas.width = this.canvasWidth;
-                frameCanvas.height = this.canvasHeight;
-                const frameCtx = frameCanvas.getContext("2d", { alpha: true, willReadFrequently: false });
+            const frameCanvas = document.createElement("canvas");
+            frameCanvas.width = this.canvasWidth;
+            frameCanvas.height = this.canvasHeight;
+            const frameCtx = frameCanvas.getContext("2d", { alpha: true, willReadFrequently: false });
 
-                const sortedLayers = [...this.layers].sort((a, b) => a.zIndex - b.zIndex);
+            const sortedLayers = [...this.layers].sort((a, b) => a.zIndex - b.zIndex);
 
-                for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
-                    const currentTime = frameIndex * frameDelay;
+            let palette = null;
 
-                    frameCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+                if (frameIndex % 5 === 0 || frameIndex === totalFrames - 1) {
+                    this.updateLoadingProgress(frameIndex + 1, totalFrames);
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+                }
+                const currentTime = frameIndex * frameDelay;
 
-                    for (const layer of sortedLayers) {
-                        if (!layer.visible) continue;
+                frameCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 
-                        let renderX, renderY, renderData;
+                for (const layer of sortedLayers) {
+                    if (!layer.visible) continue;
 
-                        if (layer.hasKeyframes && layer.keyframes.length > 0) {
-                            renderData = this.getLayerStateAtTime(layer, currentTime);
-                            if (!renderData) continue;
-                            renderX = renderData.x;
-                            renderY = renderData.y;
-                        } else {
-                            renderData = layer;
-                            renderX = layer.x;
-                            renderY = layer.y;
-                        }
+                    let renderX, renderY, renderData;
 
-                        if (
-                            renderData.type === "sprite" &&
-                            renderData.spriteCanvases &&
-                            renderData.spriteCanvases.length > 0
-                        ) {
-                            if (renderData.isAnimated) {
-                                const spriteFrameIndex = frameIndex % renderData.spriteIndices.length;
-                                const spriteIndex = renderData.spriteIndices[spriteFrameIndex];
-                                const spriteCanvas = renderData.spriteCanvases[spriteIndex];
-                                if (spriteCanvas) {
-                                    frameCtx.drawImage(spriteCanvas, renderX, renderY);
-                                }
-                            } else {
-                                const spriteIndex = renderData.spriteIndices[0];
-                                const spriteCanvas = renderData.spriteCanvases[spriteIndex];
-                                if (spriteCanvas) {
-                                    frameCtx.drawImage(spriteCanvas, renderX, renderY);
-                                }
-                            }
-                        } else if (renderData.image && renderData.imageLoaded) {
-                            frameCtx.drawImage(renderData.image, renderX, renderY, renderData.width, renderData.height);
-                        }
+                    if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                        renderData = this.getLayerStateAtTime(layer, currentTime);
+                        if (!renderData) continue;
+                        renderX = renderData.x;
+                        renderY = renderData.y;
+                    } else {
+                        renderData = layer;
+                        renderX = layer.x;
+                        renderY = layer.y;
                     }
 
-                    gif.addFrame(frameCtx, { copy: true, delay: frameDelay });
+                    if (
+                        renderData.type === "sprite" &&
+                        renderData.spriteCanvases &&
+                        renderData.spriteCanvases.length > 0
+                    ) {
+                        if (renderData.isAnimated) {
+                            let spriteFrameIndex;
+
+                            if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                                const firstKeyframeTime = layer.keyframes[0].time;
+                                const timeInAnimation = currentTime - firstKeyframeTime;
+                                const animSpeed = layer.animationSpeed || 250;
+                                spriteFrameIndex =
+                                    Math.floor(timeInAnimation / animSpeed) % renderData.spriteIndices.length;
+                            } else {
+                                spriteFrameIndex = frameIndex % renderData.spriteIndices.length;
+                            }
+
+                            const spriteIndex = renderData.spriteIndices[spriteFrameIndex];
+                            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                            if (spriteCanvas) {
+                                frameCtx.drawImage(spriteCanvas, renderX, renderY);
+                            }
+                        } else {
+                            const spriteIndex = renderData.spriteIndices[0];
+                            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                            if (spriteCanvas) {
+                                frameCtx.drawImage(spriteCanvas, renderX, renderY);
+                            }
+                        }
+                    } else if (renderData.image && renderData.imageLoaded) {
+                        frameCtx.drawImage(renderData.image, renderX, renderY, renderData.width, renderData.height);
+                    }
                 }
 
-                gif.on("finished", (blob) => {
-                    this.hideLoading();
-                    resolve(blob);
-                });
+                const imageData = frameCtx.getImageData(0, 0, this.canvasWidth, this.canvasHeight);
 
-                gif.on("error", (error) => {
-                    this.hideLoading();
-                    console.error("GIF rendering error:", error);
-                    reject(error);
-                });
+                if (!palette) {
+                    palette = gifenc.quantize(imageData.data, 256, { format: "rgba4444", oneBitAlpha: true });
+                }
 
-                gif.render();
-            } catch (error) {
-                this.hideLoading();
-                console.error("Failed to create GIF:", error);
-                reject(error);
+                const indexed = gifenc.applyPalette(imageData.data, palette, "rgba4444");
+
+                const frameOptions = {
+                    palette,
+                    delay: frameDelay,
+                    transparent: true,
+                    transparentIndex: 0,
+                    first: frameIndex === 0,
+                };
+
+                encoder.writeFrame(indexed, this.canvasWidth, this.canvasHeight, frameOptions);
             }
-        });
+
+            this.showLoading("Finalizing GIF...");
+            encoder.finish();
+
+            const buffer = encoder.bytes();
+            const blob = new Blob([buffer], { type: "image/gif" });
+
+            this.hideLoading();
+            return blob;
+        } catch (error) {
+            this.hideLoading();
+            console.error("Failed to create GIF:", error);
+            throw error;
+        }
     }
 
     static async reconstructComposition(descriptor) {
@@ -3835,6 +4369,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                         animationSpeed: kfDesc.animationSpeed || null,
                         spriteCanvases: kfSpriteCanvases,
                         spriteVariant: kfDesc.spriteVariant || null,
+                        gifDuration: kfDesc.gifDuration || null,
                     });
                 }
 

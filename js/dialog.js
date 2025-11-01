@@ -177,12 +177,11 @@ class DialogFramework {
         this.typeSpeed = 20;
         this.currentText = "";
 
-        // Auto-play state
         this.isAutoPlaying = false;
         this.autoPlayTimeout = null;
         this.autoPlaySettings = {
-            delayBetweenScenes: 1000, // 1 second default
-            typeSpeed: 20, // matches this.typeSpeed
+            delayBetweenScenes: 1000,
+            typeSpeed: 20,
         };
         this.typingTimeout = null;
         this.currentBackgroundImage = null;
@@ -197,6 +196,9 @@ class DialogFramework {
         this.clickToStartShown = false;
         this.backgroundMusicAudio = null;
         this.sceneVersion = 0;
+        this.isMuted = false;
+
+        this.gifCache = new Map(); // Map<url, {status: 'loading'|'ready'|'error', frames: [...], promise: Promise}>
 
         this.choicesSoundMove = {
             path: "gallery:Sound effects/se_53.ogg",
@@ -214,11 +216,6 @@ class DialogFramework {
         this.initializeEventListeners();
         this.initializeAudio();
         this.updateDebugInfo();
-
-        // Check initial screen size after DOM is ready and dialogFramework is initialized
-        this.deferredInit = () => {
-            this.checkScreenSize();
-        };
 
         this.entityDictionnary = new Map();
         atob(
@@ -247,6 +244,18 @@ class DialogFramework {
         }
     }
 
+    generateUUID() {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        // Fallback UUID v4 generator for browsers/contexts without crypto.randomUUID
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+            const r = (Math.random() * 16) | 0;
+            const v = c === "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+        });
+    }
+
     toEntitySpeech(lowercaseText) {
         return lowercaseText.replace(/[a-zA-Z]+/g, (word) => {
             const lowercase = word.toLowerCase();
@@ -270,16 +279,13 @@ class DialogFramework {
     }
 
     toEntitySpeechPreserveTags(text) {
-        // If no HTML tags, just apply normal transformation
         if (!text.includes("<")) {
             return this.toEntitySpeech(text);
         }
 
-        // Parse and transform only text content, preserving HTML tags
         const tempDiv = document.createElement("div");
         tempDiv.innerHTML = text;
 
-        // Function to recursively process text nodes
         const processTextNodes = (node) => {
             if (node.nodeType === Node.TEXT_NODE) {
                 node.textContent = this.toEntitySpeech(node.textContent);
@@ -345,6 +351,8 @@ class DialogFramework {
             }
         });
 
+        await this.preloadGifs();
+
         if (preloadPromises.length > 0) {
             //console.log(`Preloading ${preloadPromises.length} remote assets...`);
             try {
@@ -366,16 +374,13 @@ class DialogFramework {
         if (!this.config.backgroundMusic) return;
 
         try {
-            // Stop any existing background music
             this.stopBackgroundMusic();
 
             let audioSrc;
 
-            // Check if we have a blob URL from the editor
             if (this.config.backgroundMusicBlobUrl) {
                 audioSrc = this.config.backgroundMusicBlobUrl;
             } else if (this.config.backgroundMusic.startsWith("gallery:")) {
-                // Handle gallery references as fallback
                 const match = this.config.backgroundMusic.match(/^gallery:([^/]+)\/(.+)$/);
                 if (match && window.gameImporterAssets) {
                     const [, category, name] = match;
@@ -383,10 +388,10 @@ class DialogFramework {
                     if (asset) {
                         audioSrc = asset.url;
                     } else {
-                        audioSrc = "sounds/" + this.config.backgroundMusic; // Fallback
+                        audioSrc = "sounds/" + this.config.backgroundMusic;
                     }
                 } else {
-                    audioSrc = "sounds/" + this.config.backgroundMusic; // Fallback
+                    audioSrc = "sounds/" + this.config.backgroundMusic;
                 }
             } else if (
                 this.config.backgroundMusic.startsWith("http://") ||
@@ -399,7 +404,7 @@ class DialogFramework {
 
             this.backgroundMusicAudio = new Audio(audioSrc);
             this.backgroundMusicAudio.loop = true;
-            this.backgroundMusicAudio.volume = this.config.backgroundMusicVolume || 0.5;
+            this.backgroundMusicAudio.volume = this.isMuted ? 0 : this.config.backgroundMusicVolume || 0.5;
 
             const playPromise = this.backgroundMusicAudio.play();
             if (playPromise !== undefined) {
@@ -431,7 +436,6 @@ class DialogFramework {
             if (blobUrl) {
                 audioSrc = blobUrl;
             } else if (musicPath.startsWith("gallery:")) {
-                // Handle gallery references as fallback
                 const match = musicPath.match(/^gallery:([^/]+)\/(.+)$/);
                 if (match && window.gameImporterAssets) {
                     const [, category, name] = match;
@@ -439,10 +443,10 @@ class DialogFramework {
                     if (asset) {
                         audioSrc = asset.url;
                     } else {
-                        audioSrc = "sounds/" + musicPath; // Fallback
+                        audioSrc = "sounds/" + musicPath;
                     }
                 } else {
-                    audioSrc = "sounds/" + musicPath; // Fallback
+                    audioSrc = "sounds/" + musicPath;
                 }
             } else if (musicPath.startsWith("http://") || musicPath.startsWith("https://")) {
                 audioSrc = musicPath;
@@ -452,11 +456,19 @@ class DialogFramework {
 
             this.backgroundMusicAudio = new Audio(audioSrc);
             this.backgroundMusicAudio.loop = true;
-            this.backgroundMusicAudio.volume = Math.max(0, Math.min(1, volume));
+            this.backgroundMusicAudio.volume = this.isMuted ? 0 : Math.max(0, Math.min(1, volume));
 
-            // Apply speed and pitch
             this.backgroundMusicAudio.playbackRate = speed * pitch;
-            this.backgroundMusicAudio.preservesPitch = false;
+
+            if (this.backgroundMusicAudio.preservesPitch !== undefined) {
+                this.backgroundMusicAudio.preservesPitch = false;
+            }
+            if (this.backgroundMusicAudio.mozPreservesPitch !== undefined) {
+                this.backgroundMusicAudio.mozPreservesPitch = false;
+            }
+            if (this.backgroundMusicAudio.webkitPreservesPitch !== undefined) {
+                this.backgroundMusicAudio.webkitPreservesPitch = false;
+            }
 
             const playPromise = this.backgroundMusicAudio.play();
             if (playPromise !== undefined) {
@@ -544,7 +556,6 @@ class DialogFramework {
     }
 
     async loadSound(soundPath, soundBlobUrl = null) {
-        // If we have a blob URL, use it directly
         if (soundBlobUrl) {
             const key = soundPath + "_blob";
             if (this.loadedSounds.has(key)) {
@@ -587,7 +598,6 @@ class DialogFramework {
         try {
             let audioSrc;
 
-            // Handle gallery references as fallback
             if (soundPath.startsWith("gallery:")) {
                 const match = soundPath.match(/^gallery:([^/]+)\/(.+)$/);
                 if (match && window.gameImporterAssets) {
@@ -654,10 +664,19 @@ class DialogFramework {
             }
 
             const audioClone = audio.cloneNode();
-            audioClone.volume = Math.max(0, Math.min(1, volume));
+            audioClone.volume = this.isMuted ? 0 : Math.max(0, Math.min(1, volume));
 
             audioClone.playbackRate = speed * pitch;
-            audioClone.preservesPitch = false;
+
+            if (audioClone.preservesPitch !== undefined) {
+                audioClone.preservesPitch = false;
+            }
+            if (audioClone.mozPreservesPitch !== undefined) {
+                audioClone.mozPreservesPitch = false;
+            }
+            if (audioClone.webkitPreservesPitch !== undefined) {
+                audioClone.webkitPreservesPitch = false;
+            }
 
             const playPromise = audioClone.play();
 
@@ -677,7 +696,7 @@ class DialogFramework {
         this.aliasToCharacter = {};
 
         for (const key in this.characters) {
-            this.characters[key].uuid = `character-${crypto.randomUUID()}`;
+            this.characters[key].uuid = `character-${this.generateUUID()}`;
             this.characters[key].characterClassName = `speaker-line-${this.characters[key].uuid}`;
 
             if (this.characters[key].aliases && Array.isArray(this.characters[key].aliases)) {
@@ -712,6 +731,8 @@ class DialogFramework {
         this.updateConfig();
     }
 
+    setCompositions(compositions) {}
+
     updateConfig() {
         const controls = document.getElementById("controlsContainer");
         const debugArea = document.getElementById("debugArea");
@@ -724,8 +745,6 @@ class DialogFramework {
             debugArea.classList.toggle("hidden", !this.config.showDebug);
             debugArea.style.pointerEvents = this.config.showDebug ? "auto" : "none";
         }
-
-        updateMobileControlsDebugVisibility();
     }
 
     addScene(options) {
@@ -762,7 +781,10 @@ class DialogFramework {
 
             bustLeft: options.bustLeft !== undefined ? options.bustLeft : null,
             bustRight: options.bustRight !== undefined ? options.bustRight : null,
-            bustFade: options.bustFade !== undefined ? options.bustFade : 0,
+            portraitsTimings: options.portraitsTimings || [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+            ],
 
             imageBlobUrl: options.imageBlobUrl || null,
             bustLeftBlobUrl: options.bustLeftBlobUrl || null,
@@ -790,39 +812,31 @@ class DialogFramework {
                 return;
             }
 
-            // Block interactions during import or if not started
             if (window.isImportingAssets) {
                 return;
             }
 
-            // Tab key only toggles controls (no sequence advancement)
             if (e.code === "Tab") {
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
-                if (window.innerWidth <= 768 || window.innerHeight <= 600) {
-                    if (typeof window.toggleMobileControls === "function") {
-                        window.toggleMobileControls();
-                    }
-                } else {
-                    this.toggleControls();
-                    this.toggleDebugInfo();
-                }
+
+                this.toggleControls();
+                this.toggleDebugInfo();
+
                 return;
             }
 
-            // All other keys work normally (even during recording)
-            // Manual interactions stop auto-play
             if (e.code === "Space" || e.code === "ArrowRight") {
                 e.preventDefault();
                 if (this.isTyping) {
                     this.skipText();
                 } else {
-                    this.next(); // Manual next, will stop auto-play
+                    this.next();
                 }
             } else if (e.code === "ArrowLeft") {
                 e.preventDefault();
-                this.previous(); // Stops auto-play internally
+                this.previous();
             }
         });
 
@@ -835,8 +849,6 @@ class DialogFramework {
                 return;
             }
 
-            // Clicks work normally (even during recording)
-            // Manual clicks stop auto-play
             if (
                 !e.target.closest(".controls") &&
                 !e.target.closest(".editor-overlay") &&
@@ -845,20 +857,10 @@ class DialogFramework {
                 if (this.isTyping) {
                     this.skipText();
                 } else {
-                    this.next(); // Manual next, will stop auto-play
+                    this.next();
                 }
             }
         });
-
-        let resizeTimeout;
-        window.addEventListener("resize", () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                this.checkScreenSize();
-            }, 250);
-        });
-
-        this.checkScreenSize();
     }
 
     toggleControls() {
@@ -868,7 +870,7 @@ class DialogFramework {
 
     toggleDebugInfo() {
         const debugArea = document.getElementById("debugArea");
-        debugArea.classList.toggle("hidden");
+        debugArea?.classList.toggle("hidden");
     }
 
     updateButtonStates() {
@@ -891,9 +893,6 @@ class DialogFramework {
             if (this.scenes.length <= 0 || this.currentScene >= this.scenes.length) {
                 nextButton.disabled = true;
             }
-        }
-        if (typeof updateMobileButtonStates === "function") {
-            updateMobileButtonStates();
         }
     }
 
@@ -921,13 +920,150 @@ class DialogFramework {
         this.updateDebugInfo();
     }
 
+    async preloadGifs() {
+        const gifUrls = new Set();
+
+        this.scenes.forEach((scene) => {
+            [scene.image, scene.bustLeft, scene.bustRight].forEach((imageSrc) => {
+                if (!imageSrc) return;
+
+                if (!imageSrc.endsWith(".gif")) return;
+
+                let finalUrl = null;
+                const blobUrl = scene.imageBlobUrl || scene.bustLeftBlobUrl || scene.bustRightBlobUrl;
+
+                if (blobUrl) {
+                    finalUrl = blobUrl;
+                } else if (imageSrc.startsWith("gallery:")) {
+                    const match = imageSrc.match(/^gallery:([^/]+)\/(.+)$/);
+                    if (match && window.gameImporterAssets) {
+                        const [, category, name] = match;
+                        const asset = window.gameImporterAssets.images[category]?.[name];
+                        if (asset) {
+                            finalUrl = asset.url;
+                        } else {
+                            finalUrl = "img/" + imageSrc;
+                        }
+                    } else {
+                        finalUrl = "img/" + imageSrc;
+                    }
+                } else if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
+                    finalUrl = imageSrc;
+                } else {
+                    finalUrl = "img/" + imageSrc;
+                }
+
+                if (finalUrl) {
+                    gifUrls.add(finalUrl);
+                }
+            });
+        });
+
+        if (gifUrls.size === 0) {
+            return;
+        }
+
+        if (typeof createLoadingIndicator === "function") {
+            createLoadingIndicator();
+        }
+
+        if (typeof showLoadingIndicator === "function") {
+            //console.log(`Showing loading indicator for ${gifUrls.size} GIF(s)...`);
+            //showLoadingIndicator(`Preloading ${gifUrls.size} animation${gifUrls.size > 1 ? "s" : ""}...`);
+            showLoadingIndicator(`Preloading sequence...`);
+        } else {
+            console.warn("showLoadingIndicator function not available");
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const gifUrlsArray = Array.from(gifUrls);
+        const totalGifs = gifUrlsArray.length;
+
+        if (typeof updateLoadingProgress === "function") {
+            updateLoadingProgress("Initializing...");
+        }
+
+        try {
+            for (let i = 0; i < gifUrlsArray.length; i++) {
+                await this.preloadSingleGif(gifUrlsArray[i], i, totalGifs);
+            }
+        } finally {
+            if (typeof hideLoadingIndicator === "function") {
+                hideLoadingIndicator();
+            }
+        }
+    }
+
+    async preloadSingleGif(url, gifIndex = 0, totalGifs = 1) {
+        if (this.gifCache.has(url)) {
+            return this.gifCache.get(url).promise;
+        }
+
+        const cacheEntry = {
+            status: "loading",
+            frames: null,
+            promise: null,
+        };
+
+        const promise = (async () => {
+            try {
+                //console.log("Preloading GIF:", url);
+
+                if (typeof updateLoadingProgress === "function") {
+                    updateLoadingProgress(`GIF ${gifIndex + 1} / ${totalGifs}`);
+                }
+
+                const res = await fetch(url);
+                const buf = await res.arrayBuffer();
+
+                if (typeof updateLoadingProgress === "function") {
+                    updateLoadingProgress(`GIF ${gifIndex + 1} / ${totalGifs}<br>Parsing frames...`);
+                }
+
+                const gif = gifuct.parseGIF(buf);
+                const frames = gifuct.decompressFrames(gif, true);
+
+                cacheEntry.status = "ready";
+                cacheEntry.frames = frames;
+                //console.log("GIF preloaded successfully:", url);
+
+                return frames;
+            } catch (err) {
+                console.warn("Failed to preload GIF:", url, err);
+                cacheEntry.status = "error";
+                throw err;
+            }
+        })();
+
+        cacheEntry.promise = promise;
+        this.gifCache.set(url, cacheEntry);
+
+        return promise;
+    }
+
+    async getPreloadedGif(url) {
+        const cacheEntry = this.gifCache.get(url);
+        if (!cacheEntry) {
+            await this.preloadSingleGif(url);
+            return this.gifCache.get(url);
+        }
+
+        if (cacheEntry.status === "loading") {
+            try {
+                await cacheEntry.promise;
+            } catch (err) {}
+        }
+
+        return cacheEntry;
+    }
+
     async showScene(index, force = false) {
         if (index >= this.scenes.length) {
             this.hideDialog();
             return;
         }
 
-        // Hide dialog arrow and choices at the start of each scene
         this.hideDialogArrow();
         this.hideChoices();
 
@@ -957,13 +1093,10 @@ class DialogFramework {
         const currentBgMusic = scene.backgroundMusic;
         const previousBgMusic = previousScene ? previousScene.backgroundMusic : null;
 
-        // Check if background music has changed or needs to be stopped
         if (currentBgMusic !== previousBgMusic) {
-            // If current scene has no background music (null or empty), stop any playing music
             if (!currentBgMusic) {
                 this.stopBackgroundMusic();
             } else {
-                // Background music has changed, play the new one
                 this.playSceneBackgroundMusic(
                     currentBgMusic,
                     scene.backgroundMusicVolume,
@@ -973,7 +1106,6 @@ class DialogFramework {
                 );
             }
         }
-        // If currentBgMusic === previousBgMusic and both are not null, continue playing (do nothing)
 
         if (scene.shake) {
             if (scene.shakeDelay > 0) {
@@ -1203,36 +1335,68 @@ class DialogFramework {
     }
 
     handleBustTransitions(scene, previousScene) {
+        // portraitsTimings = [[fadeInLeft, fadeOutLeft, delayInLeft, delayOutLeft], [fadeInRight, fadeOutRight, delayInRight, delayOutRight]]
+        const leftTimings = scene.portraitsTimings ? scene.portraitsTimings[0] : [0, 0, 0, 0];
+        const rightTimings = scene.portraitsTimings ? scene.portraitsTimings[1] : [0, 0, 0, 0];
+        const prevLeftTimings =
+            previousScene && previousScene.portraitsTimings ? previousScene.portraitsTimings[0] : [0, 0, 0, 0];
+        const prevRightTimings =
+            previousScene && previousScene.portraitsTimings ? previousScene.portraitsTimings[1] : [0, 0, 0, 0];
+
+        // Handle left bust
         if (previousScene && previousScene.bustLeft !== scene.bustLeft) {
             if (previousScene.bustLeft) {
-                this.hideBust("left", previousScene.bustFade || 200);
+                const fadeOutTime = prevLeftTimings[1] || 200;
+                const delayOut = prevLeftTimings[3] || 0;
+                setTimeout(() => {
+                    this.hideBust("left", fadeOutTime);
+                }, delayOut);
             }
             if (scene.bustLeft) {
-                setTimeout(
-                    () => {
-                        this.showBust("left", scene.bustLeft, scene.bustFade || 200, scene.bustLeftBlobUrl);
-                    },
-                    previousScene && previousScene.bustLeft ? previousScene.bustFade || 200 : 0,
-                );
+                const fadeInTime = leftTimings[0] || 200;
+                const delayIn = leftTimings[2] || 0;
+                const prevFadeOut = previousScene.bustLeft ? prevLeftTimings[1] || 200 : 0;
+                const prevDelayOut = previousScene.bustLeft ? prevLeftTimings[3] || 0 : 0;
+                const totalPrevTime = prevDelayOut + prevFadeOut;
+
+                setTimeout(() => {
+                    this.showBust("left", scene.bustLeft, fadeInTime, scene.bustLeftBlobUrl);
+                }, totalPrevTime + delayIn);
             }
         } else if (!previousScene && scene.bustLeft) {
-            this.showBust("left", scene.bustLeft, scene.bustFade || 200, scene.bustLeftBlobUrl);
+            const fadeInTime = leftTimings[0] || 200;
+            const delayIn = leftTimings[2] || 0;
+            setTimeout(() => {
+                this.showBust("left", scene.bustLeft, fadeInTime, scene.bustLeftBlobUrl);
+            }, delayIn);
         }
 
+        // Handle right bust
         if (previousScene && previousScene.bustRight !== scene.bustRight) {
             if (previousScene.bustRight) {
-                this.hideBust("right", previousScene.bustFade || 200);
+                const fadeOutTime = prevRightTimings[1] || 200;
+                const delayOut = prevRightTimings[3] || 0;
+                setTimeout(() => {
+                    this.hideBust("right", fadeOutTime);
+                }, delayOut);
             }
             if (scene.bustRight) {
-                setTimeout(
-                    () => {
-                        this.showBust("right", scene.bustRight, scene.bustFade || 200, scene.bustRightBlobUrl);
-                    },
-                    previousScene && previousScene.bustRight ? previousScene.bustFade || 200 : 0,
-                );
+                const fadeInTime = rightTimings[0] || 200;
+                const delayIn = rightTimings[2] || 0;
+                const prevFadeOut = previousScene.bustRight ? prevRightTimings[1] || 200 : 0;
+                const prevDelayOut = previousScene.bustRight ? prevRightTimings[3] || 0 : 0;
+                const totalPrevTime = prevDelayOut + prevFadeOut;
+
+                setTimeout(() => {
+                    this.showBust("right", scene.bustRight, fadeInTime, scene.bustRightBlobUrl);
+                }, totalPrevTime + delayIn);
             }
         } else if (!previousScene && scene.bustRight) {
-            this.showBust("right", scene.bustRight, scene.bustFade || 200, scene.bustRightBlobUrl);
+            const fadeInTime = rightTimings[0] || 200;
+            const delayIn = rightTimings[2] || 0;
+            setTimeout(() => {
+                this.showBust("right", scene.bustRight, fadeInTime, scene.bustRightBlobUrl);
+            }, delayIn);
         }
     }
 
@@ -1322,8 +1486,131 @@ class DialogFramework {
         }
     }
 
-    showImage(imageSrc, fadeInTime = 200, fadeOutTime = 200, blobUrl = null) {
+    async showImage(imageSrc, fadeInTime = 0, fadeOutTime = 0, blobUrl = null) {
         this.currentBackgroundImage = imageSrc;
+
+        //console.log("showImage", imageSrc);
+
+        if (imageSrc === "") {
+            return;
+        }
+
+        let finalUrl = null;
+        let isAnimated = imageSrc.endsWith(".gif");
+        if (blobUrl) {
+            finalUrl = blobUrl;
+        } else if (imageSrc.startsWith("gallery:")) {
+            const match = imageSrc.match(/^gallery:([^/]+)\/(.+)$/);
+            if (match && window.gameImporterAssets) {
+                const [, category, name] = match;
+                const asset = window.gameImporterAssets.images[category]?.[name];
+                if (asset) {
+                    finalUrl = asset.url;
+                } else {
+                    finalUrl = "img/" + imageSrc;
+                }
+            } else {
+                finalUrl = "img/" + imageSrc;
+            }
+        } else if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
+            finalUrl = imageSrc;
+        } else {
+            finalUrl = "img/" + imageSrc;
+        }
+
+        if (isAnimated) {
+            //console.log("GIF", finalUrl);
+
+            const container = document.querySelector(".game-container");
+
+            // Fade out old images first
+            if (fadeOutTime > 0) {
+                const existingImages = container.querySelectorAll(".background-image.active");
+                existingImages.forEach((img) => {
+                    img.style.transition = `opacity ${fadeOutTime}ms ease-in-out`;
+                    img.classList.remove("active");
+                });
+            }
+
+            try {
+                const gifData = await this.getPreloadedGif(finalUrl);
+
+                if (gifData.status === "error" || !gifData.frames) {
+                    throw new Error("GIF failed to load");
+                }
+
+                const frames = gifData.frames;
+                const existingImages = container.querySelectorAll(".background-image.active");
+
+                const canvas = document.createElement("canvas");
+                canvas.className = "background-image";
+                canvas.style.opacity = "0";
+
+                if (fadeInTime > 0) {
+                    canvas.style.transition = `opacity ${fadeInTime}ms ease-in-out`;
+                } else {
+                    canvas.style.transition = "none";
+                }
+
+                container.appendChild(canvas);
+
+                const ctx = canvas.getContext("2d");
+                canvas.width = frames[0].dims.width;
+                canvas.height = frames[0].dims.height;
+                canvas.style.width = "100%";
+                canvas.style.height = "100%";
+
+                let frameIndex = 0;
+                let firstDrawn = false;
+
+                const renderFrame = () => {
+                    const frame = frames[frameIndex];
+
+                    if (frame.disposalType === 2) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    }
+
+                    const imgData = ctx.createImageData(frame.dims.width, frame.dims.height);
+                    imgData.data.set(frame.patch);
+                    ctx.putImageData(imgData, frame.dims.left, frame.dims.top);
+
+                    if (!firstDrawn) {
+                        firstDrawn = true;
+                        requestAnimationFrame(() => {
+                            canvas.classList.add("active");
+                            canvas.style.opacity = "1";
+                        });
+
+                        const startEvent = new CustomEvent("gifPlaybackStarted", {
+                            detail: { src: imageSrc, type: "background" },
+                        });
+                        document.dispatchEvent(startEvent);
+                    }
+
+                    frameIndex++;
+
+                    if (frameIndex < frames.length) {
+                        setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
+                    } else {
+                        const endEvent = new CustomEvent("gifPlaybackEnded", {
+                            detail: { src: imageSrc, type: "background" },
+                        });
+                        document.dispatchEvent(endEvent);
+                    }
+                };
+
+                requestAnimationFrame(renderFrame);
+
+                const cleanupTime = Math.max(fadeInTime, fadeOutTime) + 100;
+                setTimeout(() => {
+                    existingImages.forEach((el) => el.remove());
+                }, cleanupTime);
+
+                return;
+            } catch (error) {
+                console.warn("Failed to load GIF, falling back to regular image:", error);
+            }
+        }
 
         if (fadeOutTime > 0) {
             const existingImages = document.querySelectorAll(".background-image.active");
@@ -1334,33 +1621,7 @@ class DialogFramework {
         }
 
         const img = document.createElement("img");
-
-        if (imageSrc === "") {
-            img.src = "";
-            return;
-        }
-
-        if (blobUrl) {
-            img.src = blobUrl;
-        } else if (imageSrc.startsWith("gallery:")) {
-            const match = imageSrc.match(/^gallery:([^/]+)\/(.+)$/);
-            if (match && window.gameImporterAssets) {
-                const [, category, name] = match;
-                const asset = window.gameImporterAssets.images[category]?.[name];
-                if (asset) {
-                    img.src = asset.url;
-                } else {
-                    img.src = "img/" + imageSrc;
-                }
-            } else {
-                img.src = "img/" + imageSrc;
-            }
-        } else if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
-            img.src = imageSrc;
-        } else {
-            img.src = "img/" + imageSrc;
-        }
-
+        img.src = finalUrl;
         img.className = "background-image";
 
         if (fadeInTime > 0) {
@@ -1376,6 +1637,11 @@ class DialogFramework {
             requestAnimationFrame(() => {
                 img.classList.add("active");
             });
+
+            const loadEvent = new CustomEvent("imageLoaded", {
+                detail: { src: imageSrc, type: "background" },
+            });
+            document.dispatchEvent(loadEvent);
         };
 
         img.onerror = () => {
@@ -1395,34 +1661,121 @@ class DialogFramework {
         }
     }
 
-    crossfadeImages(fromImageSrc, toImageSrc, fadeOutDuration = 1000, fadeInDuration = 1000, toBlobUrl = null) {
+    async crossfadeImages(fromImageSrc, toImageSrc, fadeOutDuration = 1000, fadeInDuration = 1000, toBlobUrl = null) {
         this.currentBackgroundImage = toImageSrc;
-
+        //console.log("showImage", fromImageSrc, toImageSrc);
         const existingImages = document.querySelectorAll(".background-image.active");
 
-        const newImg = document.createElement("img");
-
+        let finalUrl = null;
+        let isAnimated = toImageSrc.endsWith(".gif");
         if (toBlobUrl) {
-            newImg.src = toBlobUrl;
+            finalUrl = toBlobUrl;
         } else if (toImageSrc.startsWith("gallery:")) {
             const match = toImageSrc.match(/^gallery:([^/]+)\/(.+)$/);
             if (match && window.gameImporterAssets) {
                 const [, category, name] = match;
                 const asset = window.gameImporterAssets.images[category]?.[name];
                 if (asset) {
-                    newImg.src = asset.url;
+                    finalUrl = asset.url;
                 } else {
-                    newImg.src = "img/" + toImageSrc;
+                    finalUrl = "img/" + toImageSrc;
                 }
             } else {
-                newImg.src = "img/" + toImageSrc;
+                finalUrl = "img/" + toImageSrc;
             }
         } else if (toImageSrc.startsWith("http://") || toImageSrc.startsWith("https://")) {
-            newImg.src = toImageSrc;
+            finalUrl = toImageSrc;
         } else {
-            newImg.src = "img/" + toImageSrc;
+            finalUrl = "img/" + toImageSrc;
+        }
+        if (isAnimated) {
+            //console.log("GIF", finalUrl);
+
+            const container = document.querySelector(".game-container");
+
+            try {
+                const gifData = await this.getPreloadedGif(finalUrl);
+
+                if (gifData.status === "error" || !gifData.frames) {
+                    throw new Error("GIF failed to load");
+                }
+
+                const frames = gifData.frames;
+
+                const canvas = document.createElement("canvas");
+                canvas.className = "background-image";
+                canvas.style.opacity = "0";
+                canvas.style.transition = `opacity ${fadeInDuration}ms ease-in-out`;
+
+                container.appendChild(canvas);
+
+                const ctx = canvas.getContext("2d");
+                canvas.width = frames[0].dims.width;
+                canvas.height = frames[0].dims.height;
+                canvas.style.width = "100%";
+                canvas.style.height = "100%";
+
+                let frameIndex = 0;
+                let firstDrawn = false;
+
+                const renderFrame = () => {
+                    const frame = frames[frameIndex];
+
+                    if (frame.disposalType === 2) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    }
+
+                    const imgData = ctx.createImageData(frame.dims.width, frame.dims.height);
+                    imgData.data.set(frame.patch);
+                    ctx.putImageData(imgData, frame.dims.left, frame.dims.top);
+
+                    if (!firstDrawn) {
+                        firstDrawn = true;
+                        requestAnimationFrame(() => {
+                            existingImages.forEach((existingImg) => {
+                                existingImg.style.transition = `opacity ${fadeOutDuration}ms ease-in-out`;
+                                existingImg.classList.remove("active");
+                            });
+
+                            canvas.classList.add("active");
+                            canvas.style.opacity = "1";
+                        });
+
+                        const startEvent = new CustomEvent("gifPlaybackStarted", {
+                            detail: { src: toImageSrc, type: "background" },
+                        });
+                        document.dispatchEvent(startEvent);
+                    }
+
+                    frameIndex++;
+
+                    if (frameIndex < frames.length) {
+                        setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
+                    } else {
+                        const endEvent = new CustomEvent("gifPlaybackEnded", {
+                            detail: { src: toImageSrc, type: "background" },
+                        });
+                        document.dispatchEvent(endEvent);
+                    }
+                };
+
+                requestAnimationFrame(renderFrame);
+
+                const maxDuration = Math.max(fadeOutDuration, fadeInDuration);
+                setTimeout(() => {
+                    existingImages.forEach((el) => {
+                        el.remove();
+                    });
+                }, maxDuration + 100);
+
+                return;
+            } catch (error) {
+                console.warn("Failed to load GIF in crossfade, falling back to regular image:", error);
+            }
         }
 
+        const newImg = document.createElement("img");
+        newImg.src = finalUrl;
         newImg.className = "background-image";
         newImg.style.transition = `opacity ${fadeInDuration}ms ease-in-out`;
         newImg.style.opacity = "0";
@@ -1441,6 +1794,11 @@ class DialogFramework {
                 newImg.classList.add("active");
                 newImg.style.opacity = "1";
             });
+
+            const loadEvent = new CustomEvent("imageLoaded", {
+                detail: { src: toImageSrc, type: "background" },
+            });
+            document.dispatchEvent(loadEvent);
 
             const maxDuration = Math.max(fadeOutDuration, fadeInDuration);
             setTimeout(() => {
@@ -1463,41 +1821,130 @@ class DialogFramework {
         }
     }
 
-    showImageInstant(imageSrc, blobUrl = null) {
+    async showImageInstant(imageSrc, blobUrl = null) {
         this.currentBackgroundImage = imageSrc;
 
-        const existingImages = document.querySelectorAll(".background-image.active");
-        existingImages.forEach((img) => {
-            img.style.transition = "none";
-            img.classList.remove("active");
-        });
+        //console.log("showImageInstant", imageSrc);
 
-        const img = document.createElement("img");
-
+        let finalUrl = null;
+        const isGif = imageSrc.endsWith(".gif");
         if (blobUrl) {
-            img.src = blobUrl;
+            finalUrl = blobUrl;
         } else if (imageSrc.startsWith("gallery:")) {
             const match = imageSrc.match(/^gallery:([^/]+)\/(.+)$/);
             if (match && window.gameImporterAssets) {
                 const [, category, name] = match;
                 const asset = window.gameImporterAssets.images[category]?.[name];
                 if (asset) {
-                    img.src = asset.url;
+                    finalUrl = asset.url;
                 } else {
-                    img.src = "img/" + imageSrc;
+                    finalUrl = "img/" + imageSrc;
                 }
             } else {
-                img.src = "img/" + imageSrc;
+                finalUrl = "img/" + imageSrc;
             }
         } else if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
-            img.src = imageSrc;
+            finalUrl = imageSrc;
         } else {
-            img.src = "img/" + imageSrc;
+            finalUrl = "img/" + imageSrc;
         }
 
+        if (isGif) {
+            //console.log("GIF", finalUrl);
+
+            const container = document.querySelector(".game-container");
+            const existingImages = container.querySelectorAll(".background-image.active");
+
+            const canvas = document.createElement("canvas");
+            canvas.className = "background-image";
+            canvas.style.transition = "none";
+            canvas.style.opacity = "0";
+            container.appendChild(canvas);
+
+            try {
+                const gifData = await this.getPreloadedGif(finalUrl);
+
+                if (gifData.status === "error" || !gifData.frames) {
+                    throw new Error("GIF failed to load");
+                }
+
+                const frames = gifData.frames;
+                const ctx = canvas.getContext("2d");
+                canvas.width = frames[0].dims.width;
+                canvas.height = frames[0].dims.height;
+                canvas.style.width = "100%";
+                canvas.style.height = "100%";
+
+                let frameIndex = 0;
+                let firstDrawn = false;
+
+                const renderFrame = () => {
+                    const frame = frames[frameIndex];
+
+                    if (frame.disposalType === 2) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    }
+
+                    const imgData = ctx.createImageData(frame.dims.width, frame.dims.height);
+                    imgData.data.set(frame.patch);
+                    ctx.putImageData(imgData, frame.dims.left, frame.dims.top);
+
+                    if (!firstDrawn) {
+                        firstDrawn = true;
+                        canvas.style.opacity = "1";
+                        canvas.classList.add("active");
+                        setTimeout(() => existingImages.forEach((el) => el.remove()), 50);
+
+                        const startEvent = new CustomEvent("gifPlaybackStarted", {
+                            detail: { src: imageSrc, type: "background" },
+                        });
+                        document.dispatchEvent(startEvent);
+                    }
+
+                    frameIndex++;
+
+                    if (frameIndex < frames.length) {
+                        setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
+                    } else {
+                        const endEvent = new CustomEvent("gifPlaybackEnded", {
+                            detail: { src: imageSrc, type: "background" },
+                        });
+                        document.dispatchEvent(endEvent);
+                    }
+                };
+
+                requestAnimationFrame(renderFrame);
+            } catch (err) {
+                console.warn("Failed to load or play GIF:", err);
+
+                const img = document.createElement("img");
+                img.src = finalUrl;
+                img.className = "background-image active";
+                container.appendChild(img);
+                setTimeout(() => existingImages.forEach((img) => img.remove()), 10);
+            }
+
+            return;
+        }
+
+        const existingImages = document.querySelectorAll(".background-image.active");
+        existingImages.forEach((el) => {
+            el.style.transition = "none";
+            el.classList.remove("active");
+        });
+
+        const img = document.createElement("img");
+        img.src = finalUrl;
         img.className = "background-image active";
         img.style.transition = "none";
         img.style.opacity = "1";
+
+        img.onload = () => {
+            const loadEvent = new CustomEvent("imageLoaded", {
+                detail: { src: imageSrc, type: "background" },
+            });
+            document.dispatchEvent(loadEvent);
+        };
 
         img.onerror = () => {
             //console.warn(`Failed to load image: ${imageSrc}`);
@@ -1533,7 +1980,6 @@ class DialogFramework {
             .replace(/<u>/g, '<span style="text-decoration: underline;">')
             .replace(/<\/u>/g, "</span>");
 
-        // Handle <l> tags with optional size attribute
         const lRegex = /<l([^>]*)>(.*?)<\/l>/g;
         formattedText = formattedText.replace(lRegex, (match, attributes, content) => {
             const sizeMatch = attributes.match(/size="([^"]+)"/);
@@ -1670,7 +2116,6 @@ class DialogFramework {
             }
         }
 
-        //if (line2 && this.isTyping) {
         if (line2) {
             const hasFormattingLine2 = line2.includes("<");
 
@@ -1684,18 +2129,14 @@ class DialogFramework {
 
         this.isTyping = false;
 
-        // Show dialog arrow when typing completes (if enabled in config)
         if (this.config.showDialogArrow !== false) {
             this.showDialogArrow();
         }
 
-        // Show and animate choices if they exist
         const scene = this.scenes[this.currentScene];
         if (scene && scene.choices && scene.choicesList && scene.choicesList.length > 0) {
-            // Filter out empty choices
             const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
             if (validChoices.length > 0) {
-                // Find the correct choice index in the filtered list
                 let adjustedCorrectChoice = 0;
                 let validIndex = 0;
                 for (let i = 0; i <= scene.correctChoice && i < scene.choicesList.length; i++) {
@@ -1794,57 +2235,6 @@ class DialogFramework {
             toggle.id = "controlsToggle";
             toggle.className = "controls-toggle";
             toggle.textContent = "Controls";
-
-            toggle.addEventListener("click", () => {
-                this.toggleMobileControls();
-            });
-
-            document.body.appendChild(toggle);
-        }
-    }
-
-    toggleMobileControls() {
-        const controls = document.getElementById("controlsContainer");
-        const toggle = document.getElementById("controlsToggle");
-        const debugArea = document.getElementById("debugArea");
-
-        if (controls.classList.contains("visible")) {
-            controls.classList.remove("visible");
-            controls.classList.add("hidden");
-            toggle.classList.remove("active");
-            if (debugArea) {
-                debugArea.classList.remove("fade-out");
-            }
-        } else {
-            controls.classList.remove("hidden");
-            controls.classList.add("visible");
-            toggle.classList.add("active");
-            if (debugArea) {
-                debugArea.classList.add("fade-out");
-            }
-        }
-    }
-
-    checkScreenSize() {
-        const isMobile = window.innerWidth <= 768 || window.innerHeight <= 600;
-
-        if (isMobile) {
-            if (typeof window.createMobileControls === "function") {
-                window.createMobileControls();
-            }
-        } else {
-            const existing = document.getElementById("mobileControls");
-            if (existing) existing.remove();
-        }
-
-        if (typeof window.updateMobileControlsDebugVisibility === "function") {
-            window.updateMobileControlsDebugVisibility();
-        }
-        if (typeof window.updateMobileButtonStates === "function") {
-            window.updateMobileButtonStates();
-        }
-        if (typeof window.updateMobileDebugInfo === "function") {
-            window.updateMobileDebugInfo();
         }
     }
 
@@ -2257,7 +2647,6 @@ class DialogFramework {
             return;
         }
 
-        // Stop auto-play if this is a manual next() call
         if (!isAutoPlay && this.isAutoPlaying) {
             this.stopAutoPlay();
         }
@@ -2278,7 +2667,6 @@ class DialogFramework {
     }
 
     previous() {
-        // Stop auto-play on manual interaction
         if (this.isAutoPlaying) {
             this.stopAutoPlay();
         }
@@ -2331,7 +2719,7 @@ class DialogFramework {
         const dialogArrow = document.getElementById(`dialogArrowPreview-${sceneIndex}`);
         if (dialogArrow) {
             dialogArrow.style.display = "block";
-            // Position arrow at top for Notification speaker
+
             if (this.currentSpeaker === "Notification") {
                 dialogArrow.classList.toggle("notification-mode", true);
             } else {
@@ -2348,7 +2736,6 @@ class DialogFramework {
     }
 
     reset() {
-        // Stop auto-play on reset
         if (this.isAutoPlaying) {
             this.stopAutoPlay();
         }
@@ -2371,17 +2758,48 @@ class DialogFramework {
         this.updateDebugInfo();
     }
 
+    clearScenes() {
+        this.scenes = [];
+        this.gifCache.clear();
+    }
+
     wait(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     playPauseSequence() {
         if (this.isAutoPlaying) {
-            // Pause auto-play
             this.stopAutoPlay();
         } else {
-            // Start auto-play
             this.startAutoPlay();
+        }
+    }
+
+    toggleMuteSequenceButton() {
+        this.isMuted = !this.isMuted;
+
+        const muteButton = document.getElementById("toggleMuteSequenceButton");
+        if (muteButton) {
+            if (this.isMuted) {
+                muteButton.style.textDecoration = "line-through";
+                muteButton.title = "Unmute sound in the sequence";
+            } else {
+                muteButton.style.textDecoration = "none";
+                muteButton.title = "Mute / Unmute sound in the sequence";
+            }
+        }
+
+        if (this.backgroundMusicAudio) {
+            if (this.isMuted) {
+                this.backgroundMusicAudio.volume = 0;
+            } else {
+                const scene = this.scenes[this.currentScene];
+                if (scene && scene.backgroundMusic) {
+                    this.backgroundMusicAudio.volume = Math.max(0, Math.min(1, scene.backgroundMusicVolume || 1.0));
+                } else {
+                    this.backgroundMusicAudio.volume = this.config.backgroundMusicVolume || 0.5;
+                }
+            }
         }
     }
 
@@ -2465,37 +2883,69 @@ class DialogFramework {
             const totalChars = plainLine1.length + plainLine2.length;
             typingDuration = totalChars * this.typeSpeed;
 
-            // Dialog timing
-            const dialogFadeIn = scene.dialogFadeInTime || this.defaultDialogFadeInTime || 500;
+            const dialogFadeIn = scene.dialogFadeInTime || 0;
             const dialogDelay = scene.dialogDelayIn || 0;
             totalDuration = Math.max(totalDuration, dialogDelay + dialogFadeIn + typingDuration);
 
-            // Image timing
-            const imageFadeIn = scene.imageFadeInTime || this.defaultImageFadeInTime || 1000;
-            const imageDelay = scene.imageDelayIn || 0;
-            totalDuration = Math.max(totalDuration, imageDelay + imageFadeIn);
+            const hasGif = scene.image && scene.image.endsWith(".gif");
 
-            if (scene.shake) {
-                const shakeDelay = scene.shakeDelay || 0;
-                const shakeDuration = scene.shakeDuration || 500;
-                totalDuration = Math.max(totalDuration, shakeDelay + shakeDuration);
-            }
+            if (hasGif) {
+                const gifEndedPromise = new Promise((resolve) => {
+                    const handler = (event) => {
+                        document.removeEventListener("gifPlaybackEnded", handler);
+                        resolve();
+                    };
+                    document.addEventListener("gifPlaybackEnded", handler);
+                });
 
-            if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
-                const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
-                if (validChoices.length > 0) {
-                    const correctChoice = scene.correctChoice || 0;
-                    const choiceSpeed = scene.choiceSpeed || 500;
-                    // Animation: (correctChoice + 1) iterations * choiceSpeed + final wait + click sound play time
-                    const choiceAnimationDuration = (correctChoice + 1) * choiceSpeed + choiceSpeed + 200; // +200ms for click sound
-                    totalDuration = Math.max(
-                        totalDuration,
-                        dialogDelay + dialogFadeIn + typingDuration + choiceAnimationDuration,
-                    );
+                let otherDuration = totalDuration;
+
+                if (scene.shake) {
+                    const shakeDelay = scene.shakeDelay || 0;
+                    const shakeDuration = scene.shakeDuration || 500;
+                    otherDuration = Math.max(otherDuration, shakeDelay + shakeDuration);
                 }
-            }
 
-            await this.wait(totalDuration);
+                if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
+                    const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
+                    if (validChoices.length > 0) {
+                        const correctChoice = scene.correctChoice || 0;
+                        const choiceSpeed = scene.choiceSpeed || 500;
+                        const choiceAnimationDuration = (correctChoice + 1) * choiceSpeed + choiceSpeed + 200;
+                        otherDuration = Math.max(
+                            otherDuration,
+                            dialogDelay + dialogFadeIn + typingDuration + choiceAnimationDuration,
+                        );
+                    }
+                }
+
+                await Promise.all([this.wait(otherDuration), gifEndedPromise]);
+            } else {
+                const imageFadeIn = scene.imageFadeInTime || 0;
+                const imageDelay = scene.imageDelayIn || 0;
+                totalDuration = Math.max(totalDuration, imageDelay + imageFadeIn);
+
+                if (scene.shake) {
+                    const shakeDelay = scene.shakeDelay || 0;
+                    const shakeDuration = scene.shakeDuration || 500;
+                    totalDuration = Math.max(totalDuration, shakeDelay + shakeDuration);
+                }
+
+                if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
+                    const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
+                    if (validChoices.length > 0) {
+                        const correctChoice = scene.correctChoice || 0;
+                        const choiceSpeed = scene.choiceSpeed || 500;
+                        const choiceAnimationDuration = (correctChoice + 1) * choiceSpeed + choiceSpeed + 200;
+                        totalDuration = Math.max(
+                            totalDuration,
+                            dialogDelay + dialogFadeIn + typingDuration + choiceAnimationDuration,
+                        );
+                    }
+                }
+
+                await this.wait(totalDuration);
+            }
         }
     }
 
@@ -2510,7 +2960,7 @@ class DialogFramework {
                 debugInfo.textContent = `End`;
                 //debugInfo.onclick = null;
                 debugInfo.onclick = (e) => {
-                    e.stopPropagation(); // Prevent click-through
+                    e.stopPropagation();
                     this.showSceneJumpInput();
                 };
                 if (!debugInfo.classList.contains("disabled")) {
@@ -2519,7 +2969,7 @@ class DialogFramework {
             } else {
                 debugInfo.textContent = `${this.currentScene + 1 < 10 ? " " : ""}${this.currentScene + 1} / ${this.scenes.length}${this.scenes.length < 10 ? " " : ""}`;
                 debugInfo.onclick = (e) => {
-                    e.stopPropagation(); // Prevent click-through
+                    e.stopPropagation();
                     this.showSceneJumpInput();
                 };
             }
@@ -2528,10 +2978,6 @@ class DialogFramework {
                 debugInfo.classList.add("disabled");
             }
             debugInfo.textContent = "No scene";
-        }
-
-        if (typeof updateMobileDebugInfo === "function") {
-            updateMobileDebugInfo();
         }
 
         this.updateButtonStates();
@@ -2606,7 +3052,6 @@ class DialogFramework {
     }
 
     jumpToScene(index) {
-        // Stop auto-play on manual scene jumping
         if (this.isAutoPlaying) {
             this.stopAutoPlay();
         }

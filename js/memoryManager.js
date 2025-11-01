@@ -21,7 +21,7 @@ class MemoryManager {
         this.db = null;
         this.dbName = "TCOAALAssets";
         this.dbVersion = 3;
-        this.DATA_VERSION = "1.0.1";
+        this.DATA_VERSION = "1.0.2";
         this.isReady = false;
         this.initPromise = this.initDB();
         this.haveDataStored = false;
@@ -288,6 +288,7 @@ class MemoryManager {
                         isComposition: asset.isComposition || false,
                         compositionId: asset.compositionId || null,
                         compositionDescriptor: asset.compositionDescriptor || null,
+                        compositionSource: asset.compositionSource || "user",
                     };
 
                     if (asset.croppedBlob) {

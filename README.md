@@ -17,14 +17,18 @@ The beginning of the game recreated as animation [here](https://tcoaal.kidev.org
 - **Scene organizer** with drag-and-drop reordering
 - No manual coding required, everything through the UI (but code possible)
 
-### Composition Editor (New!)
+### Composition Editor
 
 - **Layer-based composition system** for creating custom images and animations
-- **Keyframe animation support**:
+- **Visual keyframe animation**:
     - Add multiple keyframes to any layer with independent time and position
     - Animate asset positions over time
     - Convert layers into keyframes of other layers
     - Export as animated GIF with full keyframe support
+- **Audio keyframes**: Add timed sound effects and music to compositions
+    - Multiple audio tracks with independent timing
+    - Adjustable playback speed per keyframe
+    - Timeline-based audio management
 - **Sprite animation**: Import and animate sprite sheets
 - **Mix animations**: Combine sprite animations with keyframe animations
 - **Gallery integration**: Use imported game assets in compositions
@@ -38,7 +42,18 @@ The beginning of the game recreated as animation [here](https://tcoaal.kidev.org
 - **Sound effects** with inline playback controls
 - **Automatic asset handling** that prioritizes uploaded files over URLs
 - **Game asset import**: Import and decrypt assets from game installation folder
-- **Asset gallery**: Browse, preview, crop, and manage imported assets
+- **Persistent storage**: IndexedDB-based storage keeps imported assets between sessions
+
+### Gallery Mode
+
+Access via `?mode=gallery` or through the editor interface:
+
+- **Asset browser**: Organized by categories (backgrounds, characters, UI, sound effects)
+- **Live preview**: Visual and audio previews for all imported assets
+- **Smart cropping**: Automatic alpha-channel trimming for sprites
+- **Sprite sheet extraction**: Extract individual frames from sprite sheets
+- **Export options**: Download cropped assets as PNG or animated GIF
+- **Composition integration**: One-click asset use in composition editor
 
 ### Character System
 
@@ -102,6 +117,7 @@ The beginning of the game recreated as animation [here](https://tcoaal.kidev.org
     - ⟲ Restart: restart the sequence
     - ▶ Play: auto-play sequence _(right-click for settings)_
     - 🗂 Presets: load pre-made demo sequences
+    - ♫ Mute: toggle mute/unmute all audio
     - 📷 Screenshot: capture current frame
     - 🎥 Record: record video _(right-click for settings)_
     - **Save**: quick-save to browser _(right-click to clear)_
@@ -113,17 +129,17 @@ The beginning of the game recreated as animation [here](https://tcoaal.kidev.org
 ### URL Sharing & File Management
 
 - **Share Link button**: Generate shareable URLs with your entire project encoded
-  - Accessible via right-click on Import/Export file buttons
-  - Creates compressed URLs with your entire dialog sequence
-  - Perfect for quick sharing and collaboration
+    - Accessible via right-click on Import/Export file buttons
+    - Creates compressed URLs with your entire dialog sequence
+    - Perfect for quick sharing and collaboration
 - **File Import/Export**: Save and load dialog sequences as `.js` files
-  - **Export file**: Download your current dialog as a JavaScript file
-  - **Import file**: Load a previously saved dialog file
-  - Right-click these buttons to access URL sharing features
+    - **Export file**: Download your current dialog as a JavaScript file
+    - **Import file**: Load a previously saved dialog file
+    - Right-click these buttons to access URL sharing features
 - **Browser Storage**:
-  - **Save button**: Quick-save to browser localStorage (right-click to clear saved data)
-  - Automatically loads saved dialog on page refresh
-  - Independent from file import/export
+    - **Save button**: Quick-save to browser localStorage (right-click to clear saved data)
+    - Automatically loads saved dialog on page refresh
+    - Independent from file import/export
 - **Compression**: Advanced key compression + LZ-string compression for smaller URLs
 - **Automatic loading**: URLs with `?use=` parameter auto-load projects
 - **Perfect for**: Sharing creations, backing up work, version control, collaboration
@@ -184,9 +200,9 @@ php -S localhost:8000
 4. Build scenes using the visual interface
 5. Click **✔ Save** to apply changes
 6. Save your work:
-   - **Save button**: Quick-save to browser (right-click to clear)
-   - **Export file**: Download as `.js` file for permanent backup
-   - **Share URL**: Right-click Import/Export buttons for URL sharing
+    - **Save button**: Quick-save to browser (right-click to clear)
+    - **Export file**: Download as `.js` file for permanent backup
+    - **Share URL**: Right-click Import/Export buttons for URL sharing
 
 ### Method 2: Code Editor
 
@@ -231,6 +247,16 @@ function setupScene() {
 5. Move the layer to different positions for each keyframe
 6. Export as GIF to see the animation
 
+### Adding Audio to Compositions
+
+1. In the gallery, switch to the **Audio** tab
+2. Select a sound effect or music track
+3. Click to add it as an audio keyframe
+4. Adjust the **Time** to set when it plays
+5. Change **Speed** to alter playback rate (0.5x - 2.0x)
+6. Add multiple audio keyframes for complex soundscapes
+7. Use the visibility toggle to mute/unmute the audio track
+
 ### Converting Layers to Keyframes
 
 1. Add multiple layers with different assets
@@ -244,6 +270,7 @@ function setupScene() {
 - **GIF Export**: Exports the full animation (requires local web server)
     - Automatically calculates duration from keyframes
     - Combines sprite animations with keyframe animations
+    - Includes audio keyframes (audio not embedded in GIF)
     - Default ~30fps for smooth playback
 
 ## Visual Editor Guide
@@ -523,7 +550,7 @@ project/
 │   ├── compositionEditor.js # Handle composition of stock assets
 │   ├── dialog.js            # Dialog viewer framework
 │   ├── editor.js            # Visual dialog editor logic
-│   ├── filenameMapper.js    # Map encrypted files to readble names
+│   ├── filenameMapper.js    # Map encrypted files to readable names
 │   ├── galleryManager.js    # Handles gallery display logic
 │   ├── gameImporter.js      # Import game files
 │   ├── interface.js         # UI management
@@ -548,13 +575,13 @@ project/
 
 ### Right-Click Actions
 
-| Button | Right-Click Action |
-| ------ | ------------------ |
-| **Save** | Clear saved dialog from browser storage |
-| **Import file** | Show URL sharing options |
-| **Export file** | Show URL sharing options |
-| **▶ Play** | Configure auto-play settings (delay, typing speed) |
-| **🎥 Record** | Configure video recording settings (FPS, quality) |
+| Button          | Right-Click Action                                 |
+| --------------- | -------------------------------------------------- |
+| **Save**        | Clear saved dialog from browser storage            |
+| **Import file** | Show URL sharing options                           |
+| **Export file** | Show URL sharing options                           |
+| **▶ Play**     | Configure auto-play settings (delay, typing speed) |
+| **🎥 Record**   | Configure video recording settings (FPS, quality)  |
 
 ## Advanced Features
 
@@ -599,6 +626,7 @@ storyData.forEach((scene) => dialogFramework.addScene(scene));
 ### URL Sharing & File Management
 
 **Accessing share features:**
+
 ```javascript
 // In the editor, right-click on "Import file" or "Export file" buttons
 // This reveals the "Share Link" button
@@ -609,6 +637,7 @@ storyData.forEach((scene) => dialogFramework.addScene(scene));
 ```
 
 **File export/import:**
+
 ```javascript
 // Export: Click "Export file" button
 // - Downloads a .js file containing your dialog sequence
@@ -622,6 +651,7 @@ storyData.forEach((scene) => dialogFramework.addScene(scene));
 ```
 
 **Browser storage:**
+
 ```javascript
 // Save: Click "Save" button
 // - Stores dialog in browser localStorage
@@ -705,6 +735,7 @@ dialogFramework.toggleAutoPlay();
 **How to clear saved data**: Right-click on the "Save" button to clear the dialog saved in browser storage
 
 **Lost my work**: Check if you have:
+
 - Saved data in browser (loads automatically on refresh)
 - An exported `.js` file in your downloads folder
 - A shared URL you copied (contains entire project)
@@ -738,9 +769,20 @@ dialogFramework.toggleAutoPlay();
 
 ## Credits
 
-Dialog system and assets inspired by _[The Coffin of Andy and Leyley](https://store.steampowered.com/app/2378900/The_Coffin_of_Andy_and_Leyley/)_ by **Nemlei** / [**Kit9 Studio**](https://store.steampowered.com/search/?developer=Kit9%20Studio)  
+Dialog system and assets inspired by _[The Coffin of Andy and Leyley](https://store.steampowered.com/app/2378900/The_Coffin_of_Andy_and_Leyley/)_ by **Nemlei** / [**Kit9 Studio**](https://store.steampowered.com/search/?developer=Kit9%20Studio)
+
 Some assets, theme and inspiration by **Nemlei**
-Faustina font by Google.  
-[gif.js](https://github.com/jnordberg/gif.js/) by jnordberg.  
-[lz-string](https://github.com/pieroxy/lz-string) by pieroxy  
+
+Faustina font by Google.
+
+[gifenc](https://github.com/mattdesl/gifenc) by mattdesl.
+
+[lz-string](https://github.com/pieroxy/lz-string) by pieroxy
+
+[gifuct-js](https://github.com/matt-way/gifuct-js) by matt-way
+
+[jszip](https://github.com/Stuk/jszip) by Stuk
+
+[html2canvas](https://github.com/niklasvh/html2canvas) by niklasvh
+
 Created by Kidev as a fan tool for the community. The tool requires to own the game to work.

@@ -317,17 +317,6 @@ class GalleryManager {
                             cellHeight,
                         );
 
-                        const imageData = ctx.getImageData(0, 0, cellWidth, cellHeight);
-                        const data = imageData.data;
-                        for (let i = 0; i < data.length; i += 4) {
-                            if (data[i + 3] === 0) {
-                                data[i] = 0; // R
-                                data[i + 1] = 0; // G
-                                data[i + 2] = 0; // B
-                            }
-                        }
-                        ctx.putImageData(imageData, 0, 0);
-
                         extractedSprites.push({
                             canvas: canvas,
                             index: row * cols + col,
@@ -652,7 +641,16 @@ class GalleryManager {
 
         const audio = new Audio(asset.url);
         this.currentAudio = audio;
-        this.currentAudio.preservesPitch = false;
+
+        if (this.currentAudio.preservesPitch !== undefined) {
+            this.currentAudio.preservesPitch = false;
+        }
+        if (this.currentAudio.mozPreservesPitch !== undefined) {
+            this.currentAudio.mozPreservesPitch = false;
+        }
+        if (this.currentAudio.webkitPreservesPitch !== undefined) {
+            this.currentAudio.webkitPreservesPitch = false;
+        }
 
         this._onLoadedMeta = () => {
             if (sessionId !== this._audioSessionId) return;
@@ -676,6 +674,14 @@ class GalleryManager {
 
         const volSlider = document.getElementById("volumeSlider");
         if (volSlider) this.setAudioVolume(volSlider.value);
+
+        const speedSlider = document.getElementById("speedSlider");
+        const pitchSlider = document.getElementById("pitchSlider");
+
+        this.currentAudioSpeed = speedSlider ? parseFloat(speedSlider.value) : 1.0;
+        this.currentAudioPitch = pitchSlider ? parseFloat(pitchSlider.value) : 0;
+
+        this.updateAudioPlaybackRate();
 
         if (window.compositionEditor.autoOpenButtonManager) {
             window.compositionEditor.autoOpenButtonManager.attachTo(
@@ -778,30 +784,54 @@ class GalleryManager {
     }
 
     setAudioSpeed(value) {
-        const speed = parseFloat(value).toFixed(1);
+        const speed = parseFloat(value);
         if (isNaN(speed)) return;
 
-        if (this.currentAudio) {
-            this.currentAudio.playbackRate = speed;
-        }
+        this.currentAudioSpeed = speed;
+
+        this.updateAudioPlaybackRate();
 
         const slider = document.getElementById("speedSlider");
         const label = document.getElementById("speedValue");
-        const pct = Math.round(speed * 100);
 
-        if (slider) slider.title = `${speed}x`;
-        if (label) label.textContent = `Speed: ${speed}x`;
+        if (slider) slider.title = `${speed.toFixed(1)}x`;
+        if (label) label.textContent = `Speed: ${speed.toFixed(1)}x`;
     }
 
     setAudioPitch(value) {
-        const pitch = parseFloat(value).toFixed(1);
-        if (isNaN(pitch)) return;
+        const pitchSemitones = parseFloat(value);
+        if (isNaN(pitchSemitones)) return;
+
+        this.currentAudioPitch = pitchSemitones;
+
+        this.updateAudioPlaybackRate();
 
         const slider = document.getElementById("pitchSlider");
         const label = document.getElementById("pitchValue");
 
-        if (slider) slider.title = `Pitch: ${pitch >= 0 ? "+" : ""}${pitch}`;
-        if (label) label.textContent = `Pitch: ${pitch >= 0 ? "+" : ""}${pitch}`;
+        if (slider) slider.title = `Pitch: ${pitchSemitones >= 0 ? "+" : ""}${pitchSemitones.toFixed(1)}`;
+        if (label) label.textContent = `Pitch: ${pitchSemitones >= 0 ? "+" : ""}${pitchSemitones.toFixed(1)}`;
+    }
+
+    updateAudioPlaybackRate() {
+        if (!this.currentAudio) return;
+
+        const speed = this.currentAudioSpeed || 1.0;
+        const pitchSemitones = this.currentAudioPitch || 0;
+
+        const pitchRatio = Math.pow(2, pitchSemitones / 12);
+
+        this.currentAudio.playbackRate = speed * pitchRatio;
+
+        if (this.currentAudio.preservesPitch !== undefined) {
+            this.currentAudio.preservesPitch = false;
+        }
+        if (this.currentAudio.mozPreservesPitch !== undefined) {
+            this.currentAudio.mozPreservesPitch = false;
+        }
+        if (this.currentAudio.webkitPreservesPitch !== undefined) {
+            this.currentAudio.webkitPreservesPitch = false;
+        }
     }
 
     toggleSpriteSelection(index) {
@@ -840,45 +870,45 @@ class GalleryManager {
         }
 
         const speed = parseInt(document.getElementById("animationSpeed").value) || 100;
-
-        if (typeof GIF === "undefined") {
-            const script = document.createElement("script");
-            script.src = "js/libs/gif.js";
-            script.onload = () => this.createGif(speed);
-            document.head.appendChild(script);
-        } else {
-            this.createGif(speed);
-        }
+        this.createGif(speed);
     }
 
     createGif(speed) {
         const firstSprite = this.extractedSprites[this.selectedSprites[0]];
+        const encoder = gifenc.GIFEncoder();
 
-        const gif = new GIF({
-            workers: 2,
-            quality: 10,
-            width: firstSprite.canvas.width,
-            height: firstSprite.canvas.height,
-            workerScript: "js/libs/gif.worker.js",
-            transparent: 0x000000, // Make black (0,0,0) transparent
-            background: 0x000000,
-        });
+        const width = firstSprite.canvas.width;
+        const height = firstSprite.canvas.height;
 
-        this.selectedSprites.forEach((index) => {
+        const firstFrameData = firstSprite.canvas.getContext("2d").getImageData(0, 0, width, height);
+        const palette = gifenc.quantize(firstFrameData.data, 256, { format: "rgba4444", oneBitAlpha: true });
+
+        this.selectedSprites.forEach((index, frameIndex) => {
             const sprite = this.extractedSprites[index];
-            gif.addFrame(sprite.canvas, { delay: speed, transparent: true });
+            const ctx = sprite.canvas.getContext("2d");
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const indexed = gifenc.applyPalette(imageData.data, palette, "rgba4444");
+
+            encoder.writeFrame(indexed, width, height, {
+                palette,
+                delay: speed,
+                transparent: true,
+                transparentIndex: 0,
+                first: frameIndex === 0,
+            });
         });
 
-        gif.on("finished", (blob) => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `animation_${Date.now()}.gif`;
-            a.click();
-            URL.revokeObjectURL(url);
-        });
+        encoder.finish();
 
-        gif.render();
+        const buffer = encoder.bytes();
+        const blob = new Blob([buffer], { type: "image/gif" });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `animation_${Date.now()}.gif`;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     exportAsPng() {
@@ -1119,6 +1149,14 @@ class GalleryManager {
             return;
         }
 
+        if (asset.isComposition && window.compositionEditor.isOpen && window.compositionEditor.layers.length > 0) {
+            if (!confirm(`The compositor already has layers loaded. Replace them with "${name}"?`)) {
+                return;
+            }
+
+            window.compositionEditor.clearAllLayers(true);
+        }
+
         if (asset.isComposition && asset.compositionDescriptor) {
             for (const layerDesc of asset.compositionDescriptor.layers) {
                 const galleryRef = layerDesc.galleryRef;
@@ -1191,7 +1229,7 @@ class GalleryManager {
 
         this.flashSuccessOnButton();
 
-        if (window.compositionEditor.autoOpen === true) {
+        if (window.compositionEditor.autoOpen === true && !window.compositionEditor.isOpen) {
             window.compositionEditor.open();
         }
     }
@@ -1229,7 +1267,7 @@ class GalleryManager {
         }
 
         const assetData = {
-            name: name + (isAnimated ? " (animated)" : ""),
+            name: name,
             type: "sprite",
             assetRef: `gallery:${category}/${name}`,
             blobUrl: null,
@@ -1259,7 +1297,7 @@ class GalleryManager {
         this.clearSpriteSelection();
         this.flashSuccessOnButton();
 
-        if (window.compositionEditor.autoOpen === true) {
+        if (window.compositionEditor.autoOpen === true && !window.compositionEditor.isOpen) {
             window.compositionEditor.open();
         }
     }
@@ -1283,7 +1321,7 @@ class GalleryManager {
             type: "audio",
             assetRef: `gallery:${category}/${name}`,
             blobUrl: asset.url,
-            // time: undefined - let compositionEditor auto-position it
+
             speed: speed,
             pitch: pitch,
         };
@@ -1297,7 +1335,7 @@ class GalleryManager {
 
         this.flashSuccessOnButton(true);
 
-        if (window.compositionEditor.autoOpen === true) {
+        if (window.compositionEditor.autoOpen === true && !window.compositionEditor.isOpen) {
             window.compositionEditor.open();
         }
     }

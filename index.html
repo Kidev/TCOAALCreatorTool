@@ -27,8 +27,9 @@
         <link href="viewer.css" rel="stylesheet" />
         <link href="editor.css" rel="stylesheet" />
         <script src="js/libs/lz-string.min.js"></script>
-        <script src="js/libs/gif.js"></script>
+        <script src="js/libs/gifenc.min.js"></script>
         <script src="js/libs/html2canvas.min.js" defer></script>
+        <script src="js/libs/gifuct.min.js"></script>
     </head>
     <body>
         <div id="forcedImportOverlay" class="forced-import-overlay" style="display: none">
@@ -51,15 +52,10 @@
                 class="forced-import-content"
                 style="height: 100vh; justify-content: center; margin-top: 0; position: relative"
             >
-                <!--<img alt="Dialog Creator" class="forced-import-logo" src="img/tcoaal-title.webp" />-->
-
                 <button style="font-size: 2vmax" class="composition-btn" onclick="handleForcedImport()">
                     Import Game Assets
                 </button>
-                <!--<p class="forced-import-message">
-                    This tool requires game assets to function.<br />
-                    Please import your game folder to continue.
-                </p>-->
+
                 <p
                     class="forced-import-note"
                     style="
@@ -96,27 +92,6 @@
         </div>
         <div id="galleryModal" class="gallery-modal" style="display: none">
             <div id="galleryModalContent" class="gallery-modal-content">
-                <!--<div
-                    class="gallery-header"
-                    style="
-                        display: flex;
-                        flex-direction: row;
-                        justify-content: space-between;
-                        align-items: center;
-                        padding: 1vmin;
-                        gap: 1vmin;
-                    "
-                >
-                    <div class="h2">Assets Gallery</div>
-                    <div id="croppingProgressIndicatorModal" style="display: none">
-                        <div class="bar" id="croppingProgressBarModal"></div>
-                        <span class="label" id="croppingProgressSpanModal">Cropping...</span>
-                    </div>
-                    <-<button class="tcoaal-button-small composition-editor-open-btn" onclick="openCompositionEditor()" title="Open composition editor to create custom scenes">
-                        🖼 Composition Editor
-                    </button>->
-                    <button class="gallery-close-btn" onclick="closeGallery()">✕</button>
-                </div>-->
                 <div id="galleryMainContainer" class="gallery-main-container">
                     <div class="gallery-left-panel">
                         <div class="gallery-tabs">
@@ -171,9 +146,7 @@
                         >
                             ✔ Save to gallery
                         </button>
-                        <!--<button class="composition-btn danger" onclick="compositionEditor.clearAllLayers()" title="Remove all layers">
-                            Clear All
-                        </button>-->
+
                         <button class="composition-btn danger" onclick="compositionEditor.close()" title="Close editor">
                             Close
                         </button>
@@ -279,6 +252,14 @@
 
                 <button id="presetsButton" class="controller-buttons-viewer" title="Load a preset sequence">🗂</button>
                 <button
+                    id="toggleMuteSequenceButton"
+                    class="controller-buttons-viewer"
+                    onclick="dialogFramework.toggleMuteSequenceButton()"
+                    title="Mute / Unmute sound in the sequence"
+                >
+                    ♫
+                </button>
+                <button
                     id="playSequenceButton"
                     class="controller-buttons-viewer"
                     onclick="dialogFramework.playPauseSequence()"
@@ -304,6 +285,13 @@
                 </button>
                 <div class="controller-buttons-viewer controller-buttons-viewer-select disabled" id="debugInfo">
                     No scene
+                </div>
+                <div
+                    class="controller-buttons-viewer controller-buttons-viewer-select"
+                    id="gifFrameIndicator"
+                    style="display: none"
+                >
+                    GIF: 1/20
                 </div>
                 <button
                     id="nextButton"
@@ -384,22 +372,6 @@
                             Share link
                         </button>
 
-                        <!--<button
-                                class="tcoaal-button-small tcoaal-button-small-header js-save"
-                                onclick="saveSequence()"
-                                title="Save the current dialog to browser storage"
-                        >
-                            Save
-                        </button>
-                        <button
-                                class="tcoaal-button-small tcoaal-button-small-header js-clear danger"
-                                onclick="clearSavedSequence()"
-                                title="Clear saved dialog from browser storage"
-                                style="display: none"
-                                id="clearSavedBtn"
-                        >
-                            Clear Saved
-                        </button>-->
                         <button
                             class="tcoaal-button-small tcoaal-button-small-header js-save"
                             onclick="saveSequence()"
@@ -409,14 +381,6 @@ Right click to erase the saved dialog"
                         >
                             Save
                         </button>
-
-                        <!--<button
-                            class="tcoaal-button-small tcoaal-button-small-header js-upload"
-                            onclick="importFromLink()"
-                            title="Import a dialog from a share link or code"
-                        >
-                            Import Link
-                        </button>-->
                     </div>
                 </div>
                 <div class="editor-zone center">

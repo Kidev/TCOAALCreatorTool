@@ -147,7 +147,7 @@ class GameImporter {
                     });
                     const url = URL.createObjectURL(blob);
 
-                    const baseFileName = fileName.replace(/\.[^/.]+$/, ""); // Remove extension
+                    const baseFileName = fileName.replace(/\.[^/.]+$/, "");
                     const mappedName = this.filenameMap[baseFileName] || fileName;
                     const assetName = mappedName + "." + folderInfo.type;
 
@@ -336,10 +336,12 @@ class GameImporter {
         if (window.pendingCompositions && window.pendingCompositions.length > 0) {
             //console.log(`Processing ${window.pendingCompositions.length} pending compositions after asset import...`);
             const pending = window.pendingCompositions;
+            const pendingSource = window.pendingCompositionsSource || "user";
             window.pendingCompositions = [];
+            window.pendingCompositionsSource = undefined;
 
             if (typeof reconstructCompositionsToGallery === "function") {
-                await reconstructCompositionsToGallery(pending);
+                await reconstructCompositionsToGallery(pending, pendingSource);
             }
         }
     }
@@ -526,20 +528,6 @@ class GameImporter {
             return spriteBlobs[0];
         }
 
-        if (typeof GIF === "undefined") {
-            //console.log("GIF library not loaded, loading dynamically...");
-            await new Promise((resolve, reject) => {
-                const script = document.createElement("script");
-                script.src = "js/libs/gif.js";
-                script.onload = () => {
-                    //console.log("GIF library loaded successfully");
-                    resolve();
-                };
-                script.onerror = () => reject(new Error("Failed to load GIF library"));
-                document.head.appendChild(script);
-            });
-        }
-
         try {
             //console.log("Converting sprite blobs to canvases...");
             const blobUrls = [];
@@ -554,7 +542,9 @@ class GameImporter {
                             const canvas = document.createElement("canvas");
                             canvas.width = img.width;
                             canvas.height = img.height;
-                            const ctx = canvas.getContext("2d");
+                            const ctx = canvas.getContext("2d", { alpha: true });
+
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
                             ctx.drawImage(img, 0, 0);
                             //console.log(`Frame ${index}: ${img.width}x${img.height}`);
                             resolve(canvas);
@@ -572,34 +562,33 @@ class GameImporter {
 
             blobUrls.forEach((url) => URL.revokeObjectURL(url));
 
-            //console.log("Starting GIF rendering...");
-            const gifBlob = await new Promise((resolve, reject) => {
-                const gif = new GIF({
-                    workers: 2,
-                    quality: 10,
-                    workerScript: "js/libs/gif.worker.js",
-                    transparent: 0x00000000,
-                    width: canvases[0].width,
-                    height: canvases[0].height,
-                });
+            //console.log("Starting GIF encoding with gifenc...");
+            const encoder = gifenc.GIFEncoder();
+            const width = canvases[0].width;
+            const height = canvases[0].height;
 
-                canvases.forEach((canvas, index) => {
-                    //console.log(`Adding frame ${index} to GIF`);
-                    gif.addFrame(canvas, { delay: delay, copy: true });
-                });
+            const firstFrameData = canvases[0].getContext("2d").getImageData(0, 0, width, height);
+            const palette = gifenc.quantize(firstFrameData.data, 256, { format: "rgba4444", oneBitAlpha: true });
 
-                gif.on("finished", (blob) => {
-                    //console.log(`GIF rendering finished! Blob size: ${blob.size} bytes, type: ${blob.type}`);
-                    resolve(blob);
-                });
+            canvases.forEach((canvas, index) => {
+                const ctx = canvas.getContext("2d");
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const indexed = gifenc.applyPalette(imageData.data, palette, "rgba4444");
 
-                gif.on("error", (error) => {
-                    console.error("GIF rendering error:", error);
-                    reject(error);
+                encoder.writeFrame(indexed, width, height, {
+                    palette,
+                    delay,
+                    transparent: true,
+                    transparentIndex: 0,
+                    first: index === 0,
                 });
-
-                gif.render();
             });
+
+            encoder.finish();
+
+            const buffer = encoder.bytes();
+            const gifBlob = new Blob([buffer], { type: "image/gif" });
+            //console.log(`GIF encoding finished! Blob size: ${gifBlob.size} bytes`);
 
             return gifBlob;
         } catch (error) {

@@ -222,7 +222,7 @@ function openCompositionEditor() {
 
 window.pendingCompositions = window.pendingCompositions || [];
 
-async function reconstructCompositionsToGallery(compositions) {
+async function reconstructCompositionsToGallery(compositions, source = "user") {
     if (!compositions || compositions.length === 0) {
         return;
     }
@@ -230,6 +230,7 @@ async function reconstructCompositionsToGallery(compositions) {
     if (!window.gameImporterAssets || Object.keys(window.gameImporterAssets.images || {}).length === 0) {
         console.warn("Game assets not loaded yet. Queueing compositions for later reconstruction...");
         window.pendingCompositions = compositions;
+        window.pendingCompositionsSource = source;
         return;
     }
 
@@ -237,7 +238,12 @@ async function reconstructCompositionsToGallery(compositions) {
         window.gameImporterAssets.images["Misc"] = {};
     }
 
-    //console.log(`Reconstructing ${compositions.length} compositions...`);
+    //console.log(`Reconstructing ${compositions.length} compositions with source="${source}"...`);
+
+    const totalCompositions = compositions.length;
+    let processedCount = 0;
+    showLoadingIndicator("Building compositions");
+    updateLoadingProgress(`Processing composition 0 of ${totalCompositions}`);
 
     for (const descriptor of compositions) {
         try {
@@ -247,8 +253,12 @@ async function reconstructCompositionsToGallery(compositions) {
 
             if (window.gameImporterAssets.images["Misc"][existingFileName]) {
                 //console.log(`Composition "${descriptor.name}" already exists, skipping...`);
+                processedCount++;
+                updateLoadingProgress(`Processing composition ${processedCount} of ${totalCompositions}`);
                 continue;
             }
+
+            updateLoadingProgress(`Building "${descriptor.name}" (${processedCount + 1} of ${totalCompositions})`);
 
             const blob = await CompositionEditor.reconstructComposition(descriptor);
 
@@ -262,6 +272,7 @@ async function reconstructCompositionsToGallery(compositions) {
                     isComposition: true,
                     compositionId: descriptor.id,
                     compositionDescriptor: descriptor,
+                    compositionSource: source,
                     isAnimated: hasKeyframes,
                 };
 
@@ -277,6 +288,7 @@ async function reconstructCompositionsToGallery(compositions) {
                             isComposition: true,
                             compositionId: descriptor.id,
                             compositionDescriptor: descriptor,
+                            compositionSource: source,
                         };
 
                         await window.memoryManager.savePartialAsset(assetData, "compositions", "Misc", "images");
@@ -290,20 +302,25 @@ async function reconstructCompositionsToGallery(compositions) {
                 }
 
                 //console.log(`Reconstructed composition: "${descriptor.name}"`);
+                processedCount++;
             } else {
                 console.warn(`Failed to reconstruct composition: "${descriptor.name}"`);
+                processedCount++;
             }
         } catch (error) {
             console.error(`Error reconstructing composition "${descriptor.name}":`, error);
+            processedCount++;
         }
     }
+
+    hideLoadingIndicator();
 
     if (typeof updateGalleryCategories === "function") {
         updateGalleryCategories();
     }
 }
 
-function extractCompositionDescriptorsFromGallery() {
+function extractCompositionDescriptorsFromGallery(includePresets = false) {
     if (!window.gameImporterAssets || !window.gameImporterAssets.images["Misc"]) {
         return [];
     }
@@ -316,6 +333,11 @@ function extractCompositionDescriptorsFromGallery() {
         const isCompositionByPath = asset.originalPath === "compositions";
 
         if (isCompositionByFlag) {
+            if (!includePresets && asset.compositionSource === "preset") {
+                //console.log(`Skipping preset composition: "${asset.compositionDescriptor.name}"`);
+                continue;
+            }
+
             descriptors.push(asset.compositionDescriptor);
             //console.log(`Extracted composition descriptor: "${asset.compositionDescriptor.name}"`);
         } else if (isCompositionByPath && !asset.compositionDescriptor) {
@@ -330,7 +352,7 @@ async function runSequence() {
     window.lastProjectData = JSON.parse(JSON.stringify(projectData));
 
     dialogFramework.reset();
-    dialogFramework.scenes = [];
+    dialogFramework.clearScenes();
 
     dialogFramework.setConfig(projectData.config);
     dialogFramework.setCharacters(projectData.characters);
@@ -416,10 +438,6 @@ async function runSequence() {
     hideLoadingIndicator();
 
     closeEditor();
-
-    updateMobileControlsDebugVisibility();
-    updateMobileButtonStates();
-    updateMobileDebugInfo();
 }
 
 // Key mapping for compression (long key -> short key)
@@ -473,7 +491,7 @@ const KEY_MAP = {
     "demonSpeaker": "w",
     "bustLeft": "x",
     "bustRight": "y",
-    "bustFade": "z",
+    "portraitsTimings": "z",
     "shake": "A",
     "shakeDelay": "B",
     "shakeIntensity": "C",
@@ -599,6 +617,11 @@ function encodeSequenceToURL(projectData) {
 }
 
 function decodeSequenceFromURL(encodedString) {
+    const preset = shortPresets.find((p) => p.name === encodedString);
+    if (preset) {
+        encodedString = preset.value;
+    }
+
     try {
         let decompressed = LZString.decompressFromEncodedURIComponent(encodedString);
 
@@ -706,20 +729,10 @@ function showGalleryAssetsModal(mode = "viewer") {
         const cancelButton = document.createElement("button");
         cancelButton.textContent = "Continue without assets";
         cancelButton.className = "tcoaal-button-menu";
-        // cancelButton.style.cssText = `
-        //     padding: 0.5rem 1rem;
-        //     cursor: pointer;
-        //     font-size: 1vmax;
-        // `;
 
         const importButton = document.createElement("button");
         importButton.textContent = "Import game assets";
         importButton.className = "tcoaal-button-menu success";
-        // importButton.style.cssText = `
-        //     padding: 0.5rem 1rem;
-        //     font-size: 1vmax;
-        //     cursor: pointer;
-        // `;
 
         const closeModal = (shouldImport) => {
             modal.remove();
@@ -916,6 +929,7 @@ function loadSavedSequence() {
             }
         } catch (execError) {
             console.error("Error executing saved sequence:", execError);
+            //console.log(savedCode);
             return false;
         }
 
@@ -928,16 +942,12 @@ function loadSavedSequence() {
 
         loadProjectData(parsedData);
 
-        // Reconstruct compositions if present
         if (parsedData.compositions && parsedData.compositions.length > 0) {
             reconstructCompositionsToGallery(parsedData.compositions);
         }
 
-        //setTimeout(() => {
         updateScenesList();
-        //}, 100);
 
-        //console.log("Loaded saved sequence from localStorage");
         return true;
     } catch (error) {
         console.error("Error loading saved sequence:", error);
@@ -955,8 +965,6 @@ function clearSavedSequence() {
 }
 
 async function importFromLink() {
-    //await preloadSavedDataAssets();
-
     const input = prompt(
         "Paste a share link or code:\n\n" +
             "You can paste either:\n" +
@@ -1075,6 +1083,19 @@ function importSequence() {
             }
 
             const hasGalleryRefs = text.includes("gallery:");
+
+            if (hasGalleryRefs && !window.gameImporterAssets && window.memoryManager) {
+                try {
+                    const storageState = await window.memoryManager.getStorageState();
+                    if (storageState !== "none") {
+                        const savedAssets = await window.memoryManager.loadSavedAssets();
+                        window.gameImporterAssets = savedAssets;
+                    }
+                } catch (error) {
+                    console.warn("Failed to load saved assets from IndexedDB:", error);
+                }
+            }
+
             const hasGameAssets =
                 window.gameImporterAssets &&
                 (Object.keys(window.gameImporterAssets.images || {}).length > 0 ||
@@ -1112,14 +1133,11 @@ function importSequence() {
 
             loadProjectData(parsedData);
 
-            // Reconstruct compositions if present
             if (parsedData.compositions && parsedData.compositions.length > 0) {
                 await reconstructCompositionsToGallery(parsedData.compositions);
             }
 
-            //setTimeout(() => {
             updateScenesList();
-            //}, 100);
 
             alert("Sequence imported successfully!");
         } catch (error) {
@@ -1215,30 +1233,44 @@ function parseSequenceFile(code) {
                 speaker: scene.speaker || "",
                 line1: scene.line1 || "",
                 line2: scene.line2 || "",
-                dialogFadeInTime: scene.dialogFadeInTime !== undefined ? scene.dialogFadeInTime : 200,
-                dialogFadeOutTime: scene.dialogFadeOutTime !== undefined ? scene.dialogFadeOutTime : 200,
-                imageFadeInTime: scene.imageFadeInTime !== undefined ? scene.imageFadeInTime : 200,
-                imageFadeOutTime: scene.imageFadeOutTime !== undefined ? scene.imageFadeOutTime : 200,
-                dialogDelayIn: scene.dialogDelayIn !== undefined ? scene.dialogDelayIn : 500,
+                dialogFadeInTime: scene.dialogFadeInTime !== undefined ? scene.dialogFadeInTime : 0,
+                dialogFadeOutTime: scene.dialogFadeOutTime !== undefined ? scene.dialogFadeOutTime : 0,
+                imageFadeInTime: scene.imageFadeInTime !== undefined ? scene.imageFadeInTime : 0,
+                imageFadeOutTime: scene.imageFadeOutTime !== undefined ? scene.imageFadeOutTime : 0,
+                dialogDelayIn: scene.dialogDelayIn !== undefined ? scene.dialogDelayIn : 0,
                 dialogDelayOut: scene.dialogDelayOut !== undefined ? scene.dialogDelayOut : 0,
                 imageDelayIn: scene.imageDelayIn !== undefined ? scene.imageDelayIn : 0,
                 imageDelayOut: scene.imageDelayOut !== undefined ? scene.imageDelayOut : 0,
                 sound: scene.sound === undefined ? null : scene.sound,
                 soundVolume: scene.soundVolume !== undefined ? scene.soundVolume : 1.0,
                 soundDelay: scene.soundDelay !== undefined ? scene.soundDelay : 0,
+                soundPitch: scene.soundPitch !== undefined ? scene.soundPitch : 1.0,
+                soundSpeed: scene.soundSpeed !== undefined ? scene.soundSpeed : 1.0,
                 backgroundMusic: scene.backgroundMusic === undefined ? null : scene.backgroundMusic,
                 backgroundMusicVolume: scene.backgroundMusicVolume !== undefined ? scene.backgroundMusicVolume : 1.0,
+                backgroundMusicPitch: scene.backgroundMusicPitch !== undefined ? scene.backgroundMusicPitch : 1.0,
+                backgroundMusicSpeed: scene.backgroundMusicSpeed !== undefined ? scene.backgroundMusicSpeed : 1.0,
                 censorSpeaker: scene.censorSpeaker || false,
                 demonSpeaker: scene.demonSpeaker || false,
                 bustLeft: scene.bustLeft === undefined ? null : scene.bustLeft,
                 bustRight: scene.bustRight === undefined ? null : scene.bustRight,
-                bustFade: scene.bustFade !== undefined ? scene.bustFade : 0,
-                shake: scene.shake || false,
+                portraitsTimings:
+                    scene.portraitsTimings ||
+                    (scene.bustFade !== undefined
+                        ? [
+                              [scene.bustFade, scene.bustFade, 0, 0],
+                              [scene.bustFade, scene.bustFade, 0, 0],
+                          ]
+                        : [
+                              [0, 0, 0, 0],
+                              [0, 0, 0, 0],
+                          ]),
+                shake: scene.shake || null,
                 shakeDelay: scene.shakeDelay !== undefined ? scene.shakeDelay : 0,
                 shakeIntensity: scene.shakeIntensity !== undefined ? scene.shakeIntensity : 1,
                 shakeDuration: scene.shakeDuration !== undefined ? scene.shakeDuration : 500,
                 choices: scene.choices === undefined ? null : scene.choices,
-                choicesList: scene.choicesList || null,
+                choicesList: scene.choicesList || [],
                 correctChoice: scene.correctChoice !== undefined ? scene.correctChoice : 0,
                 choiceSpeed: scene.choiceSpeed !== undefined ? scene.choiceSpeed : 500,
             };
@@ -1259,8 +1291,11 @@ function createLoadingIndicator() {
         loadingDiv.id = "loadingIndicator";
         loadingDiv.className = "loading-indicator";
         loadingDiv.innerHTML = `
-            <div class="loading-spinner"></div>
-            <span id="loadingText">Preloading assets</span>`;
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">Preloading assets</div>
+                <div class="loading-progress" id="loadingProgress"></div>
+            </div>`;
         document.body.appendChild(loadingDiv);
     }
 }
@@ -1281,126 +1316,91 @@ function hideLoadingIndicator() {
     }
 }
 
-function createMobileControls() {
-    if (window.innerWidth > 768 && window.innerHeight > 600) {
-        return;
-    }
-
-    const existing = document.getElementById("mobileControls");
-    if (existing) {
-        existing.remove();
-    }
-
-    const mobileControls = document.createElement("div");
-    mobileControls.id = "mobileControls";
-    mobileControls.className = "mobile-controls-container";
-
-    mobileControls.innerHTML = `
-    <div class="mobile-controls-wrapper">
-        <div class="mobile-controls-ribbon" id="mobileRibbon">
-            <div class="mobile-controls-content" onclick="event.stopPropagation()">
-                <div class="mobile-controls-grid">
-                    <button onclick="event.stopPropagation(); openEditor()" class="mobile-editor-btn">Editor</button>
-                </div>
-                <div class="mobile-nav-controls">
-                    <button onclick="event.stopPropagation(); dialogFramework.previous()" id="mobilePrevButton">⬅</button>
-                    <button onclick="event.stopPropagation(); dialogFramework.next()" id="mobileNextButton">➡</button>
-                    <button onclick="event.stopPropagation(); dialogFramework.reset()" id="mobileResetButton">⟲</button>
-                </div>
-                <div class="mobile-debug-info" id="mobileDebugInfo">
-                    <div class="mobile-scene-counter" id="mobileSceneCounter">Scene: 0 / 0</div>
-                    <a href="https://github.com/Kidev/TCOAALCreatorTool" target="_blank" rel="noopener" class="mobile-github-link" onclick="event.stopPropagation()">
-                        <svg class="github-icon" viewBox="0 0 24 24">
-                            <path d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z"/>
-                        </svg>
-                        <span>View on GitHub</span>
-                    </a>
-                </div>
-            </div>
-            <button class="mobile-controls-tab" id="controls-tab-menu-drop" onclick="event.stopPropagation(); toggleMobileControls()">Controls</button>
-        </div>
-    </div>`;
-
-    document.body.appendChild(mobileControls);
-
-    updateMobileControlsDebugVisibility();
-    updateMobileButtonStates();
-}
-
-function toggleMobileControls() {
-    const ribbon = document.getElementById("mobileRibbon");
-    if (ribbon) {
-        ribbon.classList.toggle("expanded");
-    }
-    event.stopPropagation();
-}
-
-function updateMobileButtonStates() {
-    const prevButton = document.getElementById("mobilePrevButton");
-    const nextButton = document.getElementById("mobileNextButton");
-    const resetButton = document.getElementById("mobileResetButton");
-
-    if (!prevButton || !nextButton || !resetButton) return;
-
-    if (typeof dialogFramework === "undefined") return;
-
-    prevButton.disabled = false;
-    nextButton.disabled = false;
-    resetButton.disabled = false;
-
-    if (dialogFramework.currentScene < 0) {
-        prevButton.disabled = true;
-        resetButton.disabled = true;
-    } else if (dialogFramework.currentScene === 0) {
-        prevButton.disabled = true;
-    }
-
-    if (dialogFramework.currentScene >= dialogFramework.scenes.length) {
-        nextButton.disabled = true;
+function updateLoadingProgress(text) {
+    const progressElement = document.getElementById("loadingProgress");
+    if (progressElement) {
+        progressElement.innerHTML = text || "";
     }
 }
 
-function updateMobileDebugInfo() {
-    const sceneCounter = document.getElementById("mobileSceneCounter");
-    if (!sceneCounter) return;
+let menuDialogTypingActive = false;
 
-    if (typeof dialogFramework === "undefined") return;
+async function typeMenuDialogText(element, text, speed = 20) {
+    if (!text || !element) return;
 
-    if (dialogFramework.currentScene >= dialogFramework.scenes.length) {
-        sceneCounter.textContent = "End";
-    } else {
-        sceneCounter.textContent = `Scene: ${dialogFramework.currentScene + 1} / ${dialogFramework.scenes.length}`;
+    element.innerHTML = "";
+
+    const chars = [];
+    for (let i = 0; i < text.length; i++) {
+        const span = document.createElement("span");
+        span.className = "typing-char";
+        span.textContent = text[i] === " " ? "\u00A0" : text[i];
+        span.style.opacity = "0";
+        element.appendChild(span);
+        chars.push(span);
+    }
+
+    for (let i = 0; i < chars.length; i++) {
+        if (!menuDialogTypingActive) {
+            for (let j = i; j < chars.length; j++) {
+                chars[j].style.opacity = "1";
+            }
+            break;
+        }
+        chars[i].style.opacity = "1";
+        await new Promise((resolve) => setTimeout(resolve, speed));
     }
 }
 
-function updateMobileControlsDebugVisibility() {
-    const debugInfo = document.getElementById("mobileDebugInfo");
-    if (!debugInfo) return;
+async function animateMenuDialog(dialogBox) {
+    if (!dialogBox) return;
 
-    if (typeof dialogFramework === "undefined" || !dialogFramework || !dialogFramework.config) {
-        debugInfo.style.display = "none";
-        return;
+    menuDialogTypingActive = true;
+
+    const arrow = dialogBox.querySelector(".dialogArrow-fake-class");
+    if (arrow) {
+        arrow.style.opacity = "0";
     }
 
-    const showDebug = dialogFramework.config && dialogFramework.config.showDebug;
-    debugInfo.style.display = showDebug ? "flex" : "none";
-}
+    const textLines = dialogBox.querySelectorAll(".text-line");
 
-function autoCollapseMobileControls() {
-    const ribbon = document.getElementById("mobileRibbon");
-    if (ribbon && ribbon.classList.contains("expanded")) {
-        setTimeout(() => {
-            ribbon.classList.remove("expanded");
-        }, 300);
+    const lineData = [];
+    for (const line of textLines) {
+        const originalHTML = line.innerHTML;
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = originalHTML;
+        const textContent = tempDiv.textContent || tempDiv.innerText;
+
+        lineData.push({ element: line, originalHTML, textContent });
+
+        line.innerHTML = "";
+        line.style.opacity = "1";
     }
+
+    for (const data of lineData) {
+        await typeMenuDialogText(data.element, data.textContent, 20);
+
+        data.element.innerHTML = data.originalHTML;
+    }
+
+    if (arrow) {
+        arrow.style.opacity = "1";
+    }
+
+    menuDialogTypingActive = false;
 }
 
 function toggleVisSpeakerMenu() {
     const ashleyDiv = document.getElementById("dialog-content-box");
     const andrewDiv = document.getElementById("dialog-content-box2");
     if (ashleyDiv && andrewDiv) {
+        menuDialogTypingActive = false;
+
         ashleyDiv.classList.toggle("not-shown-now");
         andrewDiv.classList.toggle("not-shown-now");
+
+        const visibleDialog = ashleyDiv.classList.contains("not-shown-now") ? andrewDiv : ashleyDiv;
+        animateMenuDialog(visibleDialog);
     }
 }
 
@@ -1415,7 +1415,6 @@ function setupGalleryOnlyMode() {
         controls.style.display = "none";
     }
 
-    // Hide capture and preset buttons in gallery mode
     const screenshotBtn = document.getElementById("screenshotButton");
     const recordBtn = document.getElementById("recordButton");
     const presetsBtn = document.getElementById("presetsButton");
@@ -1456,8 +1455,8 @@ function setupGalleryOnlyMode() {
             </div>
             <div class="editor-container">
                 <div id="galleryInitialPrompt" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                    <div id="menu-buttons" style="width:35vmax;height:10vmax;font-size: 2vmax;position:fixed;left:50%;top:60%;transform:translate(-50%,-60%);">
-                    <button id="button-open-gallery-mode" class="tcoaal-button" title="Browse easily through the game assets and create your own scenes" onclick="handleGalleryOnlyImport()" style="width:35vmax;">
+                    <div id="menu-buttons" class="main-menu-container">
+                    <button id="button-open-gallery-mode" style="width:100%;" class="tcoaal-button" title="Browse easily through the game assets and create your own scenes" onclick="handleGalleryOnlyImport()" ">
                         Assets explorer
                     </button>
                     <div style="display:flex; flex-direction: row;">
@@ -1468,6 +1467,14 @@ function setupGalleryOnlyMode() {
                         Dialog viewer
                         </button>
                     </div>
+                    <button
+                        id="playGameButton"
+                        class="play-game-btn tcoaal-button disabled"
+                        title="Work in progress: can Ashley get her brother back from the claws of demons?"
+                        style="width:35vmax;margin-top:0.5vmax;opacity:0.5;cursor:default;"
+                    >
+                        Play 'Tar Souls'
+                    </button>
                     <button
                         id="clearSavedDataBtn"
                         class="clear-data-btn tcoaal-button"
@@ -1481,15 +1488,15 @@ function setupGalleryOnlyMode() {
                     <div onclick="toggleVisSpeakerMenu()" id="dialog-container-box" class="dialog-container active" style="cursor: context-menu; margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
                         <div id="dialog-content-box" class="dialog-content not-shown-now">
                             <div class="dialog-line speaker-line">Ashley</div>
-                            <div class="dialog-line text-line" style="top:34%;color:${Color.PURPLE}">"Well? Well?? What do you think??</div>
-                            <div class="dialog-line text-line" style="top:54%;color:${Color.PURPLE}">Listen to&nbsp;<a target="_blank" rel="noopener" style="color:${Color.PURPLE};" href="https://www.youtube.com/watch?v=DDdyCHu3Qe4&list=PL8FwCzf2tokHnEYuMvpWuQqQpdNBE7e-k" >our songs on YouTube</a>!!"</div>
-                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}">
+                            <div class="dialog-line text-line menu-dialog-text" style="top:34%;color:${Color.PURPLE}">"Well?&nbsp;Well??&nbsp;What&nbsp;do&nbsp;you&nbsp;think??</div>
+                            <div class="dialog-line text-line menu-dialog-text" style="top:54%;color:${Color.PURPLE}">Listen&nbsp;to&nbsp;our&nbsp;songs&nbsp;on&nbsp;<a target="_blank" rel="noopener" style="color:${Color.PURPLE};" href="https://www.youtube.com/watch?v=DDdyCHu3Qe4&list=PL8FwCzf2tokHnEYuMvpWuQqQpdNBE7e-k" >YouTube</a>!!"</div>
+                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}" style="opacity: 0; transition: opacity 0.3s ease;">
                         </div>
                         <div id="dialog-content-box2" class="dialog-content">
                             <div class="dialog-line speaker-line">Kidev</div>
-                            <div class="dialog-line text-line" style="top:34%;color:${Color.GREY_BLUE}">"Need help using my tool?</div>
-                            <div class="dialog-line text-line" style="top:54%;color:${Color.GREY_BLUE}">I made a&nbsp; <a target="_blank" rel="noopener" style="color:${Color.GREY_BLUE};" title="work in progress" href="" >tutorial video</a>&nbsp;for you!"</div>
-                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}">
+                            <div class="dialog-line text-line menu-dialog-text" style="top:34%;color:${Color.GREY_BLUE};opacity:0;">"Need&nbsp;help&nbsp;using&nbsp;my&nbsp;tool?</div>
+                            <div class="dialog-line text-line menu-dialog-text" style="top:54%;color:${Color.GREY_BLUE};opacity:0;">I&nbsp;made&nbsp;a&nbsp;tutorial&nbsp;<a target="_blank" rel="noopener" style="color:${Color.GREY_BLUE};" title="work in progress" href="" >video</a>&nbsp;for&nbsp;you!"</div>
+                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}" style="opacity: 0; transition: opacity 0.3s ease;">
                         </div>
                     </div>
                     <img src="${window.uiAssets?.menuPortraitLeft?.url}" class="bust-image left">
@@ -1690,6 +1697,13 @@ function setupGalleryOnlyMode() {
         iFrame.classList.remove("show");
     }, 10000);*/
 
+    setTimeout(() => {
+        const initialDialog = document.getElementById("dialog-content-box2");
+        if (initialDialog && !initialDialog.classList.contains("not-shown-now")) {
+            animateMenuDialog(initialDialog);
+        }
+    }, 100);
+
     setTimeout(toggleVisSpeakerMenu, 10000);
 
     const downloadButton = document.getElementById("download-all-button");
@@ -1793,8 +1807,6 @@ async function handleGalleryOnlyImport() {
                 editorOverlay.classList.add("importing");
                 editorOverlay.classList.remove("initial");
             }
-            //document.getElementById("popup-buy-frame").style.display = "none";
-            //document.getElementById("popup-buy-frame").style.zindex = "-1";
 
             document.getElementById("github-logo-icon").style.display = "none";
             document.getElementById("github-logo-icon").style.zindex = "-1";
@@ -1898,7 +1910,7 @@ function updateStickyPositions() {
     const header = document.getElementById("editorHeader");
     const dialogBox = document.getElementById("dialog-content-box");
     const forcedImportOverlay = document.getElementById("forcedImportOverlay");
-    //const iFrame = document.getElementById("popup-buy-frame");
+
     const iFrame2 = document.getElementById("steam-buy-frame");
     if (header) {
         const headerHeight = header.offsetHeight;
@@ -2108,6 +2120,15 @@ document.addEventListener("DOMContentLoaded", async function () {
                     }
                 }
 
+                if (mode === null || mode === undefined) {
+                    mode = "viewer";
+                }
+
+                if (decodedData.compositions && decodedData.compositions.length > 0) {
+                    const compositionSource = mode === "viewer" || mode === "gallery" ? "preset" : "user";
+                    await reconstructCompositionsToGallery(decodedData.compositions, compositionSource);
+                }
+
                 dialogFramework.setConfig(decodedData.config);
                 dialogFramework.setCharacters(decodedData.characters);
                 dialogFramework.setGlitchConfig(decodedData.glitchConfig);
@@ -2116,14 +2137,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                     const processedScene = processSceneWithGalleryReferences(scene);
                     dialogFramework.addScene(processedScene);
                 });
-
-                if (decodedData.compositions && decodedData.compositions.length > 0) {
-                    await reconstructCompositionsToGallery(decodedData.compositions);
-                }
-
-                if (mode === null || mode === undefined) {
-                    mode = "viewer";
-                }
 
                 if (mode === "editor") {
                     window.lastProjectData = decodedData;
@@ -2145,7 +2158,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (mode === "gallery") {
         setupGalleryOnlyMode();
     } else if (mode === "editor") {
-        createMobileControls();
         enhanceGameActions();
 
         const loadedSaved = useParam ? false : loadSavedSequence();
@@ -2162,18 +2174,15 @@ document.addEventListener("DOMContentLoaded", async function () {
             clearBtn.style.display = "inline-block";
         }
 
-        //setTimeout(() => {
         openEditor();
-        //}, 100);
     } else {
-        createMobileControls();
         enhanceGameActions();
 
         if (!useParam && typeof setupScene === "function") {
             setupScene();
 
             showLoadingIndicator("Preloading assets");
-            //console.log("Initializing and preloading assets...");
+
             await dialogFramework.preloadAssets();
             hideLoadingIndicator();
             //console.log("Ready to play!");
@@ -2190,16 +2199,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
     }
 
-    if (mode !== "gallery") {
-        updateMobileControlsDebugVisibility();
-        updateMobileButtonStates();
-        updateMobileDebugInfo();
-    }
-
     await checkSavedDataOnLoad();
-
-    // DO NOT preload assets here it will trigger cropping
-    // Assets are loaded on-demand when gallery is opened (openGallery() calls preloadSavedDataAssets())
 
     if (window.compositionRecontructedCount > 0) {
         const newUrl = new URL(window.location);
@@ -2239,7 +2239,7 @@ function handleGalleryKeydown(e) {
     // LEFT / RIGHT: move in list
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        //idx = idx < 0 ? 0 : idx;
+
         const nextIdx =
             e.key === "ArrowRight"
                 ? (idx + 1) % activeItems.length
@@ -2304,7 +2304,6 @@ function handleGalleryKeydown(e) {
                 const total = galleryManager.extractedSprites.length;
                 let nextIndex;
                 if (galleryManager.selectedSprites.length === 0) {
-                    // No sprite selected: pick first or last
                     nextIndex = e.key === "ArrowDown" ? 0 : total - 1;
                 } else {
                     const selected = galleryManager.selectedSprites[0];
@@ -2351,7 +2350,6 @@ async function clearSavedData() {
         ) {
             await window.memoryManager.clearAllData();
 
-            // Hide the button
             const clearBtn = document.getElementById("clearSavedDataBtn");
             if (clearBtn) {
                 clearBtn.style.display = "none";
@@ -2397,8 +2395,6 @@ async function loadGalleryFromSavedData(storageState) {
         if (fill) fill.style.width = "50%";
         if (text) text.textContent = "Setting up gallery...";
 
-        //document.getElementById("popup-buy-frame")?.style.display = "none";
-        //document.getElementById("popup-buy-frame")?.style.zindex = "-1";
         document.getElementById("github-logo-icon").style.display = "none";
         document.getElementById("github-logo-icon").style.zindex = "-1";
 
@@ -2462,11 +2458,11 @@ async function loadGalleryFromSavedData(storageState) {
         if (window.pendingCompositions && window.pendingCompositions.length > 0) {
             //console.log(`Processing ${window.pendingCompositions.length} pending compositions...`);
             const pending = window.pendingCompositions;
+            const pendingSource = window.pendingCompositionsSource || "user";
             window.pendingCompositions = [];
-            await reconstructCompositionsToGallery(pending);
+            window.pendingCompositionsSource = undefined;
+            await reconstructCompositionsToGallery(pending, pendingSource);
         }
-
-        //await handleSmartLoading(storageState, savedAssets);
     } catch (error) {
         console.error("Failed to load gallery from saved data:", error);
 
@@ -2485,12 +2481,12 @@ async function handleSmartLoading(storageState, savedAssets) {
 
     try {
         if (storageState === "partial" || storageState === "base") {
-            //const assetsNeedingCrop = await window.memoryManager.getAssetsNeedingCrop();
-            //await window.galleryManager.enqueueBatch(assetsNeedingCrop);
+            
+            
         } else if (storageState === "complete") {
             updateLoadingBar();
         } else if (storageState === "none") {
-            //console.log("No data stored");
+            
             updateLoadingBar();
         }
     } catch (error) {
@@ -2505,25 +2501,19 @@ function enhanceGameActions() {
 
     dialogFramework.next = function () {
         const result = originalNext.call(this);
-        autoCollapseMobileControls();
-        updateMobileButtonStates();
-        updateMobileDebugInfo();
+
         return result;
     };
 
     dialogFramework.previous = function () {
         const result = originalPrevious.call(this);
-        autoCollapseMobileControls();
-        updateMobileButtonStates();
-        updateMobileDebugInfo();
+
         return result;
     };
 
     dialogFramework.reset = function () {
         const result = originalReset.call(this);
-        autoCollapseMobileControls();
-        updateMobileButtonStates();
-        updateMobileDebugInfo();
+
         return result;
     };
 }
