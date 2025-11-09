@@ -184,6 +184,7 @@ class DialogFramework {
             typeSpeed: 20,
         };
         this.typingTimeout = null;
+        this.typingCompletedForScene = -1;
         this.currentBackgroundImage = null;
         this.currentBustLeft = null;
         this.currentBustRight = null;
@@ -1070,6 +1071,10 @@ class DialogFramework {
         this.sceneVersion++;
         const currentVersion = this.sceneVersion;
 
+        if (this.currentScene !== index) {
+            this.typingCompletedForScene = -1;
+        }
+
         const scene = this.scenes[index];
         const previousScene = index > 0 ? this.scenes[index - 1] : null;
 
@@ -1243,7 +1248,12 @@ class DialogFramework {
                         }
                     }
                 } else {
-                    // Show choices even when there's no dialog
+                    this.typingCompletedForScene = this.currentScene;
+                    document.dispatchEvent(
+                        new CustomEvent("typingComplete", {
+                            detail: { sceneIndex: this.currentScene },
+                        }),
+                    );
                     this.displayChoicesIfPresent();
                 }
             }, totalDialogDelay);
@@ -1263,8 +1273,13 @@ class DialogFramework {
                         dialogContainer.classList.add("active");
                     }
                 } else {
+                    this.typingCompletedForScene = this.currentScene;
+                    document.dispatchEvent(
+                        new CustomEvent("typingComplete", {
+                            detail: { sceneIndex: this.currentScene },
+                        }),
+                    );
                     this.hideDialog();
-                    // Show choices even when there's no dialog
                     this.displayChoicesIfPresent();
                 }
             }, scene.dialogDelayIn || 0);
@@ -2100,6 +2115,23 @@ class DialogFramework {
     }
 
     async typeDialogLines(textLine1Element, textLine2Element, line1, line2) {
+        const hasDialog = (line1 && line1.trim() !== "") || (line2 && line2.trim() !== "");
+
+        if (!hasDialog) {
+            this.typingCompletedForScene = this.currentScene;
+            document.dispatchEvent(
+                new CustomEvent("typingComplete", {
+                    detail: { sceneIndex: this.currentScene },
+                }),
+            );
+            return;
+        }
+
+        const scene = this.scenes[this.currentScene];
+        if (scene && scene.dialogFadeInTime > 0) {
+            await this.wait(scene.dialogFadeInTime);
+        }
+
         this.isTyping = true;
 
         textLine1Element.innerHTML = "";
@@ -2129,11 +2161,17 @@ class DialogFramework {
 
         this.isTyping = false;
 
+        this.typingCompletedForScene = this.currentScene;
+        document.dispatchEvent(
+            new CustomEvent("typingComplete", {
+                detail: { sceneIndex: this.currentScene },
+            }),
+        );
+
         if (this.config.showDialogArrow !== false) {
             this.showDialogArrow();
         }
 
-        const scene = this.scenes[this.currentScene];
         if (scene && scene.choices && scene.choicesList && scene.choicesList.length > 0) {
             const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
             if (validChoices.length > 0) {
@@ -2352,6 +2390,13 @@ class DialogFramework {
         }
 
         this.isTyping = false;
+
+        this.typingCompletedForScene = this.currentScene;
+        document.dispatchEvent(
+            new CustomEvent("typingComplete", {
+                detail: { sceneIndex: this.currentScene },
+            }),
+        );
     }
 
     async typeTextWithFormatting(element, parsedContainer) {
@@ -2385,6 +2430,13 @@ class DialogFramework {
         }
 
         this.isTyping = false;
+
+        this.typingCompletedForScene = this.currentScene;
+        document.dispatchEvent(
+            new CustomEvent("typingComplete", {
+                detail: { sceneIndex: this.currentScene },
+            }),
+        );
     }
 
     applyFormattingToLines(elements, textLines, parsedContainer) {
@@ -2866,26 +2918,24 @@ class DialogFramework {
     }
 
     async waitForSceneCompletion() {
-        while (this.isTyping) {
-            await this.wait(50);
+        if (this.typingCompletedForScene !== this.currentScene) {
+            const typingPromise = new Promise((resolve) => {
+                const handler = (event) => {
+                    if (event.detail.sceneIndex === this.currentScene) {
+                        document.removeEventListener("typingComplete", handler);
+                        resolve();
+                    }
+                };
+                document.addEventListener("typingComplete", handler);
+            });
+
+            await typingPromise;
         }
 
         if (this.currentScene >= 0 && this.currentScene < this.scenes.length) {
             const scene = this.scenes[this.currentScene];
 
             let totalDuration = 0;
-
-            let typingDuration = 0;
-            const line1 = scene.line1 || "";
-            const line2 = scene.line2 || "";
-            const plainLine1 = line1.replace(/<[^>]*>/g, "");
-            const plainLine2 = line2.replace(/<[^>]*>/g, "");
-            const totalChars = plainLine1.length + plainLine2.length;
-            typingDuration = totalChars * this.typeSpeed;
-
-            const dialogFadeIn = scene.dialogFadeInTime || 0;
-            const dialogDelay = scene.dialogDelayIn || 0;
-            totalDuration = Math.max(totalDuration, dialogDelay + dialogFadeIn + typingDuration);
 
             const hasGif = scene.image && scene.image.endsWith(".gif");
 
@@ -2897,54 +2947,17 @@ class DialogFramework {
                     };
                     document.addEventListener("gifPlaybackEnded", handler);
                 });
+                await gifEndedPromise;
+            }
 
-                let otherDuration = totalDuration;
-
-                if (scene.shake) {
-                    const shakeDelay = scene.shakeDelay || 0;
-                    const shakeDuration = scene.shakeDuration || 500;
-                    otherDuration = Math.max(otherDuration, shakeDelay + shakeDuration);
+            if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
+                const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
+                if (validChoices.length > 0) {
+                    const correctChoice = scene.correctChoice || 0;
+                    const choiceSpeed = scene.choiceSpeed || 500;
+                    const choiceAnimationDuration = (correctChoice + 1) * choiceSpeed + choiceSpeed + 200;
+                    await this.wait(choiceAnimationDuration);
                 }
-
-                if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
-                    const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
-                    if (validChoices.length > 0) {
-                        const correctChoice = scene.correctChoice || 0;
-                        const choiceSpeed = scene.choiceSpeed || 500;
-                        const choiceAnimationDuration = (correctChoice + 1) * choiceSpeed + choiceSpeed + 200;
-                        otherDuration = Math.max(
-                            otherDuration,
-                            dialogDelay + dialogFadeIn + typingDuration + choiceAnimationDuration,
-                        );
-                    }
-                }
-
-                await Promise.all([this.wait(otherDuration), gifEndedPromise]);
-            } else {
-                const imageFadeIn = scene.imageFadeInTime || 0;
-                const imageDelay = scene.imageDelayIn || 0;
-                totalDuration = Math.max(totalDuration, imageDelay + imageFadeIn);
-
-                if (scene.shake) {
-                    const shakeDelay = scene.shakeDelay || 0;
-                    const shakeDuration = scene.shakeDuration || 500;
-                    totalDuration = Math.max(totalDuration, shakeDelay + shakeDuration);
-                }
-
-                if (scene.choices && scene.choicesList && scene.choicesList.length > 0) {
-                    const validChoices = scene.choicesList.filter((choice) => choice && choice.trim() !== "");
-                    if (validChoices.length > 0) {
-                        const correctChoice = scene.correctChoice || 0;
-                        const choiceSpeed = scene.choiceSpeed || 500;
-                        const choiceAnimationDuration = (correctChoice + 1) * choiceSpeed + choiceSpeed + 200;
-                        totalDuration = Math.max(
-                            totalDuration,
-                            dialogDelay + dialogFadeIn + typingDuration + choiceAnimationDuration,
-                        );
-                    }
-                }
-
-                await this.wait(totalDuration);
             }
         }
     }

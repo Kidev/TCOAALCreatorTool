@@ -3431,9 +3431,6 @@ function updateGalleryCategories() {
 
         selectGalleryCategory(targetCategory);
     }
-    if (!window.imagesCroppingStarted) {
-        cropAllImages().then(() => (window.imagesCroppingStarted = false));
-    }
 }
 
 function selectGalleryCategory(category) {
