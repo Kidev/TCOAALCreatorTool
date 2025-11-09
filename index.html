@@ -104,6 +104,10 @@
                     <div class="gallery-preview-panel" id="galleryPreviewPanel">
                         <div class="preview-panel-header">
                             <h3 class="preview-title-bar">Preview<span id="previewCropBoxContainer"></span></h3>
+                            <div id="croppingProgressIndicatorModal" style="display: none">
+                                <div class="bar" id="croppingProgressBarModal"></div>
+                                <span class="label" id="croppingProgressSpanModal">Cropping...</span>
+                            </div>
                             <button class="preview-download-btn" id="previewDownloadBtn" style="display: none">
                                 ⏎ Use
                             </button>
@@ -571,6 +575,7 @@ Right click to erase the saved dialog"
         <script src="js/dialog.js"></script>
         <script src="js/gameImporter.js"></script>
         <script src="js/interface.js"></script>
+        <script src="js/tarSouls.js"></script>
         <script src="js/sequence.js"></script>
         <script src="js/editor.js"></script>
         <script src="js/galleryManager.js"></script>

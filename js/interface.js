@@ -228,7 +228,7 @@ async function reconstructCompositionsToGallery(compositions, source = "user") {
     }
 
     if (!window.gameImporterAssets || Object.keys(window.gameImporterAssets.images || {}).length === 0) {
-        console.warn("Game assets not loaded yet. Queueing compositions for later reconstruction...");
+        //console.warn("Game assets not loaded yet. Queueing compositions for later reconstruction...");
         window.pendingCompositions = compositions;
         window.pendingCompositionsSource = source;
         return;
@@ -248,7 +248,11 @@ async function reconstructCompositionsToGallery(compositions, source = "user") {
     for (const descriptor of compositions) {
         try {
             const hasKeyframes = descriptor.layers?.some((layer) => layer.hasKeyframes && layer.keyframes?.length > 1);
-            const fileExtension = hasKeyframes ? "gif" : "png";
+            const hasSpriteAnimations = descriptor.layers?.some(
+                (layer) => layer.isAnimated && layer.spriteIndices && layer.spriteIndices.length > 0,
+            );
+            const shouldBeGif = hasKeyframes || hasSpriteAnimations;
+            const fileExtension = shouldBeGif ? "gif" : "png";
             const existingFileName = `${descriptor.name}.${fileExtension}`;
 
             if (window.gameImporterAssets.images["Misc"][existingFileName]) {
@@ -273,7 +277,7 @@ async function reconstructCompositionsToGallery(compositions, source = "user") {
                     compositionId: descriptor.id,
                     compositionDescriptor: descriptor,
                     compositionSource: source,
-                    isAnimated: hasKeyframes,
+                    isAnimated: shouldBeGif,
                 };
 
                 if (window.memoryManager) {
@@ -452,6 +456,7 @@ const KEY_MAP = {
     // Config keys
     "showControls": "4",
     "showDebug": "5",
+    "showDialogArrow": ")",
     "backgroundMusic": "6",
     "backgroundMusicVolume": "7",
     "backgroundMusicPitch": "X",
@@ -491,6 +496,9 @@ const KEY_MAP = {
     "demonSpeaker": "w",
     "bustLeft": "x",
     "bustRight": "y",
+    "loopBackgroundGif": "&",
+    "centerDialog": "*",
+    "hideDialogBox": "(",
     "portraitsTimings": "z",
     "shake": "A",
     "shakeDelay": "B",
@@ -578,18 +586,22 @@ function decompressKeys(obj, isUnderCharacters = false) {
 }
 
 function removeKeyQuotes(jsonString) {
-    // Remove quotes around single-character keys (our compressed keys: 0-9, a-z, A-Z, and special chars)
+    // Remove quotes around single-character keys (our compressed keys: 0-9, a-z, A-Z, and safe special chars)
     // Pattern: "X": where X is a single character (alphanumeric or allowed special chars)
     // Replace with: X:
-    return jsonString.replace(/"([0-9a-zA-Z!@#$%^&*()_+\-=\[\]{};':",./<>?`~|\\])":/g, "$1:");
+    // Safe characters: alphanumeric + !@#$%&*()
+    // AVOID: :,"{} []<>. /\';` and other JSON syntax characters
+    return jsonString.replace(/"([0-9a-zA-Z!@#$%&*()])":/g, "$1:");
 }
 
 function addKeyQuotes(jsonString) {
     // Add quotes back around single-character keys before parsing
     // Pattern: X: where X is a single character (alphanumeric or allowed special chars) (not inside a string)
     // This regex ensures we only match keys, not values
-    // It looks for single char followed by colon, but not inside quotes
-    return jsonString.replace(/([{,])([0-9a-zA-Z!@#$%^&*()_+\-=\[\]{};':",./<>?`~|\\]):/g, '$1"$2":');
+    // It looks for single char followed by colon after { or , (key position)
+    // Safe characters: alphanumeric + !@#$%&*()
+    // AVOID: :,"{} []<>. /\';` and other JSON syntax characters
+    return jsonString.replace(/([{,])([0-9a-zA-Z!@#$%&*()]):/g, '$1"$2":');
 }
 
 function encodeSequenceToURL(projectData) {
@@ -1200,20 +1212,9 @@ function parseSequenceFile(code) {
         func(mockFramework, safeContext.Color);
 
         const parsedData = {
-            config: mockFramework.config || {
-                showControls: true,
-                showDebug: true,
-                backgroundMusic: null,
-            },
+            config: mockFramework.config || DEFAULTS.config,
             characters: {},
-            glitchConfig: mockFramework.glitchConfig || {
-                scrambledColor: Color.BLACK,
-                realColor: Color.DEFAULT,
-                changeSpeed: 50,
-                realProbability: 5,
-                autoStart: true,
-                charsAllowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
-            },
+            glitchConfig: mockFramework.glitchConfig || DEFAULTS.glitchConfig,
             scenes: [],
             compositions: mockFramework.compositions || [],
         };
@@ -1222,57 +1223,75 @@ function parseSequenceFile(code) {
             Object.entries(mockFramework.characters).forEach(([name, data]) => {
                 parsedData.characters[name] = {
                     color: data.color,
-                    aliases: data.aliases || [],
+                    aliases: data.aliases !== undefined ? data.aliases : DEFAULTS.character.aliases,
                 };
             });
         }
 
         mockFramework.scenes.forEach((scene) => {
             const editorScene = {
-                image: scene.image === undefined ? null : scene.image,
-                speaker: scene.speaker || "",
-                line1: scene.line1 || "",
-                line2: scene.line2 || "",
-                dialogFadeInTime: scene.dialogFadeInTime !== undefined ? scene.dialogFadeInTime : 0,
-                dialogFadeOutTime: scene.dialogFadeOutTime !== undefined ? scene.dialogFadeOutTime : 0,
-                imageFadeInTime: scene.imageFadeInTime !== undefined ? scene.imageFadeInTime : 0,
-                imageFadeOutTime: scene.imageFadeOutTime !== undefined ? scene.imageFadeOutTime : 0,
-                dialogDelayIn: scene.dialogDelayIn !== undefined ? scene.dialogDelayIn : 0,
-                dialogDelayOut: scene.dialogDelayOut !== undefined ? scene.dialogDelayOut : 0,
-                imageDelayIn: scene.imageDelayIn !== undefined ? scene.imageDelayIn : 0,
-                imageDelayOut: scene.imageDelayOut !== undefined ? scene.imageDelayOut : 0,
-                sound: scene.sound === undefined ? null : scene.sound,
-                soundVolume: scene.soundVolume !== undefined ? scene.soundVolume : 1.0,
-                soundDelay: scene.soundDelay !== undefined ? scene.soundDelay : 0,
-                soundPitch: scene.soundPitch !== undefined ? scene.soundPitch : 1.0,
-                soundSpeed: scene.soundSpeed !== undefined ? scene.soundSpeed : 1.0,
-                backgroundMusic: scene.backgroundMusic === undefined ? null : scene.backgroundMusic,
-                backgroundMusicVolume: scene.backgroundMusicVolume !== undefined ? scene.backgroundMusicVolume : 1.0,
-                backgroundMusicPitch: scene.backgroundMusicPitch !== undefined ? scene.backgroundMusicPitch : 1.0,
-                backgroundMusicSpeed: scene.backgroundMusicSpeed !== undefined ? scene.backgroundMusicSpeed : 1.0,
-                censorSpeaker: scene.censorSpeaker || false,
-                demonSpeaker: scene.demonSpeaker || false,
-                bustLeft: scene.bustLeft === undefined ? null : scene.bustLeft,
-                bustRight: scene.bustRight === undefined ? null : scene.bustRight,
+                image: scene.image === undefined ? DEFAULTS.scene.image : scene.image,
+                speaker: scene.speaker !== undefined ? scene.speaker : DEFAULTS.scene.speaker,
+                line1: scene.line1 !== undefined ? scene.line1 : DEFAULTS.scene.line1,
+                line2: scene.line2 !== undefined ? scene.line2 : DEFAULTS.scene.line2,
+                dialogFadeInTime:
+                    scene.dialogFadeInTime !== undefined ? scene.dialogFadeInTime : DEFAULTS.scene.dialogFadeInTime,
+                dialogFadeOutTime:
+                    scene.dialogFadeOutTime !== undefined ? scene.dialogFadeOutTime : DEFAULTS.scene.dialogFadeOutTime,
+                imageFadeInTime:
+                    scene.imageFadeInTime !== undefined ? scene.imageFadeInTime : DEFAULTS.scene.imageFadeInTime,
+                imageFadeOutTime:
+                    scene.imageFadeOutTime !== undefined ? scene.imageFadeOutTime : DEFAULTS.scene.imageFadeOutTime,
+                dialogDelayIn: scene.dialogDelayIn !== undefined ? scene.dialogDelayIn : DEFAULTS.scene.dialogDelayIn,
+                dialogDelayOut:
+                    scene.dialogDelayOut !== undefined ? scene.dialogDelayOut : DEFAULTS.scene.dialogDelayOut,
+                imageDelayIn: scene.imageDelayIn !== undefined ? scene.imageDelayIn : DEFAULTS.scene.imageDelayIn,
+                imageDelayOut: scene.imageDelayOut !== undefined ? scene.imageDelayOut : DEFAULTS.scene.imageDelayOut,
+                sound: scene.sound === undefined ? DEFAULTS.scene.sound : scene.sound,
+                soundVolume: scene.soundVolume !== undefined ? scene.soundVolume : DEFAULTS.scene.soundVolume,
+                soundDelay: scene.soundDelay !== undefined ? scene.soundDelay : DEFAULTS.scene.soundDelay,
+                soundPitch: scene.soundPitch !== undefined ? scene.soundPitch : DEFAULTS.scene.soundPitch,
+                soundSpeed: scene.soundSpeed !== undefined ? scene.soundSpeed : DEFAULTS.scene.soundSpeed,
+                backgroundMusic:
+                    scene.backgroundMusic === undefined ? DEFAULTS.scene.backgroundMusic : scene.backgroundMusic,
+                backgroundMusicVolume:
+                    scene.backgroundMusicVolume !== undefined
+                        ? scene.backgroundMusicVolume
+                        : DEFAULTS.scene.backgroundMusicVolume,
+                backgroundMusicPitch:
+                    scene.backgroundMusicPitch !== undefined
+                        ? scene.backgroundMusicPitch
+                        : DEFAULTS.scene.backgroundMusicPitch,
+                backgroundMusicSpeed:
+                    scene.backgroundMusicSpeed !== undefined
+                        ? scene.backgroundMusicSpeed
+                        : DEFAULTS.scene.backgroundMusicSpeed,
+                censorSpeaker: scene.censorSpeaker !== undefined ? scene.censorSpeaker : DEFAULTS.scene.censorSpeaker,
+                demonSpeaker: scene.demonSpeaker !== undefined ? scene.demonSpeaker : DEFAULTS.scene.demonSpeaker,
+                bustLeft: scene.bustLeft === undefined ? DEFAULTS.scene.bustLeft : scene.bustLeft,
+                bustRight: scene.bustRight === undefined ? DEFAULTS.scene.bustRight : scene.bustRight,
+                loopBackgroundGif:
+                    scene.loopBackgroundGif !== undefined ? scene.loopBackgroundGif : DEFAULTS.scene.loopBackgroundGif,
+                centerDialog: scene.centerDialog !== undefined ? scene.centerDialog : DEFAULTS.scene.centerDialog,
+                hideDialogBox: scene.hideDialogBox !== undefined ? scene.hideDialogBox : DEFAULTS.scene.hideDialogBox,
                 portraitsTimings:
-                    scene.portraitsTimings ||
-                    (scene.bustFade !== undefined
-                        ? [
-                              [scene.bustFade, scene.bustFade, 0, 0],
-                              [scene.bustFade, scene.bustFade, 0, 0],
-                          ]
-                        : [
-                              [0, 0, 0, 0],
-                              [0, 0, 0, 0],
-                          ]),
-                shake: scene.shake || null,
-                shakeDelay: scene.shakeDelay !== undefined ? scene.shakeDelay : 0,
-                shakeIntensity: scene.shakeIntensity !== undefined ? scene.shakeIntensity : 1,
-                shakeDuration: scene.shakeDuration !== undefined ? scene.shakeDuration : 500,
-                choices: scene.choices === undefined ? null : scene.choices,
-                choicesList: scene.choicesList || [],
-                correctChoice: scene.correctChoice !== undefined ? scene.correctChoice : 0,
-                choiceSpeed: scene.choiceSpeed !== undefined ? scene.choiceSpeed : 500,
+                    scene.portraitsTimings !== undefined
+                        ? scene.portraitsTimings
+                        : scene.bustFade !== undefined
+                          ? [
+                                [scene.bustFade, scene.bustFade, 0, 0],
+                                [scene.bustFade, scene.bustFade, 0, 0],
+                            ]
+                          : DEFAULTS.scene.portraitsTimings,
+                shake: scene.shake !== undefined ? scene.shake : DEFAULTS.scene.shake,
+                shakeDelay: scene.shakeDelay !== undefined ? scene.shakeDelay : DEFAULTS.scene.shakeDelay,
+                shakeIntensity:
+                    scene.shakeIntensity !== undefined ? scene.shakeIntensity : DEFAULTS.scene.shakeIntensity,
+                shakeDuration: scene.shakeDuration !== undefined ? scene.shakeDuration : DEFAULTS.scene.shakeDuration,
+                choices: scene.choices === undefined ? DEFAULTS.scene.choices : scene.choices,
+                choicesList: scene.choicesList !== undefined ? scene.choicesList : DEFAULTS.scene.choicesList,
+                correctChoice: scene.correctChoice !== undefined ? scene.correctChoice : DEFAULTS.scene.correctChoice,
+                choiceSpeed: scene.choiceSpeed !== undefined ? scene.choiceSpeed : DEFAULTS.scene.choiceSpeed,
             };
 
             parsedData.scenes.push(editorScene);
@@ -1428,6 +1447,7 @@ function setupGalleryOnlyMode() {
                 <div class="editor-zone left">
                     <div class="header-buttons">
                         <button id="scrollToTopBtn" style="display: none;" onclick="document.getElementById('editorOverlay').scrollTo({ top: 0, behavior: 'smooth' })" title="Scroll to top">⇮</button>
+                        <button id="composition-editor-btn-header" class="gallery-category-btn-editor" style="display: none; font-size: 1vmax; font-weight: bold; border: 1px solid white;" onclick="openCompositionEditor()" title="Open compositor to create custom elements">🎞 Compositor</button>
                     </div>
                 </div>
                 <div class="editor-zone center">
@@ -1441,7 +1461,7 @@ function setupGalleryOnlyMode() {
                     <div class="header-buttons" style="display: flex;flex-direction: column;width:25vmin;gap:0.1vmin;font-size:1vmax;justify-content: center;align-items: center;border-radius: 4px;">
                         <!--<button id="composition-editor-btn" class="tcoaal-button-small tcoaal-button-small-header composition-editor-open-btn" onclick="openCompositionEditor()" title="Open composition editor to create custom scenes" style="display: none;">🖼 Composition</button>-->
                         <button id="download-all-button" class="tcoaal-button-small tcoaal-button-small-header download-all disabled" onclick="downloadAllAssets()" title="Download all imported assets">Download All</button>
-                        <div id="croppingProgressIndicator" style="display: none;">
+                        <div id="croppingProgressIndicator">
                           <div class="bar" id="croppingProgressBar"></div>
                           <span class="label" id="croppingProgressSpan">Cropping...</span>
                         </div>
@@ -1469,9 +1489,10 @@ function setupGalleryOnlyMode() {
                     </div>
                     <button
                         id="playGameButton"
-                        class="play-game-btn tcoaal-button disabled"
-                        title="Work in progress: can Ashley get her brother back from the claws of demons?"
-                        style="width:35vmax;margin-top:0.5vmax;opacity:0.5;cursor:default;"
+                        class="play-game-btn tcoaal-button"
+                        title="Can Ashley get her brother back from the claws of demons?"
+                        style="width:35vmax;margin-top:0.5vmax;"
+                        onclick="reopenWithMode('tarsouls')"
                     >
                         Play 'Tar Souls'
                     </button>
@@ -1767,11 +1788,15 @@ function initGalleryScrollHandler() {
                 if (editorHeader) editorHeader.classList.add("scrolled");
                 const scrollBtn = document.getElementById("scrollToTopBtn");
                 if (scrollBtn) scrollBtn.style.display = "inline-block";
+                const compositorBtn = document.getElementById("composition-editor-btn-header");
+                if (compositorBtn) compositorBtn.style.display = "inline-block";
             } else {
                 editorOverlay.classList.remove("scrolled");
                 if (editorHeader) editorHeader.classList.remove("scrolled");
                 const scrollBtn = document.getElementById("scrollToTopBtn");
                 if (scrollBtn) scrollBtn.style.display = "none";
+                const compositorBtn = document.getElementById("composition-editor-btn-header");
+                if (compositorBtn) compositorBtn.style.display = "none";
             }
         });
     }
@@ -1832,6 +1857,25 @@ async function handleGalleryOnlyImport() {
                         updateGalleryCategories();
                     };
                     document.body.appendChild(script);
+                }
+
+                if (window.galleryManager && window.gameImporterAssets) {
+                    const assetsNeedingCrop = [];
+                    Object.keys(window.gameImporterAssets.images || {}).forEach((category) => {
+                        if (category === "Portraits" || category === "Misc") return;
+                        Object.keys(window.gameImporterAssets.images[category] || {}).forEach((name) => {
+                            const asset = window.gameImporterAssets.images[category][name];
+                            if (!asset.isSprite && !asset.cropped && asset.blob && !asset.croppedBlob) {
+                                assetsNeedingCrop.push({ asset, name, category });
+                            }
+                        });
+                    });
+
+                    if (assetsNeedingCrop.length > 0) {
+                        for (const { asset, name, category } of assetsNeedingCrop) {
+                            window.galleryManager.enqueueCropImage(asset, name, category);
+                        }
+                    }
                 }
             }, 30);
         }
@@ -2175,6 +2219,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
 
         openEditor();
+    } else if (mode === "tarsouls") {
+        await startTarSoulsGame();
     } else {
         enhanceGameActions();
 
@@ -2348,6 +2394,10 @@ async function clearSavedData() {
                 `Are you sure you want to clear all saved asset data? This will free up ${sizeText} of storage and cannot be undone.`,
             )
         ) {
+            await localStorage.removeItem("tcoaal_saved_sequence");
+            await localStorage.removeItem("tcoaal_saved_sequence_timestamp");
+            await localStorage.removeItem("tcoaal_recording_settings");
+            await localStorage.removeItem("tcoaal_autoplay_settings");
             await window.memoryManager.clearAllData();
 
             const clearBtn = document.getElementById("clearSavedDataBtn");
@@ -2382,7 +2432,9 @@ async function loadGalleryFromSavedData(storageState) {
         const savedAssets = await window.memoryManager.loadSavedAssets();
         window.gameImporterAssets = savedAssets;
 
-        Object.keys(savedAssets.images || {}).forEach((category) => {
+        cropAllImages();
+
+        /*Object.keys(savedAssets.images || {}).forEach((category) => {
             Object.keys(savedAssets.images[category] || {}).forEach((name) => {
                 const asset = savedAssets.images[category][name];
                 if (asset.croppedBlob && asset.croppedUrl) {
@@ -2390,7 +2442,7 @@ async function loadGalleryFromSavedData(storageState) {
                     asset.cropping = false;
                 }
             });
-        });
+        });*/
 
         if (fill) fill.style.width = "50%";
         if (text) text.textContent = "Setting up gallery...";

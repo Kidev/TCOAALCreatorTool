@@ -258,6 +258,18 @@ h6 {
     align-items: center;
     gap: 0.8vmax;
 }
+.row3 {
+    grid-row: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.8vmax;
+}
+.row4 {
+    grid-row: 4;
+    display: flex;
+    align-items: center;
+    gap: 0.8vmax;
+}
 
 .form-group.no-checkbox {
     grid-template-columns: 1% 15% auto;
@@ -319,9 +331,10 @@ input[type="checkbox"]:not(.null-checkbox) {
 
 .file-select-wrapper {
     display: flex;
+    align-items: stretch;
     flex-direction: row;
     gap: 0.8vmax;
-    align-items: center;
+    /*align-items: center;*/
 }
 
 .file-type-select {
@@ -332,7 +345,7 @@ input[type="checkbox"]:not(.null-checkbox) {
     border-radius: 4px;
     font-family: "Faustina", serif;
     font-size: 0.85vmax;
-    width: 7vmax;
+    width: 9vmax;
 }
 
 .file-select-button {
@@ -356,7 +369,7 @@ input[type="checkbox"]:not(.null-checkbox) {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
-    align-items: center;
+    align-items: stretch;
 }
 
 .file-select-button:hover {
@@ -374,7 +387,7 @@ input[type="checkbox"]:not(.null-checkbox) {
 }
 
 .file-clear-button {
-    position: relative;
+    /*position: relative;*/
     background: var(--danger-color);
     color: var(--txt-color);
     cursor: pointer;
@@ -387,11 +400,15 @@ input[type="checkbox"]:not(.null-checkbox) {
     flex-wrap: nowrap;
     border-color: white;
     align-content: center;
-    margin: 0.5vmax;
+    /*margin: 0.5vmax; */
     justify-items: center;
     justify-self: center;
-    padding: 0.1vmax;
-    padding-inline: 0.5vmax;
+    /*padding: 0.1vmax; */
+    /*padding-inline: 0.5vmax; */
+}
+
+#scrollToTopBtn {
+    font-size: 1.5vmax;
 }
 
 .file-clear-button:hover {
@@ -402,7 +419,7 @@ input[type="checkbox"]:not(.null-checkbox) {
     background: var(--accent-color-light);
     color: var(--txt-color);
     border: none;
-    padding: 0.5vmax 1vmax;
+    /*padding: 0.5vmax 1vmax;*/
     border-radius: 4px;
     cursor: pointer;
     font-size: 1vmax;
@@ -753,6 +770,55 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 
 .collapsible-group-header.active::before {
     transform: rotate(90deg);
+}
+
+.copy-previous-btn {
+    float: right;
+    padding: 2px 8px;
+    font-size: 0.75em;
+    /*background: var(--accent-color);
+    color: var(--txt-color);
+    border: 1px solid var(--white);*/
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: auto;
+}
+
+.copy-previous-btn:hover {
+    /*background: var(--white);
+    color: var(--bg-color);
+    transform: scale(1.05);*/
+}
+
+.loop-toggle-btn {
+    /*background: var(--success-color);
+    color: var(--txt-color);*/
+    cursor: pointer;
+    font-size: 1vmax;
+    font-family: monospace;
+    padding: 0.1vmax;
+    padding-inline: 0.5vmax;
+    margin: 0.5vmax;
+    border-color: white;
+}
+
+.loop-toggle-btn:hover {
+    /*background: var(--success-color-deep);*/
+}
+
+#composition-editor-btn-header {
+    background: var(--accent-color);
+    color: var(--txt-color);
+    border: 1px solid white;
+    padding: 0.5vmax 1vmax;
+    cursor: pointer;
+    font-size: 1vmax;
+    font-weight: bold;
+}
+
+#composition-editor-btn-header:hover {
+    background: var(--accent-color-light);
 }
 
 .header-action-buttons {
@@ -1236,6 +1302,17 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+}
+
+.preview-text.center-dialog {
+    bottom: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.preview-text.hide-dialog-box {
+    background-image: none;
 }
 
 .preview-text-speaker {
@@ -1744,7 +1821,8 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     }
 }
 
-#composition-editor-btn.success {
+#composition-editor-btn.success,
+#composition-editor-btn-header.success {
     animation: successFlash 0.5s ease;
 }
 
@@ -2316,7 +2394,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     background: var(--choice-button);
     background-size: 100% 100%;
     font-family: "Faustina", serif;
-    font-size: 1.5vmin;
+    font-size: 2vmin;
     width: 17vmin;
     text-align: center;
     color: var(--white);

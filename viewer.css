@@ -174,6 +174,16 @@ canvas.background-image {
     transform: translate(-50%, -50%);
 }
 
+.dialog-container.center-dialog {
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.dialog-container.hide-dialog-box {
+    background-image: none;
+}
+
 .dialog-content {
     position: relative;
     height: 100%;
@@ -545,6 +555,56 @@ canvas.background-image {
         0 0 2px #000000,
         0 0 3px #000000,
         0 0 4px #000000;
+}
+
+.tcoaal-button-tarsouls {
+    background: var(--choice-button);
+    background-size: 100% 100%;
+    font-family: "Faustina", serif;
+    text-align: center;
+    font-size: 1vmax;
+    color: var(--white);
+    text-shadow:
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 2px #000000,
+        0 0 3px #000000,
+        0 0 4px #000000;
+}
+
+.tcoaal-button-tarsouls.disabled,
+.tcoaal-button-tarsouls:hover {
+    background: var(--choice-button-hover);
+    background-size: 100% 100%;
+}
+
+.tcoaal-button-tarsouls-small {
+    background: var(--choice-button);
+    background-size: 100% 100%;
+    font-family: "Faustina", serif;
+    text-align: center;
+    font-size: 0.75vmax;
+    color: var(--white);
+    text-shadow:
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 1px #000000,
+        0 0 2px #000000,
+        0 0 3px #000000,
+        0 0 4px #000000;
+}
+
+.tcoaal-button-tarsouls-small.disabled,
+.tcoaal-button-tarsouls-small:hover {
+    background: var(--choice-button-hover);
+    background-size: 100% 100%;
 }
 
 .tcoaal-button-small {

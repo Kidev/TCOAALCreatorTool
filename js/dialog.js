@@ -750,56 +750,80 @@ class DialogFramework {
 
     addScene(options) {
         const scene = {
-            image: options.image !== undefined ? options.image : null,
-            speaker: options.speaker || "",
-            line1: options.line1 !== undefined ? options.line1 : "",
-            line2: options.line2 !== undefined ? options.line2 : "",
+            image: options.image !== undefined ? options.image : DEFAULTS.scene.image,
+            speaker: options.speaker !== undefined ? options.speaker : DEFAULTS.scene.speaker,
+            line1: options.line1 !== undefined ? options.line1 : DEFAULTS.scene.line1,
+            line2: options.line2 !== undefined ? options.line2 : DEFAULTS.scene.line2,
 
-            dialogFadeInTime: options.dialogFadeInTime !== undefined ? options.dialogFadeInTime : 200,
-            dialogFadeOutTime: options.dialogFadeOutTime !== undefined ? options.dialogFadeOutTime : 200,
-            imageFadeInTime: options.imageFadeInTime !== undefined ? options.imageFadeInTime : 200,
-            imageFadeOutTime: options.imageFadeOutTime !== undefined ? options.imageFadeOutTime : 200,
+            dialogFadeInTime:
+                options.dialogFadeInTime !== undefined ? options.dialogFadeInTime : DEFAULTS.scene.dialogFadeInTime,
+            dialogFadeOutTime:
+                options.dialogFadeOutTime !== undefined ? options.dialogFadeOutTime : DEFAULTS.scene.dialogFadeOutTime,
+            imageFadeInTime:
+                options.imageFadeInTime !== undefined ? options.imageFadeInTime : DEFAULTS.scene.imageFadeInTime,
+            imageFadeOutTime:
+                options.imageFadeOutTime !== undefined ? options.imageFadeOutTime : DEFAULTS.scene.imageFadeOutTime,
 
-            dialogDelayIn: options.dialogDelayIn !== undefined ? options.dialogDelayIn : 500,
-            dialogDelayOut: options.dialogDelayOut !== undefined ? options.dialogDelayOut : 0,
-            imageDelayIn: options.imageDelayIn !== undefined ? options.imageDelayIn : 0,
-            imageDelayOut: options.imageDelayOut !== undefined ? options.imageDelayOut : 0,
+            dialogDelayIn: options.dialogDelayIn !== undefined ? options.dialogDelayIn : DEFAULTS.scene.dialogDelayIn,
+            dialogDelayOut:
+                options.dialogDelayOut !== undefined ? options.dialogDelayOut : DEFAULTS.scene.dialogDelayOut,
+            imageDelayIn: options.imageDelayIn !== undefined ? options.imageDelayIn : DEFAULTS.scene.imageDelayIn,
+            imageDelayOut: options.imageDelayOut !== undefined ? options.imageDelayOut : DEFAULTS.scene.imageDelayOut,
 
-            sound: options.sound || null,
-            soundVolume: options.soundVolume || 1.0,
-            soundDelay: options.soundDelay || 0,
-            soundPitch: options.soundPitch || 1.0,
-            soundSpeed: options.soundSpeed || 1.0,
+            sound: options.sound !== undefined ? options.sound : DEFAULTS.scene.sound,
+            soundVolume: options.soundVolume !== undefined ? options.soundVolume : DEFAULTS.scene.soundVolume,
+            soundDelay: options.soundDelay !== undefined ? options.soundDelay : DEFAULTS.scene.soundDelay,
+            soundPitch: options.soundPitch !== undefined ? options.soundPitch : DEFAULTS.scene.soundPitch,
+            soundSpeed: options.soundSpeed !== undefined ? options.soundSpeed : DEFAULTS.scene.soundSpeed,
             soundBlobUrl: options.soundBlobUrl || null,
 
-            backgroundMusic: options.backgroundMusic || null,
-            backgroundMusicVolume: options.backgroundMusicVolume !== undefined ? options.backgroundMusicVolume : 1.0,
-            backgroundMusicPitch: options.backgroundMusicPitch || 1.0,
-            backgroundMusicSpeed: options.backgroundMusicSpeed || 1.0,
+            backgroundMusic:
+                options.backgroundMusic !== undefined ? options.backgroundMusic : DEFAULTS.scene.backgroundMusic,
+            backgroundMusicVolume:
+                options.backgroundMusicVolume !== undefined
+                    ? options.backgroundMusicVolume
+                    : DEFAULTS.scene.backgroundMusicVolume,
+            backgroundMusicPitch:
+                options.backgroundMusicPitch !== undefined
+                    ? options.backgroundMusicPitch
+                    : DEFAULTS.scene.backgroundMusicPitch,
+            backgroundMusicSpeed:
+                options.backgroundMusicSpeed !== undefined
+                    ? options.backgroundMusicSpeed
+                    : DEFAULTS.scene.backgroundMusicSpeed,
             backgroundMusicBlobUrl: options.backgroundMusicBlobUrl || null,
 
-            censorSpeaker: options.censorSpeaker !== undefined ? options.censorSpeaker : false,
+            censorSpeaker: options.censorSpeaker !== undefined ? options.censorSpeaker : DEFAULTS.scene.censorSpeaker,
+            demonSpeaker: options.demonSpeaker !== undefined ? options.demonSpeaker : DEFAULTS.scene.demonSpeaker,
 
-            bustLeft: options.bustLeft !== undefined ? options.bustLeft : null,
-            bustRight: options.bustRight !== undefined ? options.bustRight : null,
-            portraitsTimings: options.portraitsTimings || [
-                [0, 0, 0, 0],
-                [0, 0, 0, 0],
-            ],
+            bustLeft: options.bustLeft !== undefined ? options.bustLeft : DEFAULTS.scene.bustLeft,
+            bustRight: options.bustRight !== undefined ? options.bustRight : DEFAULTS.scene.bustRight,
+            loopBackgroundGif:
+                options.loopBackgroundGif !== undefined ? options.loopBackgroundGif : DEFAULTS.scene.loopBackgroundGif,
+            centerDialog: options.centerDialog !== undefined ? options.centerDialog : DEFAULTS.scene.centerDialog,
+            hideDialogBox: options.hideDialogBox !== undefined ? options.hideDialogBox : DEFAULTS.scene.hideDialogBox,
+            portraitsTimings:
+                options.portraitsTimings !== undefined
+                    ? options.portraitsTimings
+                    : JSON.parse(JSON.stringify(DEFAULTS.scene.portraitsTimings)),
 
             imageBlobUrl: options.imageBlobUrl || null,
             bustLeftBlobUrl: options.bustLeftBlobUrl || null,
             bustRightBlobUrl: options.bustRightBlobUrl || null,
 
-            shake: options.shake !== undefined ? options.shake : false,
-            shakeDelay: options.shakeDelay !== undefined ? options.shakeDelay : 0,
-            shakeIntensity: options.shakeIntensity !== undefined ? options.shakeIntensity : 1,
-            shakeDuration: options.shakeDuration !== undefined ? options.shakeDuration : 500,
+            shake: options.shake !== undefined ? options.shake : DEFAULTS.scene.shake,
+            shakeDelay: options.shakeDelay !== undefined ? options.shakeDelay : DEFAULTS.scene.shakeDelay,
+            shakeIntensity:
+                options.shakeIntensity !== undefined ? options.shakeIntensity : DEFAULTS.scene.shakeIntensity,
+            shakeDuration: options.shakeDuration !== undefined ? options.shakeDuration : DEFAULTS.scene.shakeDuration,
 
-            choices: options.choices !== undefined ? options.choices : null,
-            choicesList: options.choicesList || null,
-            correctChoice: options.correctChoice !== undefined ? options.correctChoice : 0,
-            choiceSpeed: options.choiceSpeed !== undefined ? options.choiceSpeed : 500,
+            choices: options.choices !== undefined ? options.choices : DEFAULTS.scene.choices,
+            choicesList:
+                options.choicesList !== undefined
+                    ? options.choicesList
+                    : JSON.parse(JSON.stringify(DEFAULTS.scene.choicesList)),
+            correctChoice: options.correctChoice !== undefined ? options.correctChoice : DEFAULTS.scene.correctChoice,
+            choiceSpeed: options.choiceSpeed !== undefined ? options.choiceSpeed : DEFAULTS.scene.choiceSpeed,
         };
 
         this.scenes.push(scene);
@@ -1146,6 +1170,7 @@ class DialogFramework {
                         fadeOutDuration,
                         fadeInDuration,
                         scene.imageBlobUrl,
+                        scene.loopBackgroundGif || false,
                     );
                 }, crossfadeDelay);
             } else {
@@ -1178,12 +1203,22 @@ class DialogFramework {
                         ) {
                             // Same image with instant transition
                             if (force === true && scene.image !== null && scene.image !== "") {
-                                this.showImageInstant(scene.image, scene.imageBlobUrl);
+                                this.showImageInstant(
+                                    scene.image,
+                                    scene.imageBlobUrl,
+                                    scene.loopBackgroundGif || false,
+                                );
                             }
                         } else if (imageFadeOutTime === 0 && scene.imageFadeInTime === 0) {
-                            this.showImageInstant(scene.image, scene.imageBlobUrl);
+                            this.showImageInstant(scene.image, scene.imageBlobUrl, scene.loopBackgroundGif || false);
                         } else {
-                            this.showImage(scene.image, scene.imageFadeInTime, 0, scene.imageBlobUrl); // fadeOutTime handled above
+                            this.showImage(
+                                scene.image,
+                                scene.imageFadeInTime,
+                                0,
+                                scene.imageBlobUrl,
+                                scene.loopBackgroundGif || false,
+                            ); // fadeOutTime handled above
                         }
                     } else {
                         // When scene.image is null, ensure any remaining images are hidden
@@ -1202,7 +1237,13 @@ class DialogFramework {
             setTimeout(() => {
                 if (this.sceneVersion !== currentVersion) return;
                 if (scene.image !== null) {
-                    this.showImage(scene.image, scene.imageFadeInTime, 0, scene.imageBlobUrl);
+                    this.showImage(
+                        scene.image,
+                        scene.imageFadeInTime,
+                        0,
+                        scene.imageBlobUrl,
+                        scene.loopBackgroundGif || false,
+                    );
                 } else {
                     this.hideAllImages(0);
                     this.currentBackgroundImage = null;
@@ -1231,11 +1272,23 @@ class DialogFramework {
 
             setTimeout(() => {
                 if (this.sceneVersion !== currentVersion) return;
+
+                const dialogContainer = document.getElementById("dialogContainer");
+                if (scene.centerDialog) {
+                    dialogContainer.classList.add("center-dialog");
+                } else {
+                    dialogContainer.classList.remove("center-dialog");
+                }
+                if (scene.hideDialogBox) {
+                    dialogContainer.classList.add("hide-dialog-box");
+                } else {
+                    dialogContainer.classList.remove("hide-dialog-box");
+                }
+
                 if (
                     (scene.line1 !== null && scene.line1.trim() !== "") ||
                     (scene.line2 !== null && scene.line2.trim() !== "")
                 ) {
-                    // Check if instant transition
                     if (dialogFadeOutTime === 0 && scene.dialogFadeInTime === 0) {
                         this.showDialogInstant(scene.speaker, scene.line1, scene.line2, scene.censorSpeaker);
                     } else {
@@ -1261,6 +1314,19 @@ class DialogFramework {
             // Scene 0: just use current scene's delays
             setTimeout(() => {
                 if (this.sceneVersion !== currentVersion) return;
+
+                const dialogContainer = document.getElementById("dialogContainer");
+                if (scene.centerDialog) {
+                    dialogContainer.classList.add("center-dialog");
+                } else {
+                    dialogContainer.classList.remove("center-dialog");
+                }
+                if (scene.hideDialogBox) {
+                    dialogContainer.classList.add("hide-dialog-box");
+                } else {
+                    dialogContainer.classList.remove("hide-dialog-box");
+                }
+
                 if (
                     (scene.line1 !== null && scene.line1.trim() !== "") ||
                     (scene.line2 !== null && scene.line2.trim() !== "")
@@ -1501,7 +1567,7 @@ class DialogFramework {
         }
     }
 
-    async showImage(imageSrc, fadeInTime = 0, fadeOutTime = 0, blobUrl = null) {
+    async showImage(imageSrc, fadeInTime = 0, fadeOutTime = 0, blobUrl = null, loopGif = false) {
         this.currentBackgroundImage = imageSrc;
 
         //console.log("showImage", imageSrc);
@@ -1607,10 +1673,16 @@ class DialogFramework {
                     if (frameIndex < frames.length) {
                         setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
                     } else {
-                        const endEvent = new CustomEvent("gifPlaybackEnded", {
-                            detail: { src: imageSrc, type: "background" },
-                        });
-                        document.dispatchEvent(endEvent);
+                        if (loopGif) {
+                            // Loop the GIF by resetting frame index
+                            frameIndex = 0;
+                            setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
+                        } else {
+                            const endEvent = new CustomEvent("gifPlaybackEnded", {
+                                detail: { src: imageSrc, type: "background" },
+                            });
+                            document.dispatchEvent(endEvent);
+                        }
                     }
                 };
 
@@ -1676,7 +1748,14 @@ class DialogFramework {
         }
     }
 
-    async crossfadeImages(fromImageSrc, toImageSrc, fadeOutDuration = 1000, fadeInDuration = 1000, toBlobUrl = null) {
+    async crossfadeImages(
+        fromImageSrc,
+        toImageSrc,
+        fadeOutDuration = 1000,
+        fadeInDuration = 1000,
+        toBlobUrl = null,
+        loopGif = false,
+    ) {
         this.currentBackgroundImage = toImageSrc;
         //console.log("showImage", fromImageSrc, toImageSrc);
         const existingImages = document.querySelectorAll(".background-image.active");
@@ -1767,10 +1846,16 @@ class DialogFramework {
                     if (frameIndex < frames.length) {
                         setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
                     } else {
-                        const endEvent = new CustomEvent("gifPlaybackEnded", {
-                            detail: { src: toImageSrc, type: "background" },
-                        });
-                        document.dispatchEvent(endEvent);
+                        if (loopGif) {
+                            // Loop the GIF by resetting frame index
+                            frameIndex = 0;
+                            setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
+                        } else {
+                            const endEvent = new CustomEvent("gifPlaybackEnded", {
+                                detail: { src: toImageSrc, type: "background" },
+                            });
+                            document.dispatchEvent(endEvent);
+                        }
                     }
                 };
 
@@ -1836,7 +1921,7 @@ class DialogFramework {
         }
     }
 
-    async showImageInstant(imageSrc, blobUrl = null) {
+    async showImageInstant(imageSrc, blobUrl = null, loopGif = false) {
         this.currentBackgroundImage = imageSrc;
 
         //console.log("showImageInstant", imageSrc);
@@ -1921,10 +2006,16 @@ class DialogFramework {
                     if (frameIndex < frames.length) {
                         setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
                     } else {
-                        const endEvent = new CustomEvent("gifPlaybackEnded", {
-                            detail: { src: imageSrc, type: "background" },
-                        });
-                        document.dispatchEvent(endEvent);
+                        if (loopGif) {
+                            // Loop the GIF by resetting frame index
+                            frameIndex = 0;
+                            setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
+                        } else {
+                            const endEvent = new CustomEvent("gifPlaybackEnded", {
+                                detail: { src: imageSrc, type: "background" },
+                            });
+                            document.dispatchEvent(endEvent);
+                        }
                     }
                 };
 
@@ -2938,8 +3029,11 @@ class DialogFramework {
             let totalDuration = 0;
 
             const hasGif = scene.image && scene.image.endsWith(".gif");
+            const isLoopingGif = scene.loopBackgroundGif || false;
 
-            if (hasGif) {
+            // Only wait for GIF to complete if it's not looping
+            // Looping GIFs never end, so autoplay should not wait for them
+            if (hasGif && !isLoopingGif) {
                 const gifEndedPromise = new Promise((resolve) => {
                     const handler = (event) => {
                         document.removeEventListener("gifPlaybackEnded", handler);

@@ -79,6 +79,24 @@ class CompositionEditor {
                 ? "Will also open the editor, click to change"
                 : "Will only add the asset in the background, click to change";
         };*/
+
+        this.GIF_RENDER_SETTINGS = {
+            maxColors: 256,
+            colorFormat: "rgba565",
+            oneBitAlpha: false,
+
+            paletteFormat: "rgba565",
+
+            enableTransparency: true,
+            transparentIndex: 0,
+
+            useDithering: true,
+
+            defaultFrameDelay: 33,
+            spriteFrameDelay: 50,
+
+            replaceTransparencyWithBlack: true,
+        };
     }
 
     generateId() {
@@ -563,6 +581,7 @@ class CompositionEditor {
             message,
             type,
             duration,
+            customClass,
             timestamp: Date.now(),
         });
 
@@ -587,7 +606,8 @@ class CompositionEditor {
         const totalNotifs = this.notificationQueue.length;
 
         const notification = document.createElement("div");
-        notification.className = `composition-notification composition-notification-${currentNotif.type}`;
+        const customClassStr = currentNotif.customClass ? ` ${currentNotif.customClass}` : "";
+        notification.className = `composition-notification composition-notification-${currentNotif.type}${customClassStr}`;
 
         const hasMultiple = totalNotifs > 1;
         const canGoPrev = this.currentNotificationIndex > 0;
@@ -811,6 +831,10 @@ class CompositionEditor {
             this.updateCanvasSize();
             this.updateLayersList();
             this.render();
+        }
+
+        if (window.galleryManager) {
+            window.galleryManager.flashSuccessOnButton();
         }
 
         return layer.id;
@@ -3335,7 +3359,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         }
 
         let totalDuration = 0;
-        let frameDelay = 100;
+        let frameDelay = this.GIF_RENDER_SETTINGS.spriteFrameDelay;
 
         if (keyframedLayers.length > 0) {
             totalDuration = Math.max(
@@ -3348,7 +3372,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                     ),
                 ),
             );
-            frameDelay = 33;
+            frameDelay = this.GIF_RENDER_SETTINGS.defaultFrameDelay;
         }
 
         if (spriteAnimatedLayers.length > 0) {
@@ -3453,16 +3477,19 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                 const imageData = frameCtx.getImageData(0, 0, this.canvasWidth, this.canvasHeight);
 
                 if (!palette) {
-                    palette = gifenc.quantize(imageData.data, 256, { format: "rgba4444", oneBitAlpha: true });
+                    palette = gifenc.quantize(imageData.data, this.GIF_RENDER_SETTINGS.maxColors, {
+                        format: this.GIF_RENDER_SETTINGS.colorFormat,
+                        oneBitAlpha: this.GIF_RENDER_SETTINGS.oneBitAlpha,
+                    });
                 }
 
-                const indexed = gifenc.applyPalette(imageData.data, palette, "rgba4444");
+                const indexed = gifenc.applyPalette(imageData.data, palette, this.GIF_RENDER_SETTINGS.paletteFormat);
 
                 const frameOptions = {
                     palette,
                     delay: frameDelay,
-                    transparent: true,
-                    transparentIndex: 0,
+                    transparent: this.GIF_RENDER_SETTINGS.enableTransparency,
+                    transparentIndex: this.GIF_RENDER_SETTINGS.transparentIndex,
                     first: frameIndex === 0,
                 };
 
@@ -3908,7 +3935,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         if (this.checkIfCompositionNameExists(compositionName)) {
             this.clearNotifications();
             this.showNotification(
-                `<strong>Name Already Exists</strong><br>A composition named "${compositionName}" already exists in the gallery. Overwrite it?`,
+                `<strong>Name Already Exists</strong><br>"${compositionName}" already exists in the gallery, continue to overwrite it`,
                 "warning",
                 0,
                 "composition-overwrite-confirmation",
@@ -3971,7 +3998,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         let fileExtension;
 
         if (shouldExportAsGif) {
-            blob = await this.renderToGifBlob();
+            blob = await this.renderToGifBlob(true); // true = gallery save
             fileExtension = "gif";
             if (!blob) {
                 this.showNotification("Failed to render composition as GIF", "error", 6000);
@@ -4122,7 +4149,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         });
     }
 
-    async renderToGifBlob() {
+    async renderToGifBlob(isGallerySave = false) {
         if (!this.canvas) return null;
 
         if (typeof gifenc === "undefined") {
@@ -4140,7 +4167,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         }
 
         let totalDuration = 0;
-        let frameDelay = 100;
+        let frameDelay = this.GIF_RENDER_SETTINGS.spriteFrameDelay;
 
         if (keyframedLayers.length > 0) {
             totalDuration = Math.max(
@@ -4153,7 +4180,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                     ),
                 ),
             );
-            frameDelay = 33;
+            frameDelay = this.GIF_RENDER_SETTINGS.defaultFrameDelay;
         }
 
         if (spriteAnimatedLayers.length > 0) {
@@ -4255,17 +4282,34 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
                 const imageData = frameCtx.getImageData(0, 0, this.canvasWidth, this.canvasHeight);
 
-                if (!palette) {
-                    palette = gifenc.quantize(imageData.data, 256, { format: "rgba4444", oneBitAlpha: true });
+                if (isGallerySave && this.GIF_RENDER_SETTINGS.replaceTransparencyWithBlack) {
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const alpha = data[i + 3];
+                        if (alpha < 255) {
+                            const alphaRatio = alpha / 255;
+                            data[i] = Math.round(data[i] * alphaRatio);
+                            data[i + 1] = Math.round(data[i + 1] * alphaRatio);
+                            data[i + 2] = Math.round(data[i + 2] * alphaRatio);
+                            data[i + 3] = 255;
+                        }
+                    }
                 }
 
-                const indexed = gifenc.applyPalette(imageData.data, palette, "rgba4444");
+                if (!palette) {
+                    palette = gifenc.quantize(imageData.data, this.GIF_RENDER_SETTINGS.maxColors, {
+                        format: this.GIF_RENDER_SETTINGS.colorFormat,
+                        oneBitAlpha: this.GIF_RENDER_SETTINGS.oneBitAlpha,
+                    });
+                }
+
+                const indexed = gifenc.applyPalette(imageData.data, palette, this.GIF_RENDER_SETTINGS.paletteFormat);
 
                 const frameOptions = {
                     palette,
                     delay: frameDelay,
-                    transparent: true,
-                    transparentIndex: 0,
+                    transparent: this.GIF_RENDER_SETTINGS.enableTransparency && !isGallerySave,
+                    transparentIndex: this.GIF_RENDER_SETTINGS.transparentIndex,
                     first: frameIndex === 0,
                 };
 
@@ -4500,8 +4544,12 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         });
 
         const hasKeyframes = editor.layers.some((l) => l.hasKeyframes && l.keyframes.length > 1);
+        const hasSpriteAnimations = editor.layers.some(
+            (l) => l.visible && l.isAnimated && l.spriteCanvases && l.spriteCanvases.length > 0,
+        );
+        const shouldRenderAsGif = hasKeyframes || hasSpriteAnimations;
 
-        const blob = hasKeyframes ? await editor.renderToGifBlob() : await editor.renderToBlob();
+        const blob = shouldRenderAsGif ? await editor.renderToGifBlob(true) : await editor.renderToBlob();
         return blob;
     }
 }

@@ -415,6 +415,7 @@ class GalleryManager {
                                     (sprite, i) => `
                                         <div class="sprite-cell-preview"
                                             data-index="${i}"
+                                            title="${asset.name} #${i}"
                                             onclick="galleryManager.toggleSpriteSelection(${i})">
                                             <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
                                         </div>`,
@@ -441,6 +442,7 @@ class GalleryManager {
                                     (sprite, i) => `
                                         <div class="sprite-cell-preview"
                                             data-index="${i}"
+                                            title="${asset.name} #${i}"
                                             onclick="galleryManager.toggleSpriteSelection(${i})">
                                             <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
                                         </div>`,
@@ -551,7 +553,7 @@ class GalleryManager {
         const previewBox = document.getElementById("previewCropBoxContainer");
         if (show) {
             previewBox.innerHTML = `
-                <button ${show ? "style='padding:0 0.2vmax;margin-left:0.5vmax;width:3.3vmax;'" : ""} 
+                <button ${show ? "style='padding:0 0.2vmax;margin-left:0.5vmax;width:auto;'" : ""} 
                     title="${this.globalImageViewMode === "cropped" ? "Preview is cropped to content: click for original" : "Preview is original: click for cropped to content"}"
                     onclick="window.galleryManager.setGlobalImageViewMode(window.galleryManager.globalImageViewMode === 'original' ? 'cropped' : 'original');window.galleryManager.updateCropButtonInPreviewTitle(${show ? "true" : "false"});">${this.globalImageViewMode === "cropped" ? "cropped" : "original"}</button>
             `;
@@ -1107,7 +1109,7 @@ class GalleryManager {
                         asset.croppedUrl = URL.createObjectURL(blob);
                         asset.cropped = true;
 
-                        if (window.memoryManager && asset.baseFileName) {
+                        if (window.memoryManager && asset.baseFileName && !asset.isComposition) {
                             try {
                                 const assetId = window.memoryManager.generateAssetId(asset.baseFileName, name);
                                 await window.memoryManager.saveCompleteAsset(assetId, blob);
@@ -1234,13 +1236,39 @@ class GalleryManager {
         }
     }
 
-    flashSuccessOnButton(audio = false) {
-        const btn = document.getElementById("composition-editor-btn");
-        if (!btn) return;
+    flashSuccessOnButton(audio = false, buttonId = null) {
+        let btn = null;
+        if (buttonId) {
+            btn = document.getElementById(buttonId);
+        } else {
+            btn = document.getElementById("composition-editor-btn");
+        }
 
-        btn.classList.remove("success");
-        void btn.offsetWidth;
-        btn.classList.add("success");
+        if (btn) {
+            btn.classList.remove("success");
+            void btn.offsetWidth;
+            btn.classList.add("success");
+
+            setTimeout(() => {
+                if (btn) {
+                    btn.classList.remove("success");
+                }
+            }, 500);
+        }
+
+        btn = document.getElementById("composition-editor-btn-header");
+
+        if (btn) {
+            btn.classList.remove("success");
+            void btn.offsetWidth;
+            btn.classList.add("success");
+
+            setTimeout(() => {
+                if (btn) {
+                    btn.classList.remove("success");
+                }
+            }, 500);
+        }
     }
 
     addSpriteToCompositionEditor() {
