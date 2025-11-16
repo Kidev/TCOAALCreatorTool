@@ -672,11 +672,16 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, 
     const isNull = currentValue === null;
 
     let selectValue = "gallery";
-    if (isUrl) {
+
+    if (isUrl || currentValue === "https://") {
         selectValue = "url";
-    } else if (isGallery) {
+    } else if (isGallery || currentValue === "gallery:") {
         selectValue = "gallery";
-    } else if (currentValue && currentValue !== "") {
+    } else if (
+        currentValue === "" ||
+        hasFile ||
+        (currentValue && currentValue !== "https://" && currentValue !== "gallery:")
+    ) {
         selectValue = "local";
     }
 
@@ -747,16 +752,18 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, 
     } else if (selectValue === "url") {
         const urlHandler = isBackgroundMusic ? "BackgroundMusic" : isSound ? "Sound" : "Image";
         const urlParams = isBackgroundMusic || isSound ? sceneIndex : `${sceneIndex}, '${field}'`;
+        const urlValue = isUrl && currentValue !== "https://" ? currentValue : "";
 
         html += `
             <label for="${fileId}" style="display: none;"></label>
             <input type="text" id="${fileId}" class="url-input" placeholder="Enter URL"
-                   value="${isUrl ? currentValue : ""}"
+                   value="${urlValue}"
                    onchange="handle${urlHandler}Url(${urlParams}, this.value)">
         `;
     } else if (selectValue === "gallery") {
         let displayName = "Select from gallery";
-        if (isGallery) {
+        const hasGalleryAsset = isGallery && currentValue !== "gallery:";
+        if (hasGalleryAsset) {
             const match = currentValue.match(/^gallery:([^/]+)\/(.+)$/);
             if (match) {
                 displayName = match[2];
@@ -764,9 +771,9 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, 
         }
         html += `
             <label for="${fileId}" style="display: none;"></label>
-            <button id="${fileId}" class="gallery-button ${isGallery ? "has-file" : ""}" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound || isBackgroundMusic})">
+            <button id="${fileId}" class="gallery-button ${hasGalleryAsset ? "has-file" : ""}" onclick="openGalleryForField(${sceneIndex}, '${field}', ${isSound || isBackgroundMusic})">
                 <span class="filename">${displayName}</span>
-                ${isGallery ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound}, ${isBackgroundMusic})">☓</button>` : ""}
+                ${hasGalleryAsset ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound}, ${isBackgroundMusic})">☓</button>` : ""}
             </button>
         `;
     }
@@ -807,14 +814,23 @@ function handleFileTypeChange(sceneIndex, field, type, isSound = false, isBackgr
     const container = document.getElementById(`${selectId}-container`);
     const fileId = `file-${fieldId}-${sceneIndex}`;
 
+    let markerValue = "";
+    if (type === "url") {
+        markerValue = "https://";
+    } else if (type === "gallery") {
+        markerValue = "gallery:";
+    } else {
+        markerValue = "";
+    }
+
     if (isBackgroundMusic) {
-        projectData.scenes[sceneIndex].backgroundMusic = null;
+        projectData.scenes[sceneIndex].backgroundMusic = markerValue;
         backgroundMusicMap.delete(sceneIndex);
     } else if (isSound) {
-        projectData.scenes[sceneIndex].sound = null;
+        projectData.scenes[sceneIndex].sound = markerValue;
         soundMap.delete(sceneIndex);
     } else {
-        projectData.scenes[sceneIndex][field] = null;
+        projectData.scenes[sceneIndex][field] = markerValue;
         imageMap.delete(`${sceneIndex}-${field}`);
     }
 
@@ -862,7 +878,7 @@ function handleFileTypeChange(sceneIndex, field, type, isSound = false, isBackgr
         `;
     }
 
-    updateScenesList();
+    updateScenesList(sceneIndex);
 }
 
 function openGalleryForField(sceneIndex, field, isSound) {
@@ -902,7 +918,9 @@ function useGalleryAsset(name, category) {
     const asset = assets[name];
 
     if (asset) {
-        if (isSound) {
+        if (field === "backgroundMusic") {
+            backgroundMusicMap.set(sceneIndex, { name: name, blob: asset.blob, galleryRef: galleryRef });
+        } else if (field === "sound" || isSound) {
             soundMap.set(sceneIndex, { name: name, blob: asset.blob, galleryRef: galleryRef });
         } else {
             imageMap.set(`${sceneIndex}-${field}`, { name: name, blob: asset.blob, galleryRef: galleryRef });
@@ -916,15 +934,15 @@ function useGalleryAsset(name, category) {
 function clearFile(sceneIndex, field, isSound = false, isBackgroundMusic = false) {
     if (isBackgroundMusic) {
         backgroundMusicMap.delete(sceneIndex);
-        projectData.scenes[sceneIndex].backgroundMusic = "";
+        projectData.scenes[sceneIndex].backgroundMusic = null;
     } else if (isSound) {
         soundMap.delete(sceneIndex);
-        projectData.scenes[sceneIndex].sound = "";
+        projectData.scenes[sceneIndex].sound = null;
     } else {
         imageMap.delete(`${sceneIndex}-${field}`);
-        projectData.scenes[sceneIndex][field] = "";
+        projectData.scenes[sceneIndex][field] = null;
     }
-    updateScenesList();
+    updateScenesList(sceneIndex);
 }
 
 function addScene() {
@@ -958,26 +976,26 @@ function addScene() {
 }
 
 function handleImageUrl(sceneIndex, field, url) {
-    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+    if (url && url !== "https://" && (url.startsWith("http://") || url.startsWith("https://"))) {
         projectData.scenes[sceneIndex][field] = url;
         imageMap.delete(`${sceneIndex}-${field}`);
-        updateScenesList();
+        updateScenesList(sceneIndex);
     } else if (!url) {
-        projectData.scenes[sceneIndex][field] = "";
+        projectData.scenes[sceneIndex][field] = "https://";
         imageMap.delete(`${sceneIndex}-${field}`);
-        updateScenesList();
+        updateScenesList(sceneIndex);
     }
 }
 
 function handleSoundUrl(sceneIndex, url) {
-    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+    if (url && url !== "https://" && (url.startsWith("http://") || url.startsWith("https://"))) {
         projectData.scenes[sceneIndex].sound = url;
         soundMap.delete(sceneIndex);
-        updateScenesList();
+        updateScenesList(sceneIndex);
     } else if (!url) {
-        projectData.scenes[sceneIndex].sound = "";
+        projectData.scenes[sceneIndex].sound = "https://";
         soundMap.delete(sceneIndex);
-        updateScenesList();
+        updateScenesList(sceneIndex);
     }
 }
 
@@ -1009,6 +1027,12 @@ function updateScenesList(onlyUpdateIndex = null) {
             if (expandedScenes.has(onlyUpdateIndex)) {
                 setTimeout(() => updatePreviewDialog(onlyUpdateIndex), 0);
             }
+
+            setTimeout(() => {
+                updateSpeakerDropdownColor(onlyUpdateIndex);
+                updateScenePreviewLinesColor(onlyUpdateIndex);
+            }, 0);
+
             return;
         }
     }
@@ -1019,7 +1043,14 @@ function updateScenesList(onlyUpdateIndex = null) {
         container.appendChild(item);
     });
 
-    setTimeout(() => updateAllPreviewDialogs(), 0);
+    setTimeout(() => {
+        updateAllPreviewDialogs();
+
+        projectData.scenes.forEach((scene, index) => {
+            updateSpeakerDropdownColor(index);
+            updateScenePreviewLinesColor(index);
+        });
+    }, 0);
 }
 
 function escapeHtml(text) {
@@ -1098,7 +1129,8 @@ function createSceneElement(index) {
     } else if (preview2.length > 0) {
         preview2 = quote + preview2 + quote;
     } else {
-        preview1 = "(NO TEXT)";
+        //preview1 = "(NO TEXT)";
+        preview1 = "";
     }
 
     if (scene.demonSpeaker === true) {
@@ -1157,12 +1189,12 @@ function createSceneElement(index) {
                     <span class="scene-preview-lines">${preview1}&nbsp;<br/>${preview2}&nbsp;</span>
                 </div>
             </button>
-        <div class="header-action-buttons">
-            <button onclick="moveScene(${index}, -1)" style="display: ${index === 0 ? "none" : "block"}">↑</button>
-            <button onclick="moveScene(${index}, 1)" style="display: ${index === projectData.scenes.length - 1 ? "none" : "block"}">↓</button>
-            <button onclick="duplicateScene(${index})" title="Duplicate scene">⎘</button>
-            <button class="danger" onclick="deleteScene(${index})">✕</button>
-        </div>
+            <div class="header-action-buttons">
+                <button onclick="moveScene(${index}, -1)" style="display: ${index === 0 ? "none" : "block"}">↑</button>
+                <button onclick="moveScene(${index}, 1)" style="display: ${index === projectData.scenes.length - 1 ? "none" : "block"}">↓</button>
+                <button onclick="duplicateScene(${index})" title="Duplicate scene">⎘</button>
+                <button class="danger" onclick="deleteScene(${index})">✕</button>
+            </div>
         </div>
         <div class="collapsible-content" style="display: ${isExpanded ? "block" : "none"};">
             <div class="scene-content">
@@ -1269,9 +1301,7 @@ function createSceneElement(index) {
                             onchange="toggleNull(${index}, 'sound', !this.checked)"
                             title="Uncheck to disable this parameter">
                         <label for="sound-checkbox-${index}">Sound effect</label>
-                        <div style="display: flex; align-items: center; gap: 0.8vmax; flex: 1;">
-                            ${createFileSelectHTML(index, "sound", scene.sound, true)}
-                        </div>
+                        ${createFileSelectHTML(index, "sound", scene.sound, true)}
                     </div>
                     <div id="sound-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.sound) ? "" : "display: none;"}">
                         <div class="form-group audio">
@@ -1301,9 +1331,7 @@ function createSceneElement(index) {
                             onchange="toggleNull(${index}, 'backgroundMusic', !this.checked)"
                             title="Uncheck to disable this parameter">
                         <label for="backgroundMusic-checkbox-${index}">Background</label>
-                        <div style="display: flex; align-items: center; gap: 0.8vmax; flex: 1;">
-                            ${createFileSelectHTML(index, "backgroundMusic", scene.backgroundMusic, false, true)}
-                        </div>
+                        ${createFileSelectHTML(index, "backgroundMusic", scene.backgroundMusic, false, true)}
                     </div>
                     <div id="backgroundMusic-params-${index}" style="margin-left: 2.5vmax; ${isValidData(scene.backgroundMusic) ? "" : "display: none;"}">
                         <div class="form-group audio">
@@ -1457,7 +1485,7 @@ function createSceneElement(index) {
                 <div class="scene-group effects-assets-group">
                     <h4 class="collapsible-group-header" onclick="toggleSceneGroup(this)">Choices and effects</h4>
                     <div class="collapsible-group-content" style="display: none;">
-                    <div class="form-group">
+                    <div class="form-group choices">
                         <input type="checkbox" class="null-checkbox" id="shake-checkbox-${index}"
                             ${isValidData(scene.shake) && scene.shake === true ? "checked" : ""}
                             onchange="toggleNull(${index}, 'shake', !this.checked)"
@@ -1481,7 +1509,7 @@ function createSceneElement(index) {
                                 onchange="updateSceneValue(${index}, 'shakeDuration', parseInt(this.value))">
                         </div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group choices">
                         <input type="checkbox" class="null-checkbox" id="choices-checkbox-${index}"
                             ${isValidData(scene.choices) && scene.choices === true ? "checked" : ""}
                             onchange="toggleNull(${index}, 'choices', !this.checked)"
@@ -1505,7 +1533,7 @@ function createSceneElement(index) {
                                 onchange="updateSceneValue(${index}, 'choiceSpeed', parseInt(this.value))">
                         </div>
                         <div class="form-group choices-list-group">
-                            <label class="label-for-choices" for="ichoices-list-${index}">Choices:</label>
+                            <label class="label-for-choices" for="choices-list-${index}">Choices:</label>
                             <div id="choices-list-${index}" class="choices-list">
                                 ${renderChoicesList(index, scene.choicesList || [], scene.correctChoice || 0)}
                             </div>                       
@@ -1917,6 +1945,51 @@ function updateTimingPresetDropdown(index, type) {
     }
 }
 
+function updateScenePreviewLinesColor(index) {
+    const sceneItems = document.querySelectorAll(".scene-item");
+    const sceneItem = sceneItems[index];
+    if (!sceneItem) return;
+
+    const previewLinesElement = sceneItem.querySelector(".scene-preview-lines");
+    if (!previewLinesElement) return;
+
+    const scene = projectData.scenes[index];
+    const speaker = scene.speaker;
+
+    if (!speaker || speaker === "Notification") {
+        previewLinesElement.style.color = "var(--txt-color)";
+        return;
+    }
+
+    const characterInfo = dialogFramework.getCharacterFromSpeaker(speaker);
+    if (characterInfo && characterInfo.character.color) {
+        previewLinesElement.style.color = characterInfo.character.color;
+    } else {
+        previewLinesElement.style.color = "var(--txt-color)";
+    }
+}
+
+function updateSpeakerDropdownColor(index) {
+    const selectElement = document.getElementById(`selectSpeaker${index}`);
+    if (!selectElement) return;
+
+    selectElement.classList.add("custom-dropdown-arrow");
+
+    const speaker = selectElement.value;
+
+    if (!speaker || speaker === "Notification") {
+        selectElement.style.color = "var(--txt-color)";
+        return;
+    }
+
+    const characterInfo = dialogFramework.getCharacterFromSpeaker(speaker);
+    if (characterInfo && characterInfo.character.color) {
+        selectElement.style.color = characterInfo.character.color;
+    } else {
+        selectElement.style.color = "var(--txt-color)";
+    }
+}
+
 function updateSceneValue(index, field, value) {
     if (["line1", "line2"].includes(field)) {
         const scene = projectData.scenes[index];
@@ -1947,22 +2020,6 @@ function updateSceneValue(index, field, value) {
             setTimeout(() => updatePreviewDialog(index), 0);
         }
     } else {
-        projectData.scenes[index][field] = value;
-
-        if (["speaker", "censorSpeaker", "demonSpeaker", "centerDialog", "hideDialogBox"].includes(field)) {
-            updateScenesList(index);
-            setTimeout(() => updatePreviewDialog(index), 0);
-        }
-
-        const dialogTimingFields = ["dialogFadeInTime", "dialogFadeOutTime", "dialogDelayIn", "dialogDelayOut"];
-        const backgroundTimingFields = ["imageFadeInTime", "imageFadeOutTime", "imageDelayIn", "imageDelayOut"];
-
-        if (dialogTimingFields.includes(field)) {
-            updateTimingPresetDropdown(index, "dialog");
-        } else if (backgroundTimingFields.includes(field)) {
-            updateTimingPresetDropdown(index, "background");
-        }
-
         const portraitTimingMatch = field.match(/^portrait(Left|Right)(FadeIn|FadeOut|DelayIn|DelayOut)$/);
         if (portraitTimingMatch) {
             const [, side, timing] = portraitTimingMatch;
@@ -1977,6 +2034,28 @@ function updateSceneValue(index, field, value) {
             }
             projectData.scenes[index].portraitsTimings[sideIndex][timingIndex] = value;
             updateTimingPresetDropdown(index, side === "Left" ? "portraitLeft" : "portraitRight");
+        } else {
+            projectData.scenes[index][field] = value;
+
+            if (["speaker", "censorSpeaker", "demonSpeaker", "centerDialog", "hideDialogBox"].includes(field)) {
+                updateScenesList(index);
+                setTimeout(() => {
+                    updatePreviewDialog(index);
+                    if (field === "speaker") {
+                        updateSpeakerDropdownColor(index);
+                        updateScenePreviewLinesColor(index);
+                    }
+                }, 0);
+            }
+
+            const dialogTimingFields = ["dialogFadeInTime", "dialogFadeOutTime", "dialogDelayIn", "dialogDelayOut"];
+            const backgroundTimingFields = ["imageFadeInTime", "imageFadeOutTime", "imageDelayIn", "imageDelayOut"];
+
+            if (dialogTimingFields.includes(field)) {
+                updateTimingPresetDropdown(index, "dialog");
+            } else if (backgroundTimingFields.includes(field)) {
+                updateTimingPresetDropdown(index, "background");
+            }
         }
     }
 }
@@ -2029,7 +2108,7 @@ async function handleImageUpload(sceneIndex, field, input) {
             }
         }
 
-        updateScenesList();
+        updateScenesList(sceneIndex);
     }
 }
 
@@ -2047,7 +2126,7 @@ async function handleSoundUpload(sceneIndex, input) {
             }
         }
 
-        updateScenesList();
+        updateScenesList(sceneIndex);
     }
 }
 
@@ -2065,19 +2144,19 @@ async function handleBackgroundMusicUpload(sceneIndex, input) {
             }
         }
 
-        updateScenesList();
+        updateScenesList(sceneIndex);
     }
 }
 
 function handleBackgroundMusicUrl(sceneIndex, url) {
-    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+    if (url && url !== "https://" && (url.startsWith("http://") || url.startsWith("https://"))) {
         projectData.scenes[sceneIndex].backgroundMusic = url;
         backgroundMusicMap.delete(sceneIndex);
-        updateScenesList();
+        updateScenesList(sceneIndex);
     } else if (!url) {
-        projectData.scenes[sceneIndex].backgroundMusic = "";
+        projectData.scenes[sceneIndex].backgroundMusic = "https://";
         backgroundMusicMap.delete(sceneIndex);
-        updateScenesList();
+        updateScenesList(sceneIndex);
     }
 }
 
@@ -2266,12 +2345,12 @@ function toggleNull(sceneIndex, field, isNull) {
                 currentlyPlayingAudio = null;
             }
         } else if (field === "shake") {
-            projectData.scenes[sceneIndex][field] = false;
+            projectData.scenes[sceneIndex][field] = null;
         } else if (field === "choices") {
             projectData.scenes[sceneIndex][field] = null;
-            projectData.scenes[sceneIndex].choicesList = null;
-            projectData.scenes[sceneIndex].correctChoice = null;
-            projectData.scenes[sceneIndex].choiceSpeed = null;
+            projectData.scenes[sceneIndex].choicesList = [];
+            projectData.scenes[sceneIndex].correctChoice = 0;
+            projectData.scenes[sceneIndex].choiceSpeed = 500;
         }
     } else {
         if (field === "shake") {
@@ -2282,7 +2361,7 @@ function toggleNull(sceneIndex, field, isNull) {
             projectData.scenes[sceneIndex].correctChoice = 0;
             projectData.scenes[sceneIndex].choiceSpeed = 500;
         } else {
-            projectData.scenes[sceneIndex][field] = "";
+            projectData.scenes[sceneIndex][field] = "gallery:";
         }
     }
 
@@ -2366,7 +2445,7 @@ function renderChoicesList(sceneIndex, choicesList, correctChoice) {
     let html = "";
     displayList.forEach((choice, i) => {
         const hasContent = choice && choice.trim() !== "";
-        const placeholderText = i === 0 ? "first choice" : `choice ${i + 1}`;
+        const placeholderText = `Choice #${i + 1}`;
 
         html += `
             <div class="choice-item ${hasContent ? "has-content" : "empty"}">
@@ -2784,7 +2863,7 @@ function updateBackgroundMusicVolume(value) {
     }
 }
 
-function handleBackgroundMusicUpload(input) {
+function handleConfigBackgroundMusicUpload(input) {
     const file = input.files[0];
     if (file) {
         backgroundMusicFile = file;
@@ -2831,7 +2910,7 @@ function handleBackgroundMusicTypeChange(type) {
 
         container.innerHTML = `
             <input type="file" id="backgroundMusicFile" accept="audio/*"
-                   onchange="handleBackgroundMusicUpload(this)" ${!enabled ? "disabled" : ""}>
+                   onchange="handleConfigBackgroundMusicUpload(this)" ${!enabled ? "disabled" : ""}>
             <button class="file-select-button ${fileName ? "has-file" : ""}" 
                     onclick="document.getElementById('backgroundMusicFile').click()"
                     id="backgroundMusicButton"
@@ -2855,7 +2934,7 @@ function handleBackgroundMusicTypeChange(type) {
         container.innerHTML = `
             <input type="text" class="url-input" placeholder="Enter URL"
                    value="${currentUrl}"
-                   onchange="handleBackgroundMusicUrl(this.value)"
+                   onchange="handleConfigBackgroundMusicUrl(this.value)"
                    ${!enabled ? "disabled" : ""}>
         `;
 
@@ -2870,7 +2949,7 @@ function handleBackgroundMusicTypeChange(type) {
     }
 }
 
-function handleBackgroundMusicUrl(url) {
+function handleConfigBackgroundMusicUrl(url) {
     if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
         backgroundMusicFile = null;
         if (backgroundMusicBlobUrl) {
@@ -3066,6 +3145,8 @@ function generateCode() {
         Object.keys(scene).forEach((key) => {
             if (key.endsWith("BlobUrl")) return;
 
+            if (key.match(/^portrait(Left|Right)(FadeIn|FadeOut|DelayIn|DelayOut)$/)) return;
+
             const value = scene[key];
             const defaultValue = DEFAULTS.scene[key];
 
@@ -3170,8 +3251,19 @@ if (document.getElementById("configShowControls")) {
 }
 
 if (document.getElementById("charactersList")) {
+    dialogFramework.setCharacters(projectData.characters);
+    dialogFramework.setConfig(projectData.config);
+    dialogFramework.setGlitchConfig(projectData.glitchConfig);
+
     updateCharactersList();
     updateScenesList();
+
+    document.getElementById("glitchScrambledColor").value = projectData.glitchConfig.scrambledColor;
+    document.getElementById("glitchRealColor").value = projectData.glitchConfig.realColor;
+    document.getElementById("glitchChangeSpeed").value = projectData.glitchConfig.changeSpeed;
+    document.getElementById("glitchRealProbability").value = projectData.glitchConfig.realProbability;
+    document.getElementById("glitchAutoStart").checked = projectData.glitchConfig.autoStart;
+    document.getElementById("glitchCharsAllowed").value = projectData.glitchConfig.charsAllowed;
 }
 
 document.addEventListener("DOMContentLoaded", function () {

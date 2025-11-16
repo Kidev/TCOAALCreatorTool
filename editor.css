@@ -218,7 +218,6 @@ h6 {
     display: grid;
     grid-template-columns: 1% 30% auto;
     align-items: center;
-    gap: 0.8vmax;
     height: 3vmax;
 }
 
@@ -277,10 +276,16 @@ h6 {
 
 .form-group.visuals {
     grid-template-columns: 1% 15% auto;
+    gap: 0.8vmax;
 }
 
 .form-group.audio {
-    grid-template-columns: 1% 15% auto;
+    grid-template-columns: 1% 19% auto;
+    gap: 0.8vmax;
+}
+
+.form-group.choices {
+    gap: 0.8vmax;
 }
 
 .form-group label {
@@ -302,6 +307,30 @@ select {
     font-family: "Faustina", serif;
     width: 100%;
     font-size: 0.85vmax;
+}
+
+/* Style all speaker dropdowns with custom white arrow */
+select.custom-dropdown-arrow {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.8vmax center;
+    background-size: 1vmax;
+    padding-right: 2.5vmax;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+select.custom-dropdown-arrow::picker-icon {
+    display: none;
+}
+
+select.custom-dropdown-arrow::-webkit-calendar-picker-indicator {
+    display: none;
+}
+
+select.custom-dropdown-arrow::-moz-calendar-picker-indicator {
+    display: none;
 }
 
 input[type="color"] {
@@ -331,10 +360,9 @@ input[type="checkbox"]:not(.null-checkbox) {
 
 .file-select-wrapper {
     display: flex;
-    align-items: stretch;
+    align-items: center;
     flex-direction: row;
     gap: 0.8vmax;
-    /*align-items: center;*/
 }
 
 .file-type-select {
@@ -350,14 +378,17 @@ input[type="checkbox"]:not(.null-checkbox) {
 
 .file-select-button {
     background: var(--accent-color-light);
-    color: var(--default);
+    color: var(--txt-color);
     border: none;
-    padding: 0.5vmax 1vmax;
+    /*padding: 0.5vmax 1vmax;*/
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.85vmax;
+    font-size: 1vmax;
     font-family: "Faustina", serif;
-    display: inline-flex;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-content: center;
     align-items: center;
     gap: 0.5vmax;
     max-width: 20vmax;
@@ -369,7 +400,7 @@ input[type="checkbox"]:not(.null-checkbox) {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
-    align-items: stretch;
+    align-items: center;
 }
 
 .file-select-button:hover {
@@ -403,7 +434,8 @@ input[type="checkbox"]:not(.null-checkbox) {
     /*margin: 0.5vmax; */
     justify-items: center;
     justify-self: center;
-    /*padding: 0.1vmax; */
+    padding: 0.1vmax 0.5vmax;
+    margin-left: 0.1vmax;
     /*padding-inline: 0.5vmax; */
 }
 
@@ -658,7 +690,8 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     justify-content: flex-start;
     align-items: center;
     flex-direction: row;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    width: 100%;
 }
 
 .scene-item-header .collapsible {
@@ -1249,7 +1282,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 .visual-assets-preview {
     position: relative;
     width: 100%;
-    height: 100%;
+    height: auto;
     display: flex;
     align-items: center;
     justify-content: center;

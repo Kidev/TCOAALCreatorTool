@@ -31,12 +31,12 @@ const defaultPresets = [
         name: "❤️☀️💔",
         description: "Penny for your thoughts? The infamous scene from Chapter 2",
         url: "index.html?mode=viewer&use=win",
-    },
+    } /*
     {
         name: "Burglary time",
         description: "Let's find a plank to cross",
         url: "index.html?mode=viewer&use=plank",
-    },
+    },*/,
 ];
 
 const shortPresets = [

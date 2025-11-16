@@ -21,7 +21,7 @@ class MemoryManager {
         this.db = null;
         this.dbName = "TCOAALAssets";
         this.dbVersion = 3;
-        this.DATA_VERSION = "1.1.0";
+        this.DATA_VERSION = "1.1.1";
         this.isReady = false;
         this.initPromise = this.initDB();
         this.haveDataStored = false;
