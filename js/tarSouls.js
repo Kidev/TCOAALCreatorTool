@@ -93,14 +93,18 @@ const DIFFICULTY_CONFIGS = {
         SPEED_OFFSET: 200,
 
         // Enemy spawn rates (must sum to 1.0)
-        SOUL_SPAWN_RATE: 0.7, // 70% souls
-        GRIME_SPAWN_RATE: 0.2, // 20% grime souls
-        TAR_SPAWN_RATE: 0.1, // 10% tar souls
+        SOUL_SPAWN_RATE: 0.7, // 70% Souls
+        GRIME_SPAWN_RATE: 0.2, // 20% grime Souls
+        TAR_SPAWN_RATE: 0.1, // 10% tar Souls
 
         // Win conditions
         FOLLOWERS_NEEDED_FOR_ANDY: 5,
         NINAS_TO_SPAWN: 3,
         GRACE_SPAWNS: 5,
+
+        // Nina box respawn mechanics
+        NINA_RESPAWN_COOLDOWN: 1500, // ms before respawned Nina can move
+        NINA_CAN_TRIGGER_BOX_RESPAWN: true,
 
         // Wall behavior
         WALL_BEHAVIOR: "teleport", // Options: "teleport", "push_down", "game_over"
@@ -113,14 +117,18 @@ const DIFFICULTY_CONFIGS = {
         SPEED_OFFSET: 100,
 
         // Enemy spawn rates
-        SOUL_SPAWN_RATE: 0.5, // 50% souls
-        GRIME_SPAWN_RATE: 0.3, // 30% grime souls
-        TAR_SPAWN_RATE: 0.2, // 20% tar souls
+        SOUL_SPAWN_RATE: 0.5, // 50% Souls
+        GRIME_SPAWN_RATE: 0.3, // 30% grime Souls
+        TAR_SPAWN_RATE: 0.2, // 20% tar Souls
 
         // Win conditions
         FOLLOWERS_NEEDED_FOR_ANDY: 10,
         NINAS_TO_SPAWN: 5,
         GRACE_SPAWNS: 3,
+
+        // Nina box respawn mechanics
+        NINA_RESPAWN_COOLDOWN: 1000, // ms before respawned Nina can move
+        NINA_CAN_TRIGGER_BOX_RESPAWN: true,
 
         // Wall behavior
         WALL_BEHAVIOR: "push_down",
@@ -133,9 +141,9 @@ const DIFFICULTY_CONFIGS = {
         SPEED_OFFSET: 0,
 
         // Enemy spawn rates
-        SOUL_SPAWN_RATE: 0.4, // 40% souls
-        GRIME_SPAWN_RATE: 0.4, // 40% grime souls
-        TAR_SPAWN_RATE: 0.2, // 20% tar souls
+        SOUL_SPAWN_RATE: 0.4, // 40% Souls
+        GRIME_SPAWN_RATE: 0.4, // 40% grime Souls
+        TAR_SPAWN_RATE: 0.2, // 20% tar Souls
 
         // Win conditions
         FOLLOWERS_NEEDED_FOR_ANDY: 10,
@@ -144,6 +152,10 @@ const DIFFICULTY_CONFIGS = {
 
         // Pocket dust
         POCKET_DUST_COOLDOWN: 500, // ms between shots (harder = shorter cooldown)
+
+        // Nina box respawn mechanics
+        NINA_RESPAWN_COOLDOWN: 500, // ms before respawned Nina can move
+        NINA_CAN_TRIGGER_BOX_RESPAWN: true,
 
         // Wall behavior
         WALL_BEHAVIOR: "game_over",
@@ -269,7 +281,7 @@ const ENEMY_CONFIG = [
         },
     },
     {
-        // Grime soul
+        // Grime Soul
         type: 2,
         category: "Game sprites",
         spritesheet: "spritessheet_12x8_characters_11.png",
@@ -282,7 +294,7 @@ const ENEMY_CONFIG = [
         },
     },
     {
-        // Tar soul
+        // Tar Soul
         type: 3,
         category: "Game sprites",
         spritesheet: "spritessheet_12x8_characters_17.png",
@@ -642,6 +654,7 @@ class Enemy {
 
         this.lastMoveTime = 0;
         this.blocked = false;
+        this.movementCooldownUntil = 0; // Timestamp until which movement is disabled
 
         this.currentAnimDirection = "forward";
         if (this.config.frames.forward && this.config.frames.forward.length > 0 && this.config.spritesheetImage) {
@@ -652,6 +665,10 @@ class Enemy {
     }
 
     move(timestamp, player = null, otherEnemies = []) {
+        if (timestamp < this.movementCooldownUntil) {
+            return false;
+        }
+
         if (timestamp - this.lastMoveTime < this.speed) {
             return false;
         }
@@ -695,6 +712,10 @@ class Enemy {
 
     setBlocked(blocked) {
         this.blocked = blocked;
+    }
+
+    setMovementCooldown(timestamp, cooldownMs) {
+        this.movementCooldownUntil = timestamp + cooldownMs;
     }
 }
 
@@ -803,7 +824,7 @@ class CollisionDetector {
             return true;
         }
 
-        // Generous collision for positive interactions (catching Andy/souls)
+        // Generous collision for positive interactions (catching Andy/Souls)
         // Check if they're on the same column/row and within 1 cell
         const dx = Math.abs(player.x - enemy.x);
         const dy = Math.abs(player.y - enemy.y);
@@ -1054,6 +1075,7 @@ class TarSoulsGame {
         sidebar.style.display = "flex";
         sidebar.style.flexDirection = "column";
         sidebar.style.justifyContent = "space-between";
+        botBlock.style.cssText = `display:flex;flex-direction:column;align-items:center;`;
 
         const title = document.createElement("img");
         title.src = "img/tcoaal-tarsouls.webp";
@@ -1145,11 +1167,11 @@ class TarSoulsGame {
         controlsList.style.cssText =
             "margin-top: 1vmax;color: var(--txt-color, #ddd); font-family: TCOAAL, monospace; font-size: 0.9rem; line-height: 1.4; z-index: 10;padding-left: 0; margin-bottom: 20px;";
         const li1 = document.createElement("li");
-        li1.innerHTML = `Move around using <strong>↑↓←→</strong> or <strong id="tarSoulsControlKeys">WASD</strong>`;
+        li1.innerHTML = `Move around using <strong id="tarSoulsControlKeys">WASD</strong> or <strong style="font-size: 1.5rem;">←↑↓→</strong>`;
         const li2 = document.createElement("li");
-        li2.innerHTML = `To attack hussies, use <strong>SPACE</strong> to throw dust clouds in front of you`;
+        li2.innerHTML = `Throw dust using <strong>SPACE</strong> and lock the hussies`;
         const li3 = document.createElement("li");
-        li3.innerHTML = `To pause use <strong>P</strong> or <strong>ESC</strong>`;
+        li3.innerHTML = `Pause using <strong>ESC</strong>`;
         controlsList.appendChild(li1);
         controlsList.appendChild(li2);
         controlsList.appendChild(li3);
@@ -1166,7 +1188,7 @@ class TarSoulsGame {
         layoutButton.id = "tarSoulsLayoutBtn";
         layoutButton.textContent = "Layout: QWERTY";
         layoutButton.onclick = () => this.toggleKeyLayout();
-        layoutButton.style.width = "50%";
+        layoutButton.style.width = "55%";
         botBlock.appendChild(layoutButton);
 
         const muteMusicButton = document.createElement("button");
@@ -1174,7 +1196,7 @@ class TarSoulsGame {
         muteMusicButton.id = "tarSoulsMuteMusicBtn";
         muteMusicButton.textContent = "Music: ON";
         muteMusicButton.onclick = () => this.toggleMuteMusic();
-        muteMusicButton.style.width = "50%";
+        muteMusicButton.style.width = "55%";
         botBlock.appendChild(muteMusicButton);
 
         const muteSoundButton = document.createElement("button");
@@ -1182,7 +1204,7 @@ class TarSoulsGame {
         muteSoundButton.id = "tarSoulsMuteSoundBtn";
         muteSoundButton.textContent = "Sound FX: ON";
         muteSoundButton.onclick = () => this.toggleMuteSound();
-        muteSoundButton.style.width = "50%";
+        muteSoundButton.style.width = "55%";
         botBlock.appendChild(muteSoundButton);
 
         const backButton = document.createElement("button");
@@ -1190,7 +1212,7 @@ class TarSoulsGame {
         backButton.textContent = "Quit";
         backButton.onclick = () => this.exitGame();
         backButton.style.width = "100%";
-        backButton.style.marginTop = "0.5vmax";
+        backButton.style.marginTop = "1vmax";
         botBlock.appendChild(backButton);
 
         const scoreDisplay = document.createElement("div");
@@ -1558,36 +1580,35 @@ class TarSoulsGame {
         const ninaIcon = createSpriteIcon(ENEMY_TYPES.ENEMY_HUSSY);
 
         instructionsPanel.innerHTML = `
-            <h2 style="color: var(--purple, #e2829a); margin-top: 0; font-size:1.5rem;display:flex; justify-content:center;">Description</h2>
-            <p style="margin-bottom: 20px;text-align:justify;">Ashley must venture through the demon realm to save Andy from the hussies. Gather souls to grow stronger. Avoid Grime Souls. Sacrifice some of your souls to prevent Tar Souls from ascending! Then grab your useless brother, dust off the hussies and leave from where you came!</p>
+            <h2 style="color: var(--purple, #e2829a); margin-top: 2vmax; margin-bottom:0.5vmax; font-size:1.5rem;display:flex; justify-content:center;">Description</h2>
+            <p style="margin-bottom: 20px;text-align:justify;">Ashley must venture through the demon realm to save Andy from the hussies. She needs to collect pure Souls, avoid Grime Souls, and sometimes sacrifice some of her Souls to prevent a Tar Soul from Ascending! Once powerful enough, she'll be able to summon and grab her useless brother. Finally, she must dust off the hussies to open the portal back to the human realm and leave!</p>
 <p style="margin-bottom: 20px;"><ul style="padding-left: 0; margin-bottom: 20px;">
-            <li>Stay above the bottom boundary line, the Shadows</li>
-            <li>Stay below the top, so do not Ascend</li>
-            <li>Catch souls by touching them</li>
-            <li>Hit Tar/Grime Souls to push them</li>
-            <li>Push from sides = push down | Push from top/bottom = push left or right</li>
-            <li>Pushed souls can kill other enemies! Pushed into Andy = GAME OVER!</li>
-           <li>If pushed into your tail, they act normally (tar = lose souls, grime = steal one)</li>
-            <li>Tar Soul are deadly if they ascend, but they disappear after stealing souls, use this at your advantage</li>
-            <li>Grime souls steal one soul but keep moving, just avoid them</li>
+            <li>Do not go into the Shadows at the bottom of the area</li>
+            <li>Do not Ascend, stay below the top of the area</li>
+            <li>Catch Souls by touching them</li>
+            <li>Push Tar Souls and Grime Souls by touching them</li>
+            <li>Pushing from the sides will push them down, otherwise it'll push them sideways</li>
+            <li>Pushed Souls affect what they hit</li>
+            <li>Tar Soul cannot be allowed to Ascend, but they disappear after stealing at least one Soul. Use this at your advantage</li>
+            <li>Grime Souls steal one Soul but keep moving, just avoid them</li>
 </ul></p>
 
-            <h2 style="color: var(--purple, #e2829a); font-size: 1.5rem;display:flex; justify-content:center;">Souls</h2>
+            <h2 style="color: var(--purple, #e2829a); margin-bottom:0.5vmax;margin-top:2vmax; font-size: 1.5rem;display:flex; justify-content:center;">Characters</h2>
             <div style="margin-bottom: 15px;">
                 <div id="soulEntity" style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
-                    <div><strong>Soul</strong> - Catch to gain one soul!</div>
+                    <div><strong>Soul</strong> - Your favourite food!</div>
                 </div>
                 <div id="grimeEntity" style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
-                    <div><strong>Grime Soul</strong> - Hit to PUSH away. If it touches your souls, it steals one!</div>
+                    <div><strong>Grime Soul</strong> - If it touches your Souls, it steals one!</div>
                 </div>
                 <div id="tarEntity" style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
-                    <div><strong>Tar Soul</strong> - Hit to PUSH away. If it touches your souls, it leaves but steals all souls after the one it touched. It MUST NOT ascend!</div>
+                    <div><strong>Tar Soul</strong> - It MUST NOT Ascend! If it touches your Souls, it vanishes but steals all Souls after the one it touched.</div>
                 </div>
                 <div id="ninaEntity" style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
-                    <div><strong>Nina</strong> - Must be dusted. Leaves cute box when she dies, don't touch it!</div>
+                    <div><strong>Nina</strong> - Must be dusted. Leaves cute box when she dies: don't touch it, she will escape!</div>
                 </div>
                 <div id="andyEntity" style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
-                    <div><strong>Andy</strong> - Appears once you own ${this.getDifficultyConfig().FOLLOWERS_NEEDED_FOR_ANDY} souls. Grab him, dust off the hussies and leave!</div>
+                    <div><strong>Andy</strong> - Appears once you own enough Souls. Grab him, dust off the hussies and leave!</div>
                 </div>
             </div>
         `;
@@ -1615,16 +1636,16 @@ class TarSoulsGame {
 
         const config = this.getDifficultyConfig();
         const commonRules = [
-            `Get ${config.FOLLOWERS_NEEDED_FOR_ANDY} souls without letting a Tar Soul ascend`,
+            `Get ${config.FOLLOWERS_NEEDED_FOR_ANDY} Souls without letting a Tar Soul Ascend`,
             `Catch Andy, kill ${config.NINAS_TO_SPAWN} hussies and escape`,
-            `First ${config.GRACE_SPAWNS} enemies cannot be Tar Souls`,
+            //`First ${config.GRACE_SPAWNS} enemies cannot be Tar Souls`,
         ];
 
         // Difficulty-specific rules using dynamic config
         const wallBehaviorText = {
-            teleport: "teleport to opposite side",
+            teleport: "get teleported to the opposite side",
             push_down: "get forced down",
-            game_over: "lose",
+            game_over: "die",
         };
 
         const difficultyRules = [
@@ -1633,13 +1654,19 @@ class TarSoulsGame {
             //`<strong>Speed decrease:</strong> ${config.SPEED_DECREASE_PER_PACE}ms per follower`,
             //`<strong>Min speed:</strong> ${config.MIN_SPEED}ms`,
             this.difficulty === "easy"
-                ? `You move slowly`
+                ? `You move carefully and have time to react`
                 : this.difficulty === "normal"
-                  ? `You move regularly`
-                  : `You move fast`,
+                  ? `You move decisively`
+                  : `You move very fast`,
         ];
 
-        const spawnRates = `There is ${Math.round(config.SOUL_SPAWN_RATE * 100)}% souls, ${Math.round(config.GRIME_SPAWN_RATE * 100)}% Grime Souls, ${Math.round(config.TAR_SPAWN_RATE * 100)}% Tar Souls`;
+        //const spawnRates = `There is ${Math.round(config.SOUL_SPAWN_RATE * 100)}% Souls, ${Math.round(config.GRIME_SPAWN_RATE * 100)}% Grime Souls and ${Math.round(config.TAR_SPAWN_RATE * 100)}% Tar Souls`;
+        const spawnRates =
+            this.difficulty === "easy"
+                ? `There are lots of Souls, few Grime Souls, and rarely Tar Souls`
+                : this.difficulty === "normal"
+                  ? `There are some Souls, few Grime Souls, and few Tar Souls`
+                  : `There are as many Souls as Grime Souls, and a few Tar Souls`;
 
         commonRules.forEach((rule) => {
             const li = document.createElement("li");
@@ -1768,6 +1795,17 @@ class TarSoulsGame {
         if (this.ninasAlive === 0) {
             this.spawnVictoryPortal();
         }
+    }
+
+    respawnNinaFromBox(x, y, timestamp) {
+        const config = this.getDifficultyConfig();
+        const nina = new Enemy(ENEMY_TYPES.ENEMY_HUSSY, x, y);
+        nina.renderX = x;
+        nina.renderY = y;
+        nina.direction = DIRECTIONS.DOWN; // Ninas move down towards the player
+        nina.setMovementCooldown(timestamp, config.NINA_RESPAWN_COOLDOWN);
+        this.enemies.push(nina);
+        this.ninasAlive++;
     }
 
     spawnVictoryPortal() {
@@ -1962,21 +2000,26 @@ class TarSoulsGame {
             }
 
             if (!this.phase2Active && CollisionDetector.checkPlayerBoundary(this.player)) {
-                this.gameOver("You got lost in the shadows!");
+                this.gameOver("You got lost in the Shadows!");
                 return;
             }
 
             if (CollisionDetector.checkSelfCollision(this.player)) {
-                this.gameOver("You destroyed one of your souls!");
+                this.gameOver("You destroyed one of your Souls!");
                 return;
             }
 
             if (this.phase2Active) {
-                for (const sprite of this.staticSprites) {
-                    if (sprite.blocksMovement && sprite.x === this.player.x && sprite.y === this.player.y) {
-                        this.gameOver("Oops");
-                        return;
-                    }
+                // Check for box collision and respawn Nina
+                const boxIndex = this.staticSprites.findIndex(
+                    (sprite) => sprite.blocksMovement && sprite.x === this.player.x && sprite.y === this.player.y,
+                );
+                if (boxIndex !== -1) {
+                    const box = this.staticSprites[boxIndex];
+                    // Remove the box
+                    this.staticSprites.splice(boxIndex, 1);
+                    // Respawn a Nina at the box's position
+                    this.respawnNinaFromBox(box.x, box.y, timestamp);
                 }
 
                 if (this.victoryPortalActive) {
@@ -2005,7 +2048,7 @@ class TarSoulsGame {
                     this.gameOver("You were infected by a hussy!");
                     return;
                 }
-                this.handleEnemyHeadCollision(enemy, i);
+                this.handleEnemyHeadCollision(enemy, i, timestamp);
                 continue;
             }
 
@@ -2020,10 +2063,10 @@ class TarSoulsGame {
 
             if (CollisionDetector.checkEnemyReachedTop(enemy)) {
                 if (enemy.type === ENEMY_TYPES.ENEMY_ANDY) {
-                    this.gameOver("Andy ascended, alone.");
+                    this.gameOver("Andy Ascended, alone.");
                     return;
                 } else if (enemy.type === ENEMY_TYPES.ENEMY_TAR) {
-                    this.gameOver("A Tar Soul ascended!");
+                    this.gameOver("A Tar Soul Ascended!");
                     return;
                 } else {
                     this.enemies.splice(i, 1);
@@ -2045,7 +2088,7 @@ class TarSoulsGame {
         this.updateUI();
     }
 
-    handleEnemyHeadCollision(enemy, enemyIndex) {
+    handleEnemyHeadCollision(enemy, enemyIndex, timestamp) {
         switch (enemy.type) {
             case ENEMY_TYPES.ENEMY_ANDY:
                 this.startPhase2(enemy);
@@ -2082,10 +2125,10 @@ class TarSoulsGame {
                 this.enemies.splice(enemyIndex, 1);
                 break;
             case ENEMY_TYPES.ENEMY_GRIME:
-                this.pushEnemy(enemy, enemyIndex);
+                this.pushEnemy(enemy, enemyIndex, timestamp);
                 break;
             case ENEMY_TYPES.ENEMY_TAR:
-                this.pushEnemy(enemy, enemyIndex);
+                this.pushEnemy(enemy, enemyIndex, timestamp);
                 break;
             case ENEMY_TYPES.ENEMY_HUSSY:
                 this.staticSprites.push({
@@ -2098,7 +2141,7 @@ class TarSoulsGame {
         }
     }
 
-    pushEnemy(enemy, enemyIndex) {
+    pushEnemy(enemy, enemyIndex, timestamp) {
         let pushX = 0;
         let pushY = 0;
 
@@ -2184,15 +2227,21 @@ class TarSoulsGame {
             (sprite) => sprite.blocksMovement && sprite.x === newX && sprite.y === newY,
         );
         if (hitStatic !== -1) {
+            const config = this.getDifficultyConfig();
+            if (config.NINA_CAN_TRIGGER_BOX_RESPAWN && enemy.type === ENEMY_TYPES.ENEMY_HUSSY) {
+                const box = this.staticSprites[hitStatic];
+                this.staticSprites.splice(hitStatic, 1);
+                this.respawnNinaFromBox(box.x, box.y, timestamp);
+                return;
+            }
+
             // Can't push into blocking static sprite, push other direction
             pushX = -pushX;
             pushY = -pushY;
             newX = enemy.x + pushX;
             newY = enemy.y + pushY;
 
-            // Validate new position
             if (newX < 0 || newX >= GAME_CONFIG.GRID_WIDTH || newY < 0 || newY >= GAME_CONFIG.GRID_HEIGHT) {
-                // Can't push at all, enemy stays in place
                 return;
             }
         }
@@ -2209,7 +2258,6 @@ class TarSoulsGame {
     }
 
     handleEnemyTailCollision(enemy, enemyIndex, followerIndex) {
-        // Tail collision: enemy touches one of the followers
         switch (enemy.type) {
             case ENEMY_TYPES.ENEMY_ANDY:
                 break;
@@ -2236,7 +2284,7 @@ class TarSoulsGame {
                 // Enemy continues, NOT removed
                 break;
             case ENEMY_TYPES.ENEMY_TAR:
-                // Tar soul removes all followers from the collision point onward
+                // Tar Soul removes all followers from the collision point onward
                 if (this.player.followers.length > 0) {
                     const lostSouls = this.player.followers.length - followerIndex;
                     this.player.followers.splice(followerIndex);
@@ -2256,7 +2304,7 @@ class TarSoulsGame {
                         this.audioManager.playSound(GAME_EVENTS_ASSETS.HIT_ANIM.sound);
                     }
 
-                    // Remove the tar soul enemy
+                    // Remove the tar Soul enemy
                     this.enemies.splice(enemyIndex, 1);
                 }
                 break;
@@ -2372,7 +2420,7 @@ class TarSoulsGame {
 
             // Draw enemy hitboxes (different colors based on type)
             for (const enemy of this.enemies) {
-                let color = "rgba(255, 165, 0, 0.8)"; // Orange for tar souls
+                let color = "rgba(255, 165, 0, 0.8)"; // Orange for tar Souls
                 if (enemy.type === ENEMY_TYPES.ENEMY_ANDY) {
                     color = "rgba(255, 255, 0, 0.8)"; // Yellow for Andy
                 } else if (enemy.type === ENEMY_TYPES.ENEMY_HUSSY) {
