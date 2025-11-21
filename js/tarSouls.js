@@ -16,333 +16,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-function parseSpriteSheetDimensions(filename) {
-    const match = filename.match(/spritessheet_(\d+)x(\d+)_/);
-    if (match) {
-        return {
-            cols: parseInt(match[1]),
-            rows: parseInt(match[2]),
-        };
-    }
-    return { cols: 12, rows: 8 };
-}
-
-// Base game configuration (common to all difficulties)
-const GAME_CONFIG = {
-    GRID_WIDTH: 10,
-    GRID_HEIGHT: 34,
-    CELL_SIZE: 48,
-    PLAY_AREA_X: 384,
-    PLAY_AREA_Y: 240,
-    CAMERA_SIZE: 600,
-    PLAYER_START_X: 4,
-    PLAYER_START_Y: 4,
-    PLAYER_MIN_Y: 25,
-    ENEMY_SPAWN_Y: 30,
-
-    // Movement smoothness
-    INTERPOLATION_SPEED: 0.15, // Lerp factor for smooth movement (lower = smoother glide)
-    INPUT_BUFFER_SIZE: 3, // Max queued inputs
-
-    // Attack
-    POCKET_DUST_COOLDOWN: 750, // ms between shots
-
-    // Debug
-    DEBUG: false, // Show grid, borders, and hitboxes
-
-    // Effect animation display durations (ms)
-    NUMBER_DISPLAY_DURATION: 1500, // How long numbers stay visible after animations
-    EFFECT_ANIMATION_SPEED: 75, // Speed multiplier for effect animations
-};
-
-const GAME_ASSETS = {
-    player_sprite: {
-        category: "Game sprites",
-        sheet: "spritessheet_12x8_characters_10.png",
-        indices: [0, 1, 2],
-        speed: 250,
-    },
-    background: {
-        category: "Backgrounds",
-        image: "backgrounds_178.png",
-    },
-    sound_effects: {
-        PLAYER_MOVE: null,
-        EAT_SOUL: "se_23.ogg",
-        EAT_GRIME_SOUL: "se_3.ogg",
-        TAR_SOUL_SPAWN: "se_57.ogg",
-        ANDY_SPAWNED: "se_18.ogg",
-        GAME_OVER: "se_50.ogg",
-        WIN: "se_17.ogg",
-        SPAWN_ANIM: "se_15.ogg",
-        POCKET_DUST: "se_35.ogg",
-    },
-    music: {
-        NORMAL: "hallucination_connect.ogg",
-        ANDY_IS_HERE: "snail_eyes.ogg",
-    },
-};
-
-// Difficulty-specific configurations
-const DIFFICULTY_CONFIGS = {
-    easy: {
-        // Player speed
-        PLAYER_INITIAL_SPEED: 350, // ms per move (slower = easier)
-        SPEED_DECREASE_PER_PACE: 10, // Slow progression
-        MIN_SPEED: 125,
-        SPEED_OFFSET: 200,
-
-        // Enemy spawn rates (must sum to 1.0)
-        SOUL_SPAWN_RATE: 0.7, // 70% Souls
-        GRIME_SPAWN_RATE: 0.2, // 20% grime Souls
-        TAR_SPAWN_RATE: 0.1, // 10% tar Souls
-
-        // Win conditions
-        FOLLOWERS_NEEDED_FOR_ANDY: 5,
-        NINAS_TO_SPAWN: 3,
-        GRACE_SPAWNS: 5,
-
-        // Nina box respawn mechanics
-        NINA_RESPAWN_COOLDOWN: 1500, // ms before respawned Nina can move
-        NINA_CAN_TRIGGER_BOX_RESPAWN: true,
-
-        // Wall behavior
-        WALL_BEHAVIOR: "teleport", // Options: "teleport", "push_down", "game_over"
-    },
-    normal: {
-        // Player speed
-        PLAYER_INITIAL_SPEED: 300, // ms per move
-        SPEED_DECREASE_PER_PACE: 12, // Moderate progression
-        MIN_SPEED: 100,
-        SPEED_OFFSET: 100,
-
-        // Enemy spawn rates
-        SOUL_SPAWN_RATE: 0.5, // 50% Souls
-        GRIME_SPAWN_RATE: 0.3, // 30% grime Souls
-        TAR_SPAWN_RATE: 0.2, // 20% tar Souls
-
-        // Win conditions
-        FOLLOWERS_NEEDED_FOR_ANDY: 10,
-        NINAS_TO_SPAWN: 5,
-        GRACE_SPAWNS: 3,
-
-        // Nina box respawn mechanics
-        NINA_RESPAWN_COOLDOWN: 1000, // ms before respawned Nina can move
-        NINA_CAN_TRIGGER_BOX_RESPAWN: true,
-
-        // Wall behavior
-        WALL_BEHAVIOR: "push_down",
-    },
-    hard: {
-        // Player speed
-        PLAYER_INITIAL_SPEED: 250, // ms per move (faster = harder)
-        SPEED_DECREASE_PER_PACE: 15, // Fast progression
-        MIN_SPEED: 75,
-        SPEED_OFFSET: 0,
-
-        // Enemy spawn rates
-        SOUL_SPAWN_RATE: 0.4, // 40% Souls
-        GRIME_SPAWN_RATE: 0.4, // 40% grime Souls
-        TAR_SPAWN_RATE: 0.2, // 20% tar Souls
-
-        // Win conditions
-        FOLLOWERS_NEEDED_FOR_ANDY: 10,
-        NINAS_TO_SPAWN: 10,
-        GRACE_SPAWNS: 2,
-
-        // Pocket dust
-        POCKET_DUST_COOLDOWN: 500, // ms between shots (harder = shorter cooldown)
-
-        // Nina box respawn mechanics
-        NINA_RESPAWN_COOLDOWN: 500, // ms before respawned Nina can move
-        NINA_CAN_TRIGGER_BOX_RESPAWN: true,
-
-        // Wall behavior
-        WALL_BEHAVIOR: "game_over",
-    },
-};
-
-// Enemy type behaviors
-const ENEMY_TYPES = {
-    ENEMY_ANDY: 0,
-    ENEMY_SOUL: 1,
-    ENEMY_GRIME: 2,
-    ENEMY_TAR: 3,
-    ENEMY_HUSSY: 4,
-};
-
-const ENEMY_TYPES_NAME = {
-    ENEMY_ANDY: "Andy",
-    ENEMY_SOUL: "Soul",
-    ENEMY_GRIME: "Grime Soul",
-    ENEMY_TAR: "Tar Soul",
-    ENEMY_HUSSY: "Nina",
-};
-
-const GAME_EVENTS_ASSETS = {
-    NUMBERS: {
-        category: "Game sprites",
-        sheet: "spritessheet_12x8_characters_9.png",
-        index: [73, 36, 37, 38, 48, 49, 50, 60, 61, 62],
-        speed: 0, // Will use NUMBER_DISPLAY_DURATION from config
-        sound: null,
-    },
-    LIMIT_PLAYER: {
-        category: "Game sprites",
-        sheet: "spritessheet_12x8_characters_14.png",
-        index: [86],
-        speed: 0,
-        sound: null,
-    },
-    SPAWN_ANIM: {
-        category: "Game sprites",
-        sheet: "spritessheet_12x8_characters_7.png",
-        index: [57, 58, 59],
-        speed: 250,
-        sound: "spawnAnim",
-    },
-    EAT_ANIM: {
-        category: "System sprites",
-        sheet: "spritessheet_8x15_system_24.png",
-        index: [40, 41, 42, 43, 44, 45, 46, 47],
-        speed: 0, // Will use EFFECT_ANIMATION_SPEED from config
-        sound: "eatSoul",
-    },
-    HIT_ANIM: {
-        category: "System sprites",
-        sheet: "spritessheet_8x15_system_24.png",
-        index: [48, 49, 50, 51, 52, 53, 54, 55],
-        speed: 0, // Will use EFFECT_ANIMATION_SPEED from config
-        sound: "eatGrimeSoul",
-    },
-    FOLLOWER_ANIM: {
-        category: "Game sprites",
-        sheet: "spritessheet_12x8_characters_17.png",
-        index: [23, 21, 22, 11, 10, 9, 10, 11, 22, 21, 23],
-        speed: 25,
-        sound: null,
-    },
-    DEATH_ANIM: {
-        category: "System sprites",
-        sheet: "spritessheet_8x10_system_3.png",
-        index: [8, 9, 10, 11, 12, 13, 14, 15],
-        speed: 50,
-        sound: "gameOver",
-    },
-    WIN_ANIM: {
-        category: "System sprites",
-        sheet: "spritessheet_8x10_system_3.png",
-        index: [40, 41, 42, 43, 44, 45, 46, 47],
-        speed: 50,
-        sound: "win",
-    },
-    DEAD_HUSSY: {
-        category: "Game sprites",
-        sheet: "spritessheet_12x8_characters_7.png",
-        index: [49],
-        speed: 0,
-        sound: null,
-    },
-    POCKET_DUST: {
-        category: "System sprites",
-        sheet: "spritessheet_8x10_system_3.png",
-        index: [8, 9, 10, 11, 12, 13, 14, 15],
-        speed: 50,
-        sound: "pocketDust",
-        monochrome: true,
-    },
-};
-
-const ENEMY_CONFIG = [
-    {
-        // Andy
-        type: 0,
-        category: "Game sprites",
-        spritesheet: "spritessheet_12x8_characters_1.png",
-        speed: 200,
-        frames: {
-            forward: [51, 52, 53],
-            backward: [87, 88, 89],
-            left: [63, 64, 65],
-            right: [77, 78, 79],
-        },
-    },
-    {
-        // Soul
-        type: 1,
-        category: "Game sprites",
-        spritesheet: "spritessheet_12x8_characters_11.png",
-        speed: 400,
-        frames: {
-            forward: [57, 58, 59],
-            backward: [93, 94, 95],
-            left: [69, 70, 71],
-            right: [81, 82, 83],
-        },
-    },
-    {
-        // Grime Soul
-        type: 2,
-        category: "Game sprites",
-        spritesheet: "spritessheet_12x8_characters_11.png",
-        speed: 350,
-        frames: {
-            forward: [51, 52, 53],
-            backward: [87, 88, 89],
-            left: [63, 64, 65],
-            right: [75, 76, 77],
-        },
-    },
-    {
-        // Tar Soul
-        type: 3,
-        category: "Game sprites",
-        spritesheet: "spritessheet_12x8_characters_17.png",
-        speed: 800,
-        frames: {
-            forward: [0, 1, 2],
-            backward: [36, 37, 38],
-            left: [12, 13, 14],
-            right: [26, 27, 28],
-        },
-    },
-    {
-        // Nina
-        type: 4,
-        category: "Game sprites",
-        spritesheet: "spritessheet_12x8_characters_1.png",
-        speeds: [400, 800],
-        frames: {
-            forward: [54, 55, 56],
-            backward: [90, 91, 92],
-            left: [66, 67, 68],
-            right: [78, 79, 80],
-        },
-    },
-];
-
-const DIRECTIONS = {
-    UP: { x: 0, y: -1, name: "up" },
-    DOWN: { x: 0, y: 1, name: "down" },
-    LEFT: { x: -1, y: 0, name: "left" },
-    RIGHT: { x: 1, y: 0, name: "right" },
-};
-
-const KEY_LAYOUTS = {
-    QWERTY: {
-        UP: ["ArrowUp", "KeyW"],
-        DOWN: ["ArrowDown", "KeyS"],
-        LEFT: ["ArrowLeft", "KeyA"],
-        RIGHT: ["ArrowRight", "KeyD"],
-    },
-    AZERTY: {
-        UP: ["ArrowUp", "KeyZ"],
-        DOWN: ["ArrowDown", "KeyS"],
-        LEFT: ["ArrowLeft", "KeyQ"],
-        RIGHT: ["ArrowRight", "KeyD"],
-    },
-};
-
 class SpriteAnimator {
     constructor(spritesheet, frames, animSpeed = 250) {
         this.spritesheet = spritesheet;
@@ -525,6 +198,8 @@ class Player {
         this.followers = [];
         this.animator = new SpriteAnimator(spritesheet, spriteIndices, GAME_ASSETS.player_sprite.speed);
         this.lastMoveTime = 0;
+        this.useDirectionalSprites = false; // Flag for Ashley sprite
+        this.spriteConfig = null; // Store sprite config for directional sprites
     }
 
     queueDirection(newDirection) {
@@ -551,6 +226,30 @@ class Player {
         );
     }
 
+    updateDirectionalFrames() {
+        if (!this.useDirectionalSprites || !this.spriteConfig || !this.spriteConfig.frames) {
+            return;
+        }
+
+        // Map direction to frame key
+        let frameKey;
+        if (this.direction.y < 0) {
+            frameKey = "backward"; // Moving up (away from camera)
+        } else if (this.direction.y > 0) {
+            frameKey = "forward"; // Moving down (toward camera)
+        } else if (this.direction.x < 0) {
+            frameKey = "left"; // Moving left
+        } else if (this.direction.x > 0) {
+            frameKey = "right"; // Moving right
+        } else {
+            frameKey = "forward"; // Default
+        }
+
+        if (this.spriteConfig.frames[frameKey]) {
+            this.animator.frames = this.spriteConfig.frames[frameKey];
+        }
+    }
+
     addFollower(enemy) {
         // Clone the enemy's sprite data for the follower
         const follower = {
@@ -560,6 +259,8 @@ class Player {
             renderY: this.y,
             animator: enemy.animator ? enemy.animator.clone() : null,
             type: enemy.type,
+            config: enemy.config, // Store config for directional sprites
+            direction: { x: 0, y: 1 }, // Initial direction (forward)
         };
         this.followers.push(follower);
         this.pace++;
@@ -577,32 +278,56 @@ class Player {
             return false;
         }
 
-        // In manual mode, only move if there's a queued direction
         if (manualOnly && this.directionQueue.length === 0) {
             return false;
         }
 
-        // Apply queued direction
         if (this.directionQueue.length > 0) {
             this.direction = this.directionQueue.shift();
+            this.updateDirectionalFrames(); // Update sprite direction
         }
 
-        // Store old positions for followers
         const prevPositions = [{ x: this.x, y: this.y }];
 
-        // Collect follower positions
         for (let i = 0; i < this.followers.length; i++) {
             prevPositions.push({ x: this.followers[i].x, y: this.followers[i].y });
         }
 
-        // Move player
+        this.prevX = this.x;
+        this.prevY = this.y;
+
         this.x += this.direction.x;
         this.y += this.direction.y;
 
-        // Update follower positions (snake-like following)
         for (let i = 0; i < this.followers.length; i++) {
-            this.followers[i].x = prevPositions[i].x;
-            this.followers[i].y = prevPositions[i].y;
+            const follower = this.followers[i];
+            const oldX = follower.x;
+            const oldY = follower.y;
+            follower.x = prevPositions[i].x;
+            follower.y = prevPositions[i].y;
+
+            if (follower.animator && follower.config && follower.config.frames) {
+                const dx = follower.x - oldX;
+                const dy = follower.y - oldY;
+                if (dx !== 0 || dy !== 0) {
+                    follower.direction = { x: dx, y: dy };
+
+                    let frameKey;
+                    if (dy < 0) {
+                        frameKey = "backward";
+                    } else if (dy > 0) {
+                        frameKey = "forward";
+                    } else if (dx < 0) {
+                        frameKey = "left";
+                    } else if (dx > 0) {
+                        frameKey = "right";
+                    }
+
+                    if (frameKey && follower.config.frames[frameKey]) {
+                        follower.animator.frames = follower.config.frames[frameKey];
+                    }
+                }
+            }
         }
 
         this.lastMoveTime = timestamp;
@@ -618,12 +343,10 @@ class Player {
             }
         }
 
-        // Interpolate render position towards grid position
         const lerpFactor = Math.min(1, GAME_CONFIG.INTERPOLATION_SPEED * (deltaTime / 16));
         this.renderX += (this.x - this.renderX) * lerpFactor;
         this.renderY += (this.y - this.renderY) * lerpFactor;
 
-        // Interpolate follower positions
         for (const follower of this.followers) {
             follower.renderX += (follower.x - follower.renderX) * lerpFactor;
             follower.renderY += (follower.y - follower.renderY) * lerpFactor;
@@ -664,6 +387,30 @@ class Enemy {
         }
     }
 
+    updateDirectionalFrames() {
+        if (!this.animator || !this.config.frames) {
+            return;
+        }
+
+        let frameKey;
+        if (this.direction.y < 0) {
+            frameKey = "backward"; // Moving up (away from camera)
+        } else if (this.direction.y > 0) {
+            frameKey = "forward"; // Moving down (toward camera)
+        } else if (this.direction.x < 0) {
+            frameKey = "left"; // Moving left
+        } else if (this.direction.x > 0) {
+            frameKey = "right"; // Moving right
+        } else {
+            frameKey = "forward"; // Default
+        }
+
+        if (this.config.frames[frameKey] && frameKey !== this.currentAnimDirection) {
+            this.currentAnimDirection = frameKey;
+            this.animator.frames = this.config.frames[frameKey];
+        }
+    }
+
     move(timestamp, player = null, otherEnemies = []) {
         if (timestamp < this.movementCooldownUntil) {
             return false;
@@ -673,17 +420,23 @@ class Enemy {
             return false;
         }
 
+        this.prevX = this.x;
+        this.prevY = this.y;
+
         if (this.type === ENEMY_TYPES.ENEMY_HUSSY && player) {
             const dx = player.x - this.x;
             const dy = player.y - this.y;
 
             let newX = this.x;
             let newY = this.y;
+            let moveDir = { x: 0, y: 0 };
 
             if (Math.abs(dy) > 0) {
-                newY += dy > 0 ? 1 : -1;
+                moveDir.y = dy > 0 ? 1 : -1;
+                newY += moveDir.y;
             } else if (Math.abs(dx) > 0) {
-                newX += dx > 0 ? 1 : -1;
+                moveDir.x = dx > 0 ? 1 : -1;
+                newX += moveDir.x;
             }
 
             const isOccupied = otherEnemies.some((e) => e !== this && e.x === newX && e.y === newY);
@@ -691,9 +444,15 @@ class Enemy {
             if (!isOccupied) {
                 this.x = newX;
                 this.y = newY;
+                // Update direction for sprite animation
+                if (moveDir.x !== 0 || moveDir.y !== 0) {
+                    this.direction = moveDir;
+                    this.updateDirectionalFrames();
+                }
             }
         } else {
             this.y += this.direction.y;
+            this.updateDirectionalFrames();
         }
 
         this.lastMoveTime = timestamp;
@@ -819,47 +578,28 @@ class CollisionDetector {
     }
 
     static checkEnemyCollision(player, enemy) {
-        // Exact position match
+        // 1. Exact same tile
         if (player.x === enemy.x && player.y === enemy.y) {
             return true;
         }
 
-        // Generous collision for positive interactions (catching Andy/Souls)
-        // Check if they're on the same column/row and within 1 cell
-        const dx = Math.abs(player.x - enemy.x);
-        const dy = Math.abs(player.y - enemy.y);
-
-        // Same column, adjacent rows
-        if (player.x === enemy.x && dy === 1) {
-            // Check if moving towards each other
-            if (
-                (player.direction.y > 0 && enemy.direction.y < 0 && player.y < enemy.y) ||
-                (player.direction.y < 0 && enemy.direction.y > 0 && player.y > enemy.y)
-            ) {
-                return true;
-            }
-            // Or player is moving towards stationary/same direction enemy
-            if ((player.direction.y > 0 && player.y < enemy.y) || (player.direction.y < 0 && player.y > enemy.y)) {
-                return true;
-            }
+        // 2. Edge crossing prevention
+        // We need previous positions
+        if (player.prevX === undefined || enemy.prevX === undefined) {
+            return false;
         }
 
-        // Same row, adjacent columns
-        if (player.y === enemy.y && dx === 1) {
-            // Check if moving towards each other
-            if (
-                (player.direction.x > 0 && enemy.direction.x < 0 && player.x < enemy.x) ||
-                (player.direction.x < 0 && enemy.direction.x > 0 && player.x > enemy.x)
-            ) {
-                return true;
-            }
-            // Or player is moving towards stationary/same direction enemy
-            if ((player.direction.x > 0 && player.x < enemy.x) || (player.direction.x < 0 && player.x > enemy.x)) {
-                return true;
-            }
-        }
+        const crossed =
+            player.prevX === enemy.x &&
+            player.prevY === enemy.y &&
+            enemy.prevX === player.x &&
+            enemy.prevY === player.y;
 
-        return false;
+        return crossed;
+    }
+
+    static checkStrictCollision(player, enemy) {
+        return player.x === enemy.x && player.y === enemy.y;
     }
 
     static checkEnemyBlockedByTail(enemy, player) {
@@ -898,6 +638,8 @@ class TarSoulsGame {
         this.backgroundImage = null;
         this.playerSpritesheet = null;
         this.playerSpriteIndices = GAME_ASSETS.player_sprite.indices;
+        this.originalPlayerSpritesheet = null; // Backup for restart
+        this.originalPlayerSpriteIndices = GAME_ASSETS.player_sprite.indices; // Backup for restart
         this.cameraY = 0;
         this.cameraRenderY = 0;
         this.lastTimestamp = 0;
@@ -931,6 +673,12 @@ class TarSoulsGame {
         this.attackQueued = false; // Only 1 attack action buffered
         this.lastPlayerMoveTime = 0;
         this.victoryPortalActive = false;
+
+        // Timer tracking for speedrun
+        this.gameStartTime = 0;
+        this.gameTotalTime = 0; // Total active play time in ms
+        this.gameTimerActive = false;
+        this.lastTimerUpdate = 0;
 
         this.difficulty = "normal";
     }
@@ -1022,7 +770,7 @@ class TarSoulsGame {
             height: 100vh;
             width: 28vw;
             background: rgba(17, 17, 17, 0.75);
-            padding: 20px;
+            padding: 1.11vmax;
             box-sizing: border-box;
             overflow-y: auto;
             display: flex;
@@ -1040,12 +788,12 @@ class TarSoulsGame {
             width: 28vw;
             height: 100vh;
             background: rgba(17, 17, 17, 0.75);
-            padding: 20px;
+            padding: 1.11vmax;
             box-sizing: border-box;
             overflow-y: auto;
             color: var(--txt-color, #ddd);
             font-family: 'TCOAAL', monospace;
-            font-size: 0.9rem;
+            font-size: 0.75vmax;
             line-height: 1.4;
             z-index: 10;
         `;
@@ -1063,6 +811,9 @@ class TarSoulsGame {
 
         this.boundHandleResize = this.handleResize.bind(this);
         window.addEventListener("resize", this.boundHandleResize);
+
+        // Apply initial difficulty styling
+        this.setDifficulty(this.difficulty);
     }
 
     buildLeftSidebar(sidebar) {
@@ -1084,7 +835,7 @@ class TarSoulsGame {
             width: 100%;
             max-width: 300px;
             height: auto;
-            margin: 0 auto 20px auto;
+            margin: 0 auto 1.11vmax auto;
             display: block;
         `;
         topBlock.appendChild(title);
@@ -1114,7 +865,7 @@ class TarSoulsGame {
         topBlock.appendChild(restartButton);
 
         const difficultyLabel = document.createElement("h2");
-        difficultyLabel.style.cssText = `color: var(--purple, #e2829a); margin-top: 0; margin-bottom:0.5vmax; font-size: 1.5rem; font-family: TCOAAL, monospace;display:flex;justify-content:center;`;
+        difficultyLabel.style.cssText = `color: var(--purple, #e2829a); margin-top: 0; margin-bottom:0.5vmax; font-size: 1.2vmax; font-family: TCOAAL, monospace;display:flex;justify-content:center;`;
         difficultyLabel.textContent = "Rules";
         difficultyLabel.style.marginTop = "2vmax";
         topBlock.appendChild(difficultyLabel);
@@ -1139,7 +890,7 @@ class TarSoulsGame {
         normalButton.id = "tarSoulsDiffNormal";
         normalButton.textContent = "Normal";
         normalButton.onclick = () => this.setDifficulty("normal");
-        normalButton.style.cssText = "flex: 1; background: var(--yellow);";
+        normalButton.style.cssText = "flex: 1;";
         difficultyContainer.appendChild(normalButton);
 
         const hardButton = document.createElement("button");
@@ -1154,20 +905,20 @@ class TarSoulsGame {
 
         const rulesContainer = document.createElement("div");
         const rules = document.createElement("ul");
-        rulesContainer.style.cssText = `margin-top: 1vmax;color: var(--txt-color, #ddd); font-family: TCOAAL, monospace; font-size: 0.9rem; line-height: 1.4; z-index: 10;`;
-        rules.style.cssText = `padding-left: 0; margin-bottom: 20px;`;
+        rulesContainer.style.cssText = `margin-top: 1vmax;color: var(--txt-color, #ddd); font-family: TCOAAL, monospace; font-size: 0.75vmax; line-height: 1.4; z-index: 10;`;
+        rules.style.cssText = `padding-left: 0; margin-bottom: 1.11vmax;`;
         rules.id = "tarSoulsRulesList";
         rulesContainer.appendChild(rules);
         topBlock.appendChild(rulesContainer);
 
         const controlsTitle = document.createElement("h2");
-        controlsTitle.style.cssText = `color: var(--purple, #e2829a); margin-top: 2vmax; margin-bottom:0.5vmax; font-size: 1.5rem; font-family: TCOAAL, monospace;display:flex;justify-content:center;`;
+        controlsTitle.style.cssText = `color: var(--purple, #e2829a); margin-top: 2vmax; margin-bottom:0.5vmax; font-size: 1.2vmax; font-family: TCOAAL, monospace;display:flex;justify-content:center;`;
         controlsTitle.textContent = "Controls";
         const controlsList = document.createElement("ul");
         controlsList.style.cssText =
-            "margin-top: 1vmax;color: var(--txt-color, #ddd); font-family: TCOAAL, monospace; font-size: 0.9rem; line-height: 1.4; z-index: 10;padding-left: 0; margin-bottom: 20px;";
+            "margin-top: 1vmax;color: var(--txt-color, #ddd); font-family: TCOAAL, monospace; font-size: 0.75vmax; line-height: 1.4; z-index: 10;padding-left: 0; margin-bottom: 1.11vmax;";
         const li1 = document.createElement("li");
-        li1.innerHTML = `Move around using <strong id="tarSoulsControlKeys">WASD</strong> or <strong style="font-size: 1.5rem;">←↑↓→</strong>`;
+        li1.innerHTML = `Move around using <strong id="tarSoulsControlKeys">WASD</strong> or <strong style="font-size: 1.2vmax;">←↑↓→</strong>`;
         const li2 = document.createElement("li");
         li2.innerHTML = `Throw dust using <strong>SPACE</strong> and lock the hussies`;
         const li3 = document.createElement("li");
@@ -1179,7 +930,7 @@ class TarSoulsGame {
         topBlock.appendChild(controlsList);
 
         const settingsLabel = document.createElement("h2");
-        settingsLabel.style.cssText = `color: var(--purple, #e2829a); margin-top: 0; margin-bottom:0.5vmax; font-size: 1.5rem; font-family: TCOAAL, monospace;display:flex;justify-content:center;`;
+        settingsLabel.style.cssText = `color: var(--purple, #e2829a); margin-top: 0; margin-bottom:0.5vmax; font-size: 1.2vmax; font-family: TCOAAL, monospace;display:flex;justify-content:center;`;
         settingsLabel.textContent = "Settings";
         botBlock.appendChild(settingsLabel);
 
@@ -1220,7 +971,7 @@ class TarSoulsGame {
         scoreDisplay.style.cssText = `
             color: var(--txt-color, #ddd);
             font-family: 'TCOAAL', monospace;
-            font-size: 1rem;
+            font-size: 0.8vmax;
             padding: 12px;
             background: rgba(0,0,0,0.5);
             border-radius: 4px;
@@ -1244,6 +995,17 @@ class TarSoulsGame {
             console.warn("Background image not found in game assets");
         }
 
+        const parseSpriteSheetDimensions = (filename) => {
+            const match = filename.match(/spritessheet_(\d+)x(\d+)_/);
+            if (match) {
+                return {
+                    cols: parseInt(match[1]),
+                    rows: parseInt(match[2]),
+                };
+            }
+            return { cols: 12, rows: 8 };
+        };
+
         const playerSheet = this.getGameAsset(
             "images",
             GAME_ASSETS.player_sprite.category,
@@ -1253,6 +1015,8 @@ class TarSoulsGame {
             this.playerSpritesheet = await this.loadImage(playerSheet.url);
             const dimensions = parseSpriteSheetDimensions(GAME_ASSETS.player_sprite.sheet);
             this.playerSpritesheet.gridCols = dimensions.cols;
+            // Backup original spritesheet for restart
+            this.originalPlayerSpritesheet = this.playerSpritesheet;
             this.playerSpritesheet.gridRows = dimensions.rows;
         } else {
             console.warn("Player spritesheet not found in game assets");
@@ -1410,16 +1174,37 @@ class TarSoulsGame {
         const normalBtn = document.getElementById("tarSoulsDiffNormal");
         const hardBtn = document.getElementById("tarSoulsDiffHard");
 
-        if (easyBtn) easyBtn.style.background = "";
-        if (normalBtn) normalBtn.style.background = "";
-        if (hardBtn) hardBtn.style.background = "";
+        if (easyBtn) {
+            easyBtn.style.background = "";
+            easyBtn.style.boxShadow = "";
+            easyBtn.style.border = "";
+        }
+        if (normalBtn) {
+            normalBtn.style.background = "";
+            normalBtn.style.boxShadow = "";
+            normalBtn.style.border = "";
+        }
+        if (hardBtn) {
+            hardBtn.style.background = "";
+            hardBtn.style.boxShadow = "";
+            hardBtn.style.border = "";
+        }
 
         if (difficulty === "easy" && easyBtn) {
-            easyBtn.style.background = "var(--green)";
+            easyBtn.style.backgroundColor = "color-mix(in srgb, var(--green) 60%, transparent)";
+            easyBtn.style.boxShadow =
+                "inset 0 0 25px color-mix(in srgb, var(--green) 80%, transparent), 0 0 10px color-mix(in srgb, var(--green) 40%, transparent)";
+            easyBtn.style.border = "2px solid var(--green)";
         } else if (difficulty === "normal" && normalBtn) {
-            normalBtn.style.background = "var(--yellow)";
+            normalBtn.style.backgroundColor = "color-mix(in srgb, var(--yellow) 60%, transparent)";
+            normalBtn.style.boxShadow =
+                "inset 0 0 25px color-mix(in srgb, var(--yellow) 80%, transparent), 0 0 10px color-mix(in srgb, var(--yellow) 40%, transparent)";
+            normalBtn.style.border = "2px solid var(--yellow)";
         } else if (difficulty === "hard" && hardBtn) {
-            hardBtn.style.background = "var(--red)";
+            hardBtn.style.backgroundColor = "color-mix(in srgb, var(--red) 60%, transparent)";
+            hardBtn.style.boxShadow =
+                "inset 0 0 25px color-mix(in srgb, var(--red) 80%, transparent), 0 0 10px color-mix(in srgb, var(--red) 40%, transparent)";
+            hardBtn.style.border = "2px solid var(--red)";
         }
 
         //console.log(`Difficulty set to: ${difficulty}`);
@@ -1434,12 +1219,14 @@ class TarSoulsGame {
         if (this.gameState === "playing") {
             this.gameState = "paused";
             document.getElementById("tarSoulsPauseBtn").textContent = "Resume";
+            this.pauseTimer();
 
             if (leftSidebar) leftSidebar.style.display = "flex";
             if (rightSidebar) rightSidebar.style.display = "block";
         } else if (this.gameState === "paused") {
             this.gameState = "playing";
             document.getElementById("tarSoulsPauseBtn").textContent = "Pause";
+            this.resumeTimer(performance.now());
 
             if (leftSidebar) leftSidebar.style.display = "none";
             if (rightSidebar) rightSidebar.style.display = "none";
@@ -1580,9 +1367,9 @@ class TarSoulsGame {
         const ninaIcon = createSpriteIcon(ENEMY_TYPES.ENEMY_HUSSY);
 
         instructionsPanel.innerHTML = `
-            <h2 style="color: var(--purple, #e2829a); margin-top: 2vmax; margin-bottom:0.5vmax; font-size:1.5rem;display:flex; justify-content:center;">Description</h2>
-            <p style="margin-bottom: 20px;text-align:justify;">Ashley must venture through the demon realm to save Andy from the hussies. She needs to collect pure Souls, avoid Grime Souls, and sometimes sacrifice some of her Souls to prevent a Tar Soul from Ascending! Once powerful enough, she'll be able to summon and grab her useless brother. Finally, she must dust off the hussies to open the portal back to the human realm and leave!</p>
-<p style="margin-bottom: 20px;"><ul style="padding-left: 0; margin-bottom: 20px;">
+            <h2 style="color: var(--purple, #e2829a); margin-top: 2vmax; margin-bottom:0.5vmax; font-size:1.2vmax;display:flex; justify-content:center;">Description</h2>
+            <p style="margin-bottom: 1.11vmax;text-align:justify;">Ashley must venture through the demon realm to save Andy from the hussies. She needs to collect pure Souls, avoid Grime Souls, and sometimes sacrifice some of her Souls to prevent a Tar Soul from Ascending! Once powerful enough, she'll be able to summon and grab her useless brother. Finally, she must dust off the hussies to open the portal back to the human realm and leave!</p>
+<p style="margin-bottom: 1.11vmax;"><ul style="padding-left: 0; margin-bottom: 1.11vmax;">
             <li>Do not go into the Shadows at the bottom of the area</li>
             <li>Do not Ascend, stay below the top of the area</li>
             <li>Catch Souls by touching them</li>
@@ -1593,7 +1380,7 @@ class TarSoulsGame {
             <li>Grime Souls steal one Soul but keep moving, just avoid them</li>
 </ul></p>
 
-            <h2 style="color: var(--purple, #e2829a); margin-bottom:0.5vmax;margin-top:2vmax; font-size: 1.5rem;display:flex; justify-content:center;">Characters</h2>
+            <h2 style="color: var(--purple, #e2829a); margin-bottom:0.5vmax;margin-top:2vmax; font-size: 1.2vmax;display:flex; justify-content:center;">Characters</h2>
             <div style="margin-bottom: 15px;">
                 <div id="soulEntity" style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
                     <div><strong>Soul</strong> - Your favourite food!</div>
@@ -1641,9 +1428,8 @@ class TarSoulsGame {
             //`First ${config.GRACE_SPAWNS} enemies cannot be Tar Souls`,
         ];
 
-        // Difficulty-specific rules using dynamic config
         const wallBehaviorText = {
-            teleport: "get teleported to the opposite side",
+            teleport: "get to the opposite side",
             push_down: "get forced down",
             game_over: "die",
         };
@@ -1663,10 +1449,10 @@ class TarSoulsGame {
         //const spawnRates = `There is ${Math.round(config.SOUL_SPAWN_RATE * 100)}% Souls, ${Math.round(config.GRIME_SPAWN_RATE * 100)}% Grime Souls and ${Math.round(config.TAR_SPAWN_RATE * 100)}% Tar Souls`;
         const spawnRates =
             this.difficulty === "easy"
-                ? `There are lots of Souls, few Grime Souls, and rarely Tar Souls`
+                ? `Mostly Souls, few Grime Souls, rarely Tar Souls`
                 : this.difficulty === "normal"
-                  ? `There are some Souls, few Grime Souls, and few Tar Souls`
-                  : `There are as many Souls as Grime Souls, and a few Tar Souls`;
+                  ? `Some Souls, few Grime Souls, few Tar Souls`
+                  : `As many Souls as Grime Souls, few Tar Souls`;
 
         commonRules.forEach((rule) => {
             const li = document.createElement("li");
@@ -1713,6 +1499,8 @@ class TarSoulsGame {
 
         if (directionPressed && this.waitingForFirstInput) {
             this.waitingForFirstInput = false;
+            // Start the speedrun timer on first input
+            this.startTimer(performance.now());
         }
 
         if (code === "Space" && this.phase2Active) {
@@ -1808,6 +1596,50 @@ class TarSoulsGame {
         this.ninasAlive++;
     }
 
+    handlePlayerPushbackBoundaries() {
+        const hitLeftWall = this.player.x < 0;
+        const hitRightWall = this.player.x >= GAME_CONFIG.GRID_WIDTH;
+        const hitTopWall = this.player.y < 0;
+        const hitBottomWall = this.player.y >= GAME_CONFIG.GRID_HEIGHT;
+
+        // Top/bottom walls are always game over
+        if (hitTopWall || hitBottomWall) {
+            this.gameOver("Hit the wall!");
+            return;
+        }
+
+        // Left/right wall behavior depends on difficulty
+        if (hitLeftWall || hitRightWall) {
+            if (this.difficulty === "easy") {
+                // Teleport to opposite side
+                if (hitLeftWall) {
+                    this.player.x = GAME_CONFIG.GRID_WIDTH - 1;
+                    this.player.renderX = GAME_CONFIG.GRID_WIDTH - 1;
+                } else if (hitRightWall) {
+                    this.player.x = 0;
+                    this.player.renderX = 0;
+                }
+            } else if (this.difficulty === "normal") {
+                // Push down
+                this.player.direction = DIRECTIONS.DOWN;
+                this.player.y += 1;
+                this.player.directionQueue = [];
+                // Clamp x position
+                this.player.x = Math.max(0, Math.min(GAME_CONFIG.GRID_WIDTH - 1, this.player.x));
+                this.player.renderX = this.player.x;
+            } else {
+                this.gameOver("You fell in the void!");
+                return;
+            }
+        }
+
+        // Check if player is out of bounds (shadows) in phase 1
+        if (!this.phase2Active && CollisionDetector.checkPlayerBoundary(this.player)) {
+            this.gameOver("You got lost in the Shadows!");
+            return;
+        }
+    }
+
     spawnVictoryPortal() {
         this.victoryPortalActive = true;
 
@@ -1825,6 +1657,34 @@ class TarSoulsGame {
 
         this.player.followers = [];
         this.player.addFollower(andyEnemy);
+
+        const ashleySheet = this.getGameAsset(
+            "images",
+            GAME_ASSETS.player_ashley.category,
+            GAME_ASSETS.player_ashley.spritesheet,
+        );
+        if (ashleySheet) {
+            // Load the Ashley spritesheet and update player rendering
+            this.loadImage(ashleySheet.url).then((loadedSheet) => {
+                const parseSpriteSheetDimensions = (filename) => {
+                    const match = filename.match(/spritessheet_(\d+)x(\d+)_/);
+                    if (match) {
+                        return { cols: parseInt(match[1]), rows: parseInt(match[2]) };
+                    }
+                    return { cols: 12, rows: 8 };
+                };
+                const dimensions = parseSpriteSheetDimensions(GAME_ASSETS.player_ashley.spritesheet);
+                loadedSheet.gridCols = dimensions.cols;
+                loadedSheet.gridRows = dimensions.rows;
+                this.playerSpritesheet = loadedSheet;
+                this.player.animator.spritesheet = loadedSheet;
+
+                this.player.useDirectionalSprites = true;
+                this.player.spriteConfig = GAME_ASSETS.player_ashley;
+
+                this.player.updateDirectionalFrames();
+            });
+        }
 
         const winAnim = new GameAnimation(GAME_EVENTS_ASSETS.WIN_ANIM, this.player.x, this.player.y, true, this.player);
         this.animations.push(winAnim);
@@ -1850,14 +1710,44 @@ class TarSoulsGame {
         const enemy = new Enemy(type, x, GAME_CONFIG.ENEMY_SPAWN_Y);
         this.enemies.push(enemy);
 
-        // Create warning wave for Andy and Tar Souls
         if (type === ENEMY_TYPES.ENEMY_ANDY) {
-            const wave = new WarningWave(x, "white");
-            this.warningWaves.push(wave);
+            const scaledPlayAreaY = GAME_CONFIG.PLAY_AREA_Y * this.bgScale;
+            const scaledCellSize = GAME_CONFIG.CELL_SIZE * this.bgScale;
+
+            const cameraTopGridY = Math.floor((this.cameraY - scaledPlayAreaY) / scaledCellSize);
+            const visibleRows = Math.floor(this.canvasHeight / scaledCellSize);
+            const cameraBottomGridY = cameraTopGridY + visibleRows - 1;
+
+            let indicatorY;
+
+            if (enemy.y >= cameraTopGridY && enemy.y <= cameraBottomGridY) {
+                indicatorY = enemy.y - 1;
+            } else {
+                indicatorY = cameraBottomGridY;
+            }
+
+            const heartAnim = new GameAnimation(GAME_EVENTS_ASSETS.GREEN_HEART_ANIM, x, indicatorY, false);
+            this.animations.push(heartAnim);
+            this.audioManager.playSound("andySpawned", 0.25);
         } else if (type === ENEMY_TYPES.ENEMY_TAR) {
-            const wave = new WarningWave(x, "red");
-            this.warningWaves.push(wave);
-            this.audioManager.playSound("tarSoulSpawn", 0.5);
+            const scaledPlayAreaY = GAME_CONFIG.PLAY_AREA_Y * this.bgScale;
+            const scaledCellSize = GAME_CONFIG.CELL_SIZE * this.bgScale;
+
+            const cameraTopGridY = Math.floor((this.cameraY - scaledPlayAreaY) / scaledCellSize);
+            const visibleRows = Math.floor(this.canvasHeight / scaledCellSize);
+            const cameraBottomGridY = cameraTopGridY + visibleRows - 1;
+
+            let indicatorY;
+
+            if (enemy.y >= cameraTopGridY && enemy.y <= cameraBottomGridY) {
+                indicatorY = enemy.y - 1;
+            } else {
+                indicatorY = cameraBottomGridY;
+            }
+
+            const skullAnim = new GameAnimation(GAME_EVENTS_ASSETS.SKULL_ANIM, x, indicatorY, false);
+            this.animations.push(skullAnim);
+            this.audioManager.playSound("tarSoulSpawn", 0.25);
         }
     }
 
@@ -1871,7 +1761,7 @@ class TarSoulsGame {
             x = Math.max(0, Math.min(GAME_CONFIG.GRID_WIDTH - 1, x));
 
             this.spawnEnemy(type, x);
-            this.enemySpawnCount++; // Increment spawn counter
+            this.enemySpawnCount++;
         } else {
             const config = this.getDifficultyConfig();
             const rand = Math.random();
@@ -1930,6 +1820,8 @@ class TarSoulsGame {
 
     update(deltaTime, timestamp) {
         if (this.gameState !== "playing") return;
+
+        this.updateTimer(timestamp);
 
         for (let i = this.animations.length - 1; i >= 0; i--) {
             this.animations[i].update(timestamp, deltaTime);
@@ -2010,16 +1902,24 @@ class TarSoulsGame {
             }
 
             if (this.phase2Active) {
-                // Check for box collision and respawn Nina
                 const boxIndex = this.staticSprites.findIndex(
                     (sprite) => sprite.blocksMovement && sprite.x === this.player.x && sprite.y === this.player.y,
                 );
                 if (boxIndex !== -1) {
                     const box = this.staticSprites[boxIndex];
-                    // Remove the box
+                    const config = this.getDifficultyConfig();
+
+                    const pushbackDistance = config.NINA_BOX_PLAYER_PUSHBACK;
+                    const pushbackX = -this.player.direction.x * pushbackDistance;
+                    const pushbackY = -this.player.direction.y * pushbackDistance;
+
                     this.staticSprites.splice(boxIndex, 1);
-                    // Respawn a Nina at the box's position
                     this.respawnNinaFromBox(box.x, box.y, timestamp);
+
+                    this.player.x += pushbackX;
+                    this.player.y += pushbackY;
+
+                    this.handlePlayerPushbackBoundaries();
                 }
 
                 if (this.victoryPortalActive) {
@@ -2043,7 +1943,17 @@ class TarSoulsGame {
                 continue;
             }
 
-            if (CollisionDetector.checkEnemyCollision(this.player, enemy)) {
+            const hasCollision =
+                this.phase2Active && enemy.type === ENEMY_TYPES.ENEMY_HUSSY
+                    ? CollisionDetector.checkStrictCollision(this.player, enemy)
+                    : CollisionDetector.checkEnemyCollision(this.player, enemy);
+
+            if (hasCollision) {
+                enemy.x = this.player.x;
+                enemy.y = this.player.y;
+                enemy.renderX = this.player.renderX;
+                enemy.renderY = this.player.renderY;
+
                 if (this.phase2Active && enemy.type === ENEMY_TYPES.ENEMY_HUSSY) {
                     this.gameOver("You were infected by a hussy!");
                     return;
@@ -2055,6 +1965,10 @@ class TarSoulsGame {
             if (this.phase2Active && enemy.type === ENEMY_TYPES.ENEMY_HUSSY) {
                 for (const follower of this.player.followers) {
                     if (follower.x === enemy.x && follower.y === enemy.y) {
+                        enemy.x = follower.x;
+                        enemy.y = follower.y;
+                        enemy.renderX = follower.renderX;
+                        enemy.renderY = follower.renderY;
                         this.gameOver("A HUSSY TOOK ANDY!");
                         return;
                     }
@@ -2095,6 +2009,11 @@ class TarSoulsGame {
                 this.enemies.splice(enemyIndex, 1);
                 break;
             case ENEMY_TYPES.ENEMY_SOUL:
+                if (this.phase2Active) {
+                    this.pushEnemy(enemy, enemyIndex, timestamp);
+                    break;
+                }
+
                 const followerAnim = new GameAnimation(
                     GAME_EVENTS_ASSETS.FOLLOWER_ANIM,
                     this.player.x,
@@ -2155,6 +2074,27 @@ class TarSoulsGame {
             pushY = 0;
         }
 
+        // Rotate player and tail when pushed (flip 180 degrees)
+        if (this.phase2Active && this.player.followers.length > 0) {
+            // Reverse the entire tail positions to simulate rotation
+            const tailPositions = this.player.followers.map((f) => ({ x: f.x, y: f.y }));
+            tailPositions.reverse();
+
+            // Calculate the offset from player to first follower (Andy)
+            const andy = this.player.followers[0];
+            const offsetX = andy.x - this.player.x;
+            const offsetY = andy.y - this.player.y;
+
+            // Position Andy on the opposite side of the player
+            andy.x = this.player.x - offsetX;
+            andy.y = this.player.y - offsetY;
+            andy.renderX = andy.x;
+            andy.renderY = andy.y;
+
+            // Update player direction to point toward the pushed direction
+            this.player.direction = { x: pushX, y: pushY };
+        }
+
         let newX = enemy.x + pushX;
         let newY = enemy.y + pushY;
 
@@ -2196,6 +2136,11 @@ class TarSoulsGame {
 
             // If it's Andy, GAME OVER
             if (hitEnemy.type === ENEMY_TYPES.ENEMY_ANDY) {
+                // Move enemy to collision point for proper visual display
+                enemy.x = newX;
+                enemy.y = newY;
+                enemy.renderX = newX;
+                enemy.renderY = newY;
                 this.gameOver("An entity crushed Andy!");
                 return;
             }
@@ -2206,13 +2151,11 @@ class TarSoulsGame {
             // Adjust enemyIndex if needed (if we removed an enemy before this one)
             const adjustedIndex = hitEnemyIndex < enemyIndex ? enemyIndex - 1 : enemyIndex;
 
-            // Move the pushing enemy to the new position
             enemy.x = newX;
             enemy.y = newY;
             enemy.renderX = newX;
             enemy.renderY = newY;
 
-            // Play a hit animation at the collision point
             const hitAnim = new GameAnimation(GAME_EVENTS_ASSETS.HIT_ANIM, newX, newY, false, null, null);
             this.animations.push(hitAnim);
 
@@ -2798,6 +2741,46 @@ class TarSoulsGame {
         this.animationFrameId = requestAnimationFrame(this.boundGameLoop);
     }
 
+    startTimer(timestamp) {
+        if (!this.gameTimerActive) {
+            this.gameTimerActive = true;
+            this.gameStartTime = timestamp;
+            this.lastTimerUpdate = timestamp;
+            this.gameTotalTime = 0;
+        }
+    }
+
+    updateTimer(timestamp) {
+        if (this.gameTimerActive) {
+            const deltaTime = timestamp - this.lastTimerUpdate;
+            this.gameTotalTime += deltaTime;
+            this.lastTimerUpdate = timestamp;
+        }
+    }
+
+    pauseTimer() {
+        this.gameTimerActive = false;
+    }
+
+    resumeTimer(timestamp) {
+        if (!this.gameTimerActive) {
+            this.gameTimerActive = true;
+            this.lastTimerUpdate = timestamp;
+        }
+    }
+
+    stopTimer() {
+        this.gameTimerActive = false;
+    }
+
+    getFormattedTime() {
+        const totalSeconds = Math.floor(this.gameTotalTime / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const milliseconds = Math.floor((this.gameTotalTime % 1000) / 10);
+        return `${minutes}:${seconds.toString().padStart(2, "0")}.${milliseconds.toString().padStart(2, "0")}`;
+    }
+
     gameOver(reason) {
         //console.log("Game Over:", reason);
         this.gameState = "lost";
@@ -2819,6 +2802,7 @@ class TarSoulsGame {
 
     win() {
         this.gameState = "won";
+        this.stopTimer();
 
         const winAnim = new GameAnimation(GAME_EVENTS_ASSETS.WIN_ANIM, this.player.x, this.player.y, true);
         this.animations.push(winAnim);
@@ -2852,16 +2836,16 @@ class TarSoulsGame {
         const title = document.createElement("h1");
         title.style.cssText = `
             font-family: 'TCOAAL', monospace;
-            font-size: 4rem;
+            font-size: 3.2vmax;
             color: var(--red, #ff4444);
-            margin-bottom: 20px;
+            margin-bottom: 1.11vmax;
         `;
         title.textContent = "GAME OVER";
 
         const message = document.createElement("p");
         message.style.cssText = `
             font-family: 'TCOAAL', monospace;
-            font-size: 1.5rem;
+            font-size: 1.2vmax;
             color: var(--txt-color, #ddd);
             margin-bottom: 40px;
         `;
@@ -2911,20 +2895,20 @@ class TarSoulsGame {
         const title = document.createElement("h1");
         title.style.cssText = `
             font-family: 'TCOAAL', monospace;
-            font-size: 4rem;
+            font-size: 3.2vmax;
             color: var(--green, #4a9d4a);
-            margin-bottom: 20px;
+            margin-bottom: 1.11vmax;
         `;
         title.textContent = "YOU WIN!";
 
         const message = document.createElement("p");
         message.style.cssText = `
             font-family: 'TCOAAL', monospace;
-            font-size: 1.5rem;
+            font-size: 1.2vmax;
             color: var(--txt-color, #ddd);
             margin-bottom: 40px;
         `;
-        message.textContent = `You saved your brother! Followers: ${this.player.followers.length}`;
+        message.textContent = `You saved your brother! Time: ${this.getFormattedTime()}`;
 
         const restartButton = document.createElement("button");
         restartButton.className = "tcoaal-button-tarsouls";
@@ -2957,11 +2941,19 @@ class TarSoulsGame {
 
         this.enemies = [];
         this.enemySpawnTimer = 0;
-        this.enemySpawnCount = 0; // Reset spawn counter for grace period
+        this.enemySpawnCount = 0;
         this.andySpawned = false;
         this.lastTimestamp = performance.now();
-        this.cameraY = 0;
-        this.cameraRenderY = 0;
+
+        const scaledPlayAreaY = GAME_CONFIG.PLAY_AREA_Y * this.bgScale;
+        const scaledCellSize = GAME_CONFIG.CELL_SIZE * this.bgScale;
+        const playerScreenY = scaledPlayAreaY + GAME_CONFIG.PLAYER_START_Y * scaledCellSize;
+        this.cameraY = playerScreenY - this.canvasHeight / 2;
+        const scaledBgHeight = this.backgroundImage ? this.backgroundImage.height * this.bgScale : this.canvasHeight;
+        const maxCameraY = scaledBgHeight - this.canvasHeight;
+        this.cameraY = Math.max(0, Math.min(this.cameraY, maxCameraY));
+        this.cameraRenderY = this.cameraY;
+
         this.animations = [];
         this.staticSprites = [];
 
@@ -2970,6 +2962,11 @@ class TarSoulsGame {
         this.pocketDustActive = null;
         this.lastPlayerMoveTime = 0;
         this.victoryPortalActive = false;
+
+        if (this.originalPlayerSpritesheet) {
+            this.playerSpritesheet = this.originalPlayerSpritesheet;
+            this.playerSpriteIndices = this.originalPlayerSpriteIndices;
+        }
 
         this.player = new Player(
             GAME_CONFIG.PLAYER_START_X,

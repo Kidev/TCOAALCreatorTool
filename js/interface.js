@@ -101,6 +101,8 @@ async function loadAndInjectUIAssets() {
 
 function openEditor() {
     if (typeof dialogFramework !== "undefined") {
+        dialogFramework.stopAutoPlay();
+        dialogFramework.sceneVersion++;
         dialogFramework.stopBackgroundMusic();
     }
 
@@ -1044,7 +1046,7 @@ async function importFromLink() {
 
         updateScenesList();
 
-        alert("Sequence imported successfully from link!");
+        //alert("Sequence imported successfully from link!");
     } catch (error) {
         console.error("Error importing from link:", error);
         alert("Error importing from link: " + error.message);
@@ -1151,7 +1153,7 @@ function importSequence() {
 
             updateScenesList();
 
-            alert("Sequence imported successfully!");
+            //alert("Sequence imported successfully!");
         } catch (error) {
             console.error("Error importing sequence:", error);
             alert("Error importing sequence file: " + error.message);
@@ -1409,10 +1411,22 @@ async function animateMenuDialog(dialogBox) {
     menuDialogTypingActive = false;
 }
 
-function toggleVisSpeakerMenu() {
+let menuToggleTimeout = null;
+
+function toggleVisSpeakerMenu(isUserClick = false) {
     const ashleyDiv = document.getElementById("dialog-content-box");
     const andrewDiv = document.getElementById("dialog-content-box2");
     if (ashleyDiv && andrewDiv) {
+        if (isUserClick && menuDialogTypingActive) {
+            menuDialogTypingActive = false;
+            return;
+        }
+
+        if (menuToggleTimeout) {
+            clearTimeout(menuToggleTimeout);
+            menuToggleTimeout = null;
+        }
+
         menuDialogTypingActive = false;
 
         ashleyDiv.classList.toggle("not-shown-now");
@@ -1420,6 +1434,9 @@ function toggleVisSpeakerMenu() {
 
         const visibleDialog = ashleyDiv.classList.contains("not-shown-now") ? andrewDiv : ashleyDiv;
         animateMenuDialog(visibleDialog);
+
+        const delay = isUserClick ? 20000 : 10000;
+        menuToggleTimeout = setTimeout(() => toggleVisSpeakerMenu(false), delay);
     }
 }
 
@@ -1497,6 +1514,15 @@ function setupGalleryOnlyMode() {
                         Play 'Tar Souls'
                     </button>
                     <button
+                        id="helpBtn"
+                        class="help-btn tcoaal-button"
+                        onclick="reopenWithMode('help')"
+                        title="Guides to use this website's tools"
+                        style="width:35vmax;margin-top:0.5vmax;"
+                    >
+                        Help
+                    </button>
+                    <button
                         id="clearSavedDataBtn"
                         class="clear-data-btn tcoaal-button"
                         onclick="clearSavedData()"
@@ -1506,7 +1532,7 @@ function setupGalleryOnlyMode() {
                         Clear saved data
                     </button>
                     </div>
-                    <div onclick="toggleVisSpeakerMenu()" id="dialog-container-box" class="dialog-container active" style="cursor: context-menu; margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
+                    <div onclick="toggleVisSpeakerMenu(true)" id="dialog-container-box" class="dialog-container active" style="cursor: context-menu; margin: 0; position: fixed; transform: translateX(-50%); margin: 0 auto;">
                         <div id="dialog-content-box" class="dialog-content not-shown-now">
                             <div class="dialog-line speaker-line">Ashley</div>
                             <div class="dialog-line text-line menu-dialog-text" style="top:34%;color:${Color.PURPLE}">"Well?&nbsp;Well??&nbsp;What&nbsp;do&nbsp;you&nbsp;think??</div>
@@ -1515,8 +1541,8 @@ function setupGalleryOnlyMode() {
                         </div>
                         <div id="dialog-content-box2" class="dialog-content">
                             <div class="dialog-line speaker-line">Kidev</div>
-                            <div class="dialog-line text-line menu-dialog-text" style="top:34%;color:${Color.GREY_BLUE};opacity:0;">"Need&nbsp;help&nbsp;using&nbsp;my&nbsp;tool?</div>
-                            <div class="dialog-line text-line menu-dialog-text" style="top:54%;color:${Color.GREY_BLUE};opacity:0;">I&nbsp;made&nbsp;a&nbsp;tutorial&nbsp;<a target="_blank" rel="noopener" style="color:${Color.GREY_BLUE};" title="work in progress" href="" >video</a>&nbsp;for&nbsp;you!"</div>
+                            <div class="dialog-line text-line menu-dialog-text" style="top:34%;color:${Color.GREY_BLUE};opacity:0;">"Need&nbsp;help&nbsp;using&nbsp;a&nbsp;tool?</div>
+                            <div class="dialog-line text-line menu-dialog-text" style="top:54%;color:${Color.GREY_BLUE};opacity:0;">Take a look at the Help option in the menu!"</div>
                             <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}" style="opacity: 0; transition: opacity 0.3s ease;">
                         </div>
                     </div>
@@ -1952,6 +1978,7 @@ async function downloadAllAssets() {
 
 function updateStickyPositions() {
     const header = document.getElementById("editorHeader");
+    const helpHeader = document.getElementById("helpHeader");
     const dialogBox = document.getElementById("dialog-content-box");
     const forcedImportOverlay = document.getElementById("forcedImportOverlay");
 
@@ -1959,6 +1986,10 @@ function updateStickyPositions() {
     if (header) {
         const headerHeight = header.offsetHeight;
         document.documentElement.style.setProperty("--header-height", headerHeight + "px");
+    }
+    if (helpHeader) {
+        const helpHeaderHeight = helpHeader.offsetHeight;
+        document.documentElement.style.setProperty("--help-header-height", helpHeaderHeight + "px");
     }
     /*if (dialogBox) {
         const NATIVE_W = 646;
@@ -2044,6 +2075,9 @@ async function checkAssetsAndShowForcedImport() {
                 overlay.style.display = "flex";
                 updateStickyPositions();
             }
+
+            document.body.classList.remove("mode-loading");
+            document.body.classList.add("mode-ready");
 
             return true;
         }
@@ -2201,6 +2235,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     if (mode === "gallery") {
         setupGalleryOnlyMode();
+
+        document.body.classList.remove("mode-loading");
+        document.body.classList.add("mode-ready");
     } else if (mode === "editor") {
         enhanceGameActions();
 
@@ -2219,10 +2256,25 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
 
         openEditor();
+
+        document.body.classList.remove("mode-loading");
+        document.body.classList.add("mode-ready");
     } else if (mode === "tarsouls") {
         await startTarSoulsGame();
+
+        document.body.classList.remove("mode-loading");
+        document.body.classList.add("mode-ready");
+    } else if (mode === "help") {
+        setupHelpMode();
+
+        document.body.classList.remove("mode-loading");
+        document.body.classList.add("mode-ready");
+        updateStickyPositions();
     } else {
         enhanceGameActions();
+
+        const autoplayParam = urlParams.get("autoplay");
+        const shouldAutoplay = autoplayParam !== null && useParam !== null;
 
         if (!useParam && typeof setupScene === "function") {
             setupScene();
@@ -2239,10 +2291,19 @@ document.addEventListener("DOMContentLoaded", async function () {
             await dialogFramework.preloadAssets();
             hideLoadingIndicator();
             dialogFramework.updateDebugInfo();
+
+            if (shouldAutoplay && !dialogFramework.isAutoPlaying) {
+                setTimeout(() => {
+                    dialogFramework.startAutoPlay();
+                }, 100);
+            }
         } else {
             //console.warn("No setup function found in sequence.js. Please define setupScene()");
             dialogFramework.updateDebugInfo();
         }
+
+        document.body.classList.remove("mode-loading");
+        document.body.classList.add("mode-ready");
     }
 
     await checkSavedDataOnLoad();
@@ -2649,4 +2710,282 @@ class DropDownButton {
             this.menu.appendChild(btn);
         });
     }
+}
+
+function setupHelpMode() {
+    const helpOverlay = document.getElementById("helpOverlay");
+    const scrollToTopBtn = document.getElementById("scrollToTopBtn");
+    const contentDiv = document.getElementById("helpMarkdownContent");
+
+    if (helpOverlay) {
+        helpOverlay.style.display = "block";
+    }
+
+    if (typeof marked !== "undefined") {
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            headerIds: true,
+            mangle: false,
+            highlight: function (code, lang) {
+                if (typeof Prism !== "undefined" && lang && Prism.languages[lang]) {
+                    return Prism.highlight(code, Prism.languages[lang], lang);
+                }
+                return code;
+            },
+        });
+    }
+
+    if (helpOverlay && scrollToTopBtn) {
+        const helpHeader = document.getElementById("helpHeader");
+
+        helpOverlay.addEventListener("scroll", () => {
+            const scrollTop = helpOverlay.scrollTop;
+
+            if (scrollTop > 300) {
+                scrollToTopBtn.style.display = "inline-block";
+            } else {
+                scrollToTopBtn.style.display = "none";
+            }
+
+            if (scrollTop > 50) {
+                helpOverlay.classList.add("scrolled");
+                if (helpHeader) {
+                    helpHeader.classList.add("scrolled");
+                }
+            } else {
+                helpOverlay.classList.remove("scrolled");
+                if (helpHeader) {
+                    helpHeader.classList.remove("scrolled");
+                }
+            }
+        });
+    }
+
+    async function loadMarkdown() {
+        if (!contentDiv) return;
+
+        const assetHelperArt = await memoryManager.getAssetByPath("img/pictures/3c813e43e423988a.png");
+
+        document.getElementById("bottomHelpArt").innerHTML =
+            `<img src=${URL.createObjectURL(assetHelperArt.blob)} alt="Help art">`;
+
+        try {
+            const cacheBuster = new Date().getTime();
+            const response = await fetch(`HOWTO.md?v=${cacheBuster}`);
+
+            if (!response.ok) {
+                throw new Error(`Failed to load HOWTO.md: ${response.status} ${response.statusText}`);
+            }
+
+            const markdown = await response.text();
+            const html = marked.parse(markdown);
+
+            contentDiv.innerHTML = html;
+
+            if (typeof Prism !== "undefined") {
+                contentDiv.querySelectorAll("pre code").forEach((block) => {
+                    Prism.highlightElement(block);
+                });
+            }
+
+            contentDiv.querySelectorAll("a").forEach((link) => {
+                if (link.hostname && link.hostname !== window.location.hostname) {
+                    link.setAttribute("target", "_blank");
+                    link.setAttribute("rel", "noopener noreferrer");
+                }
+            });
+
+            contentDiv.querySelectorAll("img").forEach((img) => {
+                const src = img.getAttribute("src");
+                if (src && src.toLowerCase().endsWith(".mp4")) {
+                    const video = document.createElement("video");
+                    video.setAttribute("controls", "");
+                    video.setAttribute("src", src);
+
+                    const alt = img.getAttribute("alt");
+                    if (alt) {
+                        video.setAttribute("title", alt);
+                    }
+
+                    img.parentNode.replaceChild(video, img);
+                }
+            });
+
+            const firstBlockquote = contentDiv.querySelector("blockquote");
+            if (firstBlockquote) {
+                const links = firstBlockquote.querySelectorAll("a");
+                if (links.length >= 2) {
+                    firstBlockquote.classList.add("help-button-container");
+
+                    links.forEach((link) => {
+                        const linkText = link.textContent.trim();
+                        const linkHref = link.getAttribute("href") || "";
+
+                        let imageSrc = null;
+
+                        if (linkText.includes("Chapter 1")) {
+                            imageSrc = "img/sequence-intro.webp";
+                        } else if (linkText.includes("Chapter 2")) {
+                            imageSrc = "img/sequence-vision.webp";
+                        }
+
+                        if (imageSrc) {
+                            const img = document.createElement("img");
+                            img.src = imageSrc;
+                            img.alt = linkText;
+                            img.title = linkText;
+                            img.style.display = "block";
+                            link.textContent = "";
+                            link.appendChild(img);
+                        }
+                    });
+                }
+            }
+
+            generateHelpNavigation();
+
+            setupHelpScrollTracking();
+        } catch (error) {
+            console.error("Error loading markdown:", error);
+            contentDiv.innerHTML = `
+                <div class="error">
+                    <strong>Error loading help documentation</strong>
+                    <p>${error.message}</p>
+                    <p>Please make sure HOWTO.md exists in the project root directory.</p>
+                </div>
+            `;
+        }
+    }
+
+    function generateHelpNavigation() {
+        const navLinksContainer = document.getElementById("helpNavLinks");
+        const headers = contentDiv.querySelectorAll("h1, h2, h3, h4, h5, h6");
+
+        if (!navLinksContainer || headers.length === 0) return;
+
+        navLinksContainer.innerHTML = "";
+
+        const introLink = document.createElement("a");
+        introLink.className = "help-nav-link level-1";
+        introLink.textContent = "Showcase";
+        introLink.href = "#showcase";
+        introLink.dataset.targetId = "showcase";
+        introLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            if (helpOverlay) {
+                helpOverlay.scrollTo({
+                    top: 0,
+                    behavior: "smooth",
+                });
+            }
+        });
+        navLinksContainer.appendChild(introLink);
+
+        headers.forEach((header, index) => {
+            const level = parseInt(header.tagName.substring(1));
+            const text = header.textContent;
+            const id = header.id || `section-${index}`;
+
+            if (level === 1 && index === 0) {
+                if (!header.id) {
+                    header.id = id;
+                }
+                return;
+            }
+
+            if (!header.id) {
+                header.id = id;
+            }
+
+            let navLevel = level;
+            if (level === 2) {
+                navLevel = 1;
+            } else if (level === 3) {
+                navLevel = 2;
+            } else if (level === 4) {
+                navLevel = 3;
+            } else if (level === 5) {
+                navLevel = 4;
+            } else if (level === 6) {
+                navLevel = 5;
+            }
+
+            const link = document.createElement("a");
+            link.className = `help-nav-link level-${navLevel}`;
+            link.textContent = text;
+            link.href = `#${id}`;
+            link.dataset.targetId = id;
+
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                const targetElement = document.getElementById(id);
+                if (targetElement && helpOverlay) {
+                    const headerHeight =
+                        parseFloat(
+                            getComputedStyle(document.documentElement).getPropertyValue("--help-header-height"),
+                        ) || 60;
+
+                    const offsetTop = targetElement.offsetTop - headerHeight - 60;
+                    helpOverlay.scrollTo({
+                        top: offsetTop,
+                        behavior: "smooth",
+                    });
+                }
+            });
+
+            navLinksContainer.appendChild(link);
+        });
+    }
+
+    function setupHelpScrollTracking() {
+        if (!helpOverlay) return;
+
+        const navLinks = document.querySelectorAll(".help-nav-link");
+        const headers = contentDiv.querySelectorAll("h1, h2, h3, h4, h5, h6");
+
+        if (navLinks.length === 0) return;
+
+        const headerHeight =
+            parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--help-header-height")) || 60;
+
+        const trackableHeaders = [];
+        headers.forEach((header, index) => {
+            const level = parseInt(header.tagName.substring(1));
+
+            if (level === 1 && index === 0) return;
+
+            if (!header.id) {
+                header.id = `section-${index}`;
+            }
+
+            trackableHeaders.push(header);
+        });
+
+        helpOverlay.addEventListener("scroll", () => {
+            const scrollTop = helpOverlay.scrollTop;
+
+            let currentId = "showcase";
+
+            for (const header of trackableHeaders) {
+                const headerTop = header.offsetTop;
+
+                if (headerTop <= scrollTop + headerHeight + 80) {
+                    currentId = header.id;
+                }
+            }
+
+            navLinks.forEach((link) => {
+                if (link.dataset.targetId === currentId) {
+                    link.classList.add("active");
+                } else {
+                    link.classList.remove("active");
+                }
+            });
+        });
+
+        helpOverlay.dispatchEvent(new Event("scroll"));
+    }
+
+    loadMarkdown();
 }

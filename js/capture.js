@@ -184,9 +184,9 @@ function showRecordingSettings() {
                 console.warn("Failed to save recording settings:", e);
             }
 
-            alert(
-                `Recording settings saved!\nFPS: ${recordingSettings.fps}\nBitrate: ${(recordingSettings.bitrate / 1000000).toFixed(1)} Mbps`,
-            );
+            //alert(
+            //    `Recording settings saved!\nFPS: ${recordingSettings.fps}\nBitrate: ${(recordingSettings.bitrate / 1000000).toFixed(1)} Mbps`,
+            //);
         }
         modal.remove();
         document.removeEventListener("keydown", escHandler);

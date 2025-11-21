@@ -26,12 +26,65 @@
         <link href="colors.css" rel="stylesheet" />
         <link href="viewer.css" rel="stylesheet" />
         <link href="editor.css" rel="stylesheet" />
+        <link href="js/libs/prism-tomorrow.min.css" rel="stylesheet" />
+        <style>
+            body.mode-loading {
+                opacity: 0;
+            }
+            body.mode-ready {
+                opacity: 1;
+                transition: opacity 0.15s ease-in;
+            }
+            /* Instant feedback on navigation */
+            body.mode-transitioning {
+                opacity: 0;
+                transition: opacity 0.12s ease-out;
+            }
+        </style>
+        <script>
+            (function () {
+                const urlParams = new URLSearchParams(window.location.search);
+                const mode = urlParams.get("mode");
+                document.documentElement.className = "mode-loading";
+                window.detectedMode = mode || "viewer";
+
+                // Instant navigation feedback - start fade immediately on click
+                window.startNavigationTransition = function (url) {
+                    document.body.classList.remove("mode-ready");
+                    document.body.classList.add("mode-transitioning");
+                    // Small delay to allow transition to start, then navigate
+                    setTimeout(() => {
+                        window.location.href = url;
+                    }, 50);
+                };
+
+                // Add instant feedback to all navigation links when DOM loads
+                document.addEventListener("DOMContentLoaded", function () {
+                    // Intercept all internal navigation links
+                    document.addEventListener("click", function (e) {
+                        const link = e.target.closest('a[href^="."], a[href^="index.html"], a[href^="?"]');
+                        if (link && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                            // Check if it's not opening in new tab
+                            const target = link.getAttribute("target");
+                            if (!target || target === "_self") {
+                                e.preventDefault();
+                                const href = link.getAttribute("href");
+                                startNavigationTransition(href);
+                            }
+                        }
+                    });
+                });
+            })();
+        </script>
         <script src="js/libs/lz-string.min.js"></script>
         <script src="js/libs/gifenc.min.js"></script>
         <script src="js/libs/html2canvas.min.js" defer></script>
         <script src="js/libs/gifuct.min.js"></script>
+        <script src="js/libs/marked.min.js"></script>
+        <script src="js/libs/prism.min.js"></script>
+        <script src="js/libs/prism-javascript.min.js"></script>
     </head>
-    <body>
+    <body class="mode-loading">
         <div id="forcedImportOverlay" class="forced-import-overlay" style="display: none">
             <a
                 href="https://github.com/Kidev/TCOAALCreatorTool"
@@ -570,11 +623,63 @@ Right click to erase the saved dialog"
         </div>
         <label for="fileInput" style="display: none"></label>
         <input accept=".json" id="fileInput" style="display: none" type="file" />
+        <!-- Help Mode Overlay -->
+        <div class="help-overlay spa-mode" id="helpOverlay" style="display: none" onclick="event.stopPropagation()">
+            <div class="editor-header" id="helpHeader">
+                <div class="editor-zone left">
+                    <div class="header-buttons">
+                        <button
+                            id="scrollToTopBtn"
+                            style="display: none; font-size: 1.5vmax"
+                            onclick="document.getElementById('helpOverlay').scrollTo({ top: 0, behavior: 'smooth' })"
+                            title="Scroll to top"
+                        >
+                            ⇮
+                        </button>
+                    </div>
+                </div>
+                <div class="editor-zone center">
+                    <div class="editor-header-content">
+                        <a href="." title="Back to home screen">
+                            <img alt="Dialog Creator" class="editor-title-image" src="img/tcoaal-title.webp" />
+                        </a>
+                    </div>
+                </div>
+                <div class="editor-zone right">
+                    <div class="header-buttons">
+                        <button
+                            class="tcoaal-button-small tcoaal-button-small-header"
+                            onclick="startNavigationTransition('index.html')"
+                            title="Return to home screen"
+                        >
+                            Back to site
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-main-container">
+                <nav class="help-nav-sidebar" id="helpNavSidebar">
+                    <div class="help-nav-links" id="helpNavLinks">
+                        <div class="loading" style="font-size: 14px; padding: 16px">Loading...</div>
+                    </div>
+                </nav>
+
+                <div class="help-content">
+                    <div id="helpMarkdownContent" class="markdown-body">
+                        <div class="loading">Loading help documentation</div>
+                    </div>
+                    <div style="margin-top: 8vmax" id="bottomHelpArt"></div>
+                </div>
+            </div>
+        </div>
+
         <script src="js/filenameMapper.js"></script>
         <script src="js/memoryManager.js"></script>
         <script src="js/dialog.js"></script>
         <script src="js/gameImporter.js"></script>
         <script src="js/interface.js"></script>
+        <script src="js/tarSoulsConfig.js"></script>
         <script src="js/tarSouls.js"></script>
         <script src="js/sequence.js"></script>
         <script src="js/editor.js"></script>

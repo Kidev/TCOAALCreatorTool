@@ -167,6 +167,26 @@ function isDefault(value, defaultValue) {
     return false;
 }
 
+function replaceSpacesOutsideTags(str) {
+    let result = "";
+    let insideTag = false;
+    for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+        if (char === "<") {
+            insideTag = true;
+            result += char;
+        } else if (char === ">") {
+            insideTag = false;
+            result += char;
+        } else if (char === " " && !insideTag) {
+            result += "&nbsp;";
+        } else {
+            result += char;
+        }
+    }
+    return result;
+}
+
 function mergeWithDefaults(data, defaults) {
     if (data === null || data === undefined) return JSON.parse(JSON.stringify(defaults));
     if (typeof data !== "object" || typeof defaults !== "object") return data;
@@ -1138,6 +1158,9 @@ function createSceneElement(index) {
         preview2 = dialogFramework.toEntitySpeechPreserveTags(preview2);
     }
 
+    preview1 = replaceSpacesOutsideTags(preview1);
+    preview2 = replaceSpacesOutsideTags(preview2);
+
     const isValidData = (data) => {
         return data !== null && data !== undefined;
     };
@@ -1688,7 +1711,8 @@ function updatePreviewDialog(index) {
     }
 
     if (processedLine1.includes("<")) {
-        const parsed1 = dialogFramework.parseFormattedText(processedLine1);
+        const spacedLine1 = replaceSpacesOutsideTags(processedLine1);
+        const parsed1 = dialogFramework.parseFormattedText(spacedLine1);
         text1Element.innerHTML = parsed1.innerHTML;
 
         const glitchContainers1 = text1Element.querySelectorAll(".glitch-container");
@@ -1703,7 +1727,8 @@ function updatePreviewDialog(index) {
     }
 
     if (processedLine2.includes("<")) {
-        const parsed2 = dialogFramework.parseFormattedText(processedLine2);
+        const spacedLine2 = replaceSpacesOutsideTags(processedLine2);
+        const parsed2 = dialogFramework.parseFormattedText(spacedLine2);
         text2Element.innerHTML = parsed2.innerHTML;
 
         const glitchContainers2 = text2Element.querySelectorAll(".glitch-container");
@@ -1790,6 +1815,9 @@ function updateSceneHeaderPreview(index) {
         preview1 = dialogFramework.toEntitySpeechPreserveTags(preview1);
         preview2 = dialogFramework.toEntitySpeechPreserveTags(preview2);
     }
+
+    preview1 = replaceSpacesOutsideTags(preview1);
+    preview2 = replaceSpacesOutsideTags(preview2);
 
     previewLinesElement.innerHTML = `${preview1}&nbsp;<br/>${preview2}&nbsp;`;
 }

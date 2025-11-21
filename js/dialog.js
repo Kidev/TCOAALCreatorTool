@@ -2690,7 +2690,12 @@ class DialogFramework {
         const chars = this.wrapTextNodesInSpans(element);
 
         for (let i = 0; i < chars.length; i++) {
-            if (!this.isTyping) break;
+            if (!this.isTyping) {
+                for (let j = 0; j < chars.length; j++) {
+                    chars[j].style.opacity = "1";
+                }
+                break;
+            }
 
             chars[i].style.opacity = "1";
             await this.wait(this.typeSpeed);
