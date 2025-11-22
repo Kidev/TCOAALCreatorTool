@@ -34,6 +34,60 @@ class GalleryManager {
         this.cropQueue = [];
         this.isCropping = false;
         this.willReadFrequently = true;
+        this.favouriteStarUrl = null;
+    }
+
+    async extractFavouriteStar() {
+        if (this.favouriteStarUrl) return this.favouriteStarUrl;
+
+        const spriteSheetName = "spritessheet_12x8_characters_14.png";
+        const spriteIndex = 6;
+        const cols = 12;
+        const rows = 8;
+
+        if (!window.gameImporterAssets?.images?.["Game sprites"]?.[spriteSheetName]) {
+            return null;
+        }
+
+        const asset = window.gameImporterAssets.images["Game sprites"][spriteSheetName];
+
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const cellWidth = img.width / cols;
+                const cellHeight = img.height / rows;
+                const col = spriteIndex % cols;
+                const row = Math.floor(spriteIndex / cols);
+
+                const canvas = document.createElement("canvas");
+                canvas.width = cellWidth;
+                canvas.height = cellHeight;
+                const ctx = canvas.getContext("2d", { alpha: true });
+
+                ctx.drawImage(
+                    img,
+                    col * cellWidth,
+                    row * cellHeight,
+                    cellWidth,
+                    cellHeight,
+                    0,
+                    0,
+                    cellWidth,
+                    cellHeight,
+                );
+
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        this.favouriteStarUrl = URL.createObjectURL(blob);
+                        resolve(this.favouriteStarUrl);
+                    } else {
+                        resolve(null);
+                    }
+                }, "image/png");
+            };
+            img.onerror = () => resolve(null);
+            img.src = asset.url;
+        });
     }
 
     setGlobalImageViewMode(mode) {

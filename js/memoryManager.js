@@ -599,6 +599,51 @@ class MemoryManager {
             request.onerror = () => reject(request.error);
         });
     }
+
+    generateFavouriteKey(type, category, name) {
+        return `${type}:${category}:${name}`;
+    }
+
+    async getFavourites() {
+        const data = await this.loadMetadata("favourites");
+        return new Set(data || []);
+    }
+
+    async saveFavourites(favouritesSet) {
+        await this.saveMetadata("favourites", Array.from(favouritesSet));
+    }
+
+    async isFavourite(type, category, name) {
+        const favourites = await this.getFavourites();
+        return favourites.has(this.generateFavouriteKey(type, category, name));
+    }
+
+    async toggleFavourite(type, category, name) {
+        const key = this.generateFavouriteKey(type, category, name);
+        const favourites = await this.getFavourites();
+
+        if (favourites.has(key)) {
+            favourites.delete(key);
+        } else {
+            favourites.add(key);
+        }
+
+        await this.saveFavourites(favourites);
+        return favourites.has(key);
+    }
+
+    async setFavourite(type, category, name, isFavourite) {
+        const key = this.generateFavouriteKey(type, category, name);
+        const favourites = await this.getFavourites();
+
+        if (isFavourite) {
+            favourites.add(key);
+        } else {
+            favourites.delete(key);
+        }
+
+        await this.saveFavourites(favourites);
+    }
 }
 
 if (!window.memoryManager) {

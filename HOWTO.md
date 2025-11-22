@@ -215,7 +215,10 @@ function setupScene() {
 ## Gallery
 
 The gallery allows you to look through all the game assets. If you open it from the main menu, I'll call it the **Asset viewer**. The first time you open it, it will crop all the relevant images in the background (you will see a progress bar). The next times, it will not happen.  
-Here, you can download the assets individually or all at once in a ZIP file. **The ZIP file also includes the cropped versions!** If you open it from the editor, I'll call it the **Gallery**. From there, you cannot download, but you can **Use** assets: when the editor shows a button 'Select from gallery', clicking on it opens the gallery. Then pressing **Use** will use that asset in the editor. 
+Here, you can download the assets individually or all at once in a ZIP file. **The ZIP file also includes the cropped versions!** If you open it from the editor, I'll call it the **Gallery**. From there, you cannot download, but you can **Use** assets: when the editor shows a button 'Select from gallery', clicking on it opens the gallery. Then pressing **Use** will use that asset in the editor.  
+Use right click on an asset to add it to favorites and find it easily, making it appear first in its category.
+![favorites](docs/favorites.png)
+
 
 ### Images
 
@@ -251,6 +254,7 @@ There are shortcuts:
 | **↑↓**           | Move selected character in Portraits OR Previous/next sprite in sprites sheets |
 | **SPACE**           | Cropped/original version |  
 | **ESC**           | Exit the gallery only |  
+| **Right click**   | Add to favorites |
 
 ### Audio
 
@@ -337,6 +341,11 @@ The duration of the animation is the duration of the longest timeline. Adding th
 If you add any audio asset to the compositor, it will appear in the unique audio track, on top. They work exactly the same as sequence layers, but with sounds. And instead of placing them on the canvas, you can tweak volume/pitch/speed of each.
 
 ![audio-track](docs/layers-audio-track.mp4)
+
+### Templating  
+You have the possibility to import an image that will replace the black background of the Compositor. This template image will not be exported, even if you leave it visible when exporting. You can hide it, and remove it as you want.  
+It is very useful to reproduce certain scenes in the game with lots of objects that you want precisely placed. For example, the eye animations in the visions.
+![template-comp](docs/templates.mp4)
 
 ### Exporting
 

@@ -3752,7 +3752,7 @@ function selectGalleryCategory(category) {
     updateGalleryContent();
 }
 
-function updateGalleryContent() {
+async function updateGalleryContent() {
     const contentContainer = document.getElementById("galleryContent");
     if (!contentContainer || !window.gameImporterAssets || !currentGalleryCategory) return;
 
@@ -3783,8 +3783,30 @@ function updateGalleryContent() {
         }
     }
 
+    let favouritesSet = new Set();
+    if (window.memoryManager) {
+        try {
+            favouritesSet = await window.memoryManager.getFavourites();
+        } catch (e) {
+            console.warn("Failed to load favourites:", e);
+        }
+    }
+
+    let favouriteStarUrl = null;
+    if (window.galleryManager) {
+        favouriteStarUrl = await window.galleryManager.extractFavouriteStar();
+    }
+
     const assetEntries = Object.entries(assets);
     assetEntries.sort((a, b) => {
+        const keyA = window.memoryManager?.generateFavouriteKey(currentGalleryTab, currentGalleryCategory, a[0]);
+        const keyB = window.memoryManager?.generateFavouriteKey(currentGalleryTab, currentGalleryCategory, b[0]);
+        const favA = favouritesSet.has(keyA);
+        const favB = favouritesSet.has(keyB);
+
+        if (favA && !favB) return -1;
+        if (!favA && favB) return 1;
+
         const normalize = (name) => {
             return name.replace(
                 /^spritessheet_(\d+)x(\d+)_([^.]*)\.png$/,
@@ -3865,13 +3887,18 @@ function updateGalleryContent() {
             if (!baseName.startsWith(bustFilterValue.toLowerCase() + "_")) return;
         }
         const formatName = window.galleryManager.formatAssetTitle(name, currentGalleryCategory, currentGalleryTab);
+        const favKey = window.memoryManager?.generateFavouriteKey(currentGalleryTab, currentGalleryCategory, name);
+        const isFav = favouritesSet.has(favKey);
+
         const item = document.createElement("div");
-        item.className = "gallery-item";
+        item.className = "gallery-item" + (isFav ? " favourite" : "");
         item.dataset.filename = name;
         item.dataset.assetIndex = index.toString();
         item.dataset.baseFileName = asset.baseFileName;
         item.dataset.originalName = asset.originalName;
         item.dataset.formatName = formatName;
+        item.dataset.category = currentGalleryCategory;
+        item.dataset.type = currentGalleryTab;
         item.onclick = function (ev) {
             document.querySelectorAll(".gallery-item").forEach((it) => {
                 it.classList.remove("selected");
@@ -3880,12 +3907,32 @@ function updateGalleryContent() {
             window.galleryManager.scrollIfRequired(ev.currentTarget);
             window.galleryManager.previewAsset(name, currentGalleryCategory, currentGalleryTab);
         };
+        item.oncontextmenu = async function (ev) {
+            ev.preventDefault();
+            if (!window.memoryManager) return;
+
+            const itemEl = ev.currentTarget;
+            const assetName = itemEl.dataset.filename;
+            const assetCategory = itemEl.dataset.category;
+            const assetType = itemEl.dataset.type;
+
+            const nowFav = await window.memoryManager.toggleFavourite(assetType, assetCategory, assetName);
+            itemEl.classList.toggle("favourite", nowFav);
+
+            updateGalleryContent();
+        };
+        const starHtml = favouriteStarUrl
+            ? `<img class="gallery-item-fav-star" src="${favouriteStarUrl}" alt="Favourite" title="Favourite">`
+            : `<span class="gallery-item-fav-star" title="Favourite">★</span>`;
+
         if (currentGalleryTab === "images") {
             item.innerHTML = `
+                ${starHtml}
                 <img src="${asset.croppedUrl || asset.url}" alt="${name}" loading="lazy">
                 <div class="gallery-item-name">${formatName}</div>`;
         } else {
             item.innerHTML = `
+                ${starHtml}
                 <div class="gallery-item-audio compact">
                 <div class="audio-icon">🎵</div>
                 <div class="gallery-item-name">${formatName}</div>

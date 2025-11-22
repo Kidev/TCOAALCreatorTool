@@ -1618,6 +1618,31 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     background: var(--accent-color-light);
 }
 
+.gallery-item .gallery-item-fav-star {
+    position: absolute;
+    top: 0.3vmax;
+    right: 0.3vmax;
+    width: 1.5vmax;
+    height: 1.5vmax;
+    object-fit: contain;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+    image-rendering: pixelated;
+}
+
+.gallery-item span.gallery-item-fav-star {
+    width: auto;
+    height: auto;
+    font-size: 1.2vmax;
+    color: #ffd700;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+.gallery-item.favourite .gallery-item-fav-star {
+    opacity: 1;
+}
+
 /* GALLERY-ONLY MODE STYLES */
 .gallery-only-mode body {
     overflow: auto;
@@ -3828,6 +3853,10 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     padding-bottom: 60px;
     min-width: 0;
     margin-top: var(--help-header-height);
+}
+
+.help-content summary {
+    cursor: pointer;
 }
 
 /* Responsive design for smaller screens */

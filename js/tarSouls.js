@@ -492,12 +492,14 @@ class AudioManager {
             pocketDust: GAME_ASSETS.sound_effects.POCKET_DUST,
         };
 
+        this.trackSource = "official"; // 'official' or 'kidev'
         this.backgroundMusic = {
             normal: GAME_ASSETS.music.NORMAL,
             andyIsHere: GAME_ASSETS.music.ANDY_IS_HERE,
         };
 
         this.currentMusic = null;
+        this.currentMusicName = null;
         this.musicMuted = false;
         this.soundMuted = false;
     }
@@ -524,6 +526,7 @@ class AudioManager {
 
         if (music) {
             this.currentMusic = music;
+            this.currentMusicName = musicName;
             music.loop = true;
             if (!this.musicMuted) {
                 music.play().catch((e) => console.log("Music play failed:", e));
@@ -554,6 +557,50 @@ class AudioManager {
 
     setSoundMuted(muted) {
         this.soundMuted = muted;
+    }
+
+    setTrackSource(source, gameAssets) {
+        this.trackSource = source;
+        const musicSource = source === "kidev" ? GAME_ASSETS.music_kidev : GAME_ASSETS.music;
+
+        this.backgroundMusic = {
+            normal: this.createAudioElement(gameAssets, musicSource.NORMAL),
+            andyIsHere: this.createAudioElement(gameAssets, musicSource.ANDY_IS_HERE),
+        };
+
+        if (this.currentMusicName && this.currentMusic) {
+            const wasPlaying = !this.currentMusic.paused;
+            this.currentMusic.pause();
+            this.currentMusic.currentTime = 0;
+
+            const newMusic = this.backgroundMusic[this.currentMusicName];
+            if (newMusic) {
+                this.currentMusic = newMusic;
+                newMusic.loop = true;
+                if (wasPlaying && !this.musicMuted) {
+                    newMusic.play().catch((e) => console.log("Music play failed:", e));
+                }
+            }
+        }
+    }
+
+    createAudioElement(gameAssets, filename) {
+        if (!filename) return null;
+
+        if (filename.startsWith("music/")) {
+            const audio = new Audio(filename);
+            audio.preload = "auto";
+            return audio;
+        }
+
+        const asset = gameAssets?.audio?.["Background songs"]?.[filename];
+        if (asset?.url) {
+            const audio = new Audio(asset.url);
+            audio.preload = "auto";
+            return audio;
+        }
+
+        return null;
     }
 }
 
@@ -700,7 +747,6 @@ class TarSoulsGame {
             this.getDifficultyConfig(),
         );
 
-        // Initialize camera centered on player spawn position for menu preview
         const scaledPlayAreaY = GAME_CONFIG.PLAY_AREA_Y * this.bgScale;
         const scaledCellSize = GAME_CONFIG.CELL_SIZE * this.bgScale;
         const playerScreenY = scaledPlayAreaY + GAME_CONFIG.PLAYER_START_Y * scaledCellSize;
@@ -950,6 +996,14 @@ class TarSoulsGame {
         muteMusicButton.style.width = "55%";
         botBlock.appendChild(muteMusicButton);
 
+        const trackSourceButton = document.createElement("button");
+        trackSourceButton.className = "tcoaal-button-tarsouls";
+        trackSourceButton.id = "tarSoulsTrackSourceBtn";
+        trackSourceButton.textContent = "Tracks: Official";
+        trackSourceButton.onclick = () => this.toggleTrackSource();
+        trackSourceButton.style.width = "55%";
+        botBlock.appendChild(trackSourceButton);
+
         const muteSoundButton = document.createElement("button");
         muteSoundButton.className = "tcoaal-button-tarsouls";
         muteSoundButton.id = "tarSoulsMuteSoundBtn";
@@ -1156,6 +1210,15 @@ class TarSoulsGame {
         const btn = document.getElementById("tarSoulsMuteMusicBtn");
         if (btn) {
             btn.textContent = this.audioManager.musicMuted ? "Music: OFF" : "Music: ON";
+        }
+    }
+
+    toggleTrackSource() {
+        const newSource = this.audioManager.trackSource === "official" ? "kidev" : "official";
+        this.audioManager.setTrackSource(newSource, this.gameAssets);
+        const btn = document.getElementById("tarSoulsTrackSourceBtn");
+        if (btn) {
+            btn.textContent = newSource === "official" ? "Tracks: Official" : "Tracks: Kidev";
         }
     }
 
@@ -1474,9 +1537,17 @@ class TarSoulsGame {
     }
 
     handleKeyDown(event) {
-        if (this.gameState !== "playing") return;
-
         const code = event.code;
+
+        if (code === "Escape" || code === "KeyP") {
+            if (this.gameState === "playing" || this.gameState === "paused") {
+                this.togglePause();
+                event.preventDefault();
+            }
+            return;
+        }
+
+        if (this.gameState !== "playing") return;
 
         let directionPressed = false;
         if (this.keyLayout.UP.includes(code)) {
@@ -1506,11 +1577,6 @@ class TarSoulsGame {
         if (code === "Space" && this.phase2Active) {
             // Queue attack action (only 1 buffered)
             this.attackQueued = true;
-            event.preventDefault();
-        }
-
-        if (code === "Escape" || code === "KeyP") {
-            this.togglePause();
             event.preventDefault();
         }
     }
@@ -2937,6 +3003,9 @@ class TarSoulsGame {
 
     restart() {
         this.cleanup();
+
+        window.addEventListener("resize", this.boundHandleResize);
+
         this.togglePause();
 
         this.enemies = [];
