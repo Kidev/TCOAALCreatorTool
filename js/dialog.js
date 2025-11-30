@@ -199,7 +199,7 @@ class DialogFramework {
         this.sceneVersion = 0;
         this.isMuted = false;
 
-        this.gifCache = new Map(); // Map<url, {status: 'loading'|'ready'|'error', frames: [...], promise: Promise}>
+        this.gifCache = new Map();
 
         this.choicesSoundMove = {
             path: "gallery:Sound effects/se_53.ogg",
@@ -249,7 +249,7 @@ class DialogFramework {
         if (typeof crypto !== "undefined" && crypto.randomUUID) {
             return crypto.randomUUID();
         }
-        // Fallback UUID v4 generator for browsers/contexts without crypto.randomUUID
+
         return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
             const r = (Math.random() * 16) | 0;
             const v = c === "x" ? r : (r & 0x3) | 0x8;
@@ -886,6 +886,17 @@ class DialogFramework {
                 }
             }
         });
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                if (this.isTyping) {
+                    this.skipText();
+                }
+                if (this.isAutoPlaying) {
+                    this.stopAutoPlay();
+                }
+            }
+        });
     }
 
     toggleControls() {
@@ -1416,7 +1427,6 @@ class DialogFramework {
     }
 
     handleBustTransitions(scene, previousScene) {
-        // portraitsTimings = [[fadeInLeft, fadeOutLeft, delayInLeft, delayOutLeft], [fadeInRight, fadeOutRight, delayInRight, delayOutRight]]
         const leftTimings = scene.portraitsTimings ? scene.portraitsTimings[0] : [0, 0, 0, 0];
         const rightTimings = scene.portraitsTimings ? scene.portraitsTimings[1] : [0, 0, 0, 0];
         const prevLeftTimings =
@@ -1424,7 +1434,6 @@ class DialogFramework {
         const prevRightTimings =
             previousScene && previousScene.portraitsTimings ? previousScene.portraitsTimings[1] : [0, 0, 0, 0];
 
-        // Handle left bust
         if (previousScene && previousScene.bustLeft !== scene.bustLeft) {
             if (previousScene.bustLeft) {
                 const fadeOutTime = prevLeftTimings[1] || 200;
@@ -1452,7 +1461,6 @@ class DialogFramework {
             }, delayIn);
         }
 
-        // Handle right bust
         if (previousScene && previousScene.bustRight !== scene.bustRight) {
             if (previousScene.bustRight) {
                 const fadeOutTime = prevRightTimings[1] || 200;
@@ -1847,7 +1855,6 @@ class DialogFramework {
                         setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
                     } else {
                         if (loopGif) {
-                            // Loop the GIF by resetting frame index
                             frameIndex = 0;
                             setTimeout(() => requestAnimationFrame(renderFrame), frame.delay);
                         } else {
@@ -3036,8 +3043,6 @@ class DialogFramework {
             const hasGif = scene.image && scene.image.endsWith(".gif");
             const isLoopingGif = scene.loopBackgroundGif || false;
 
-            // Only wait for GIF to complete if it's not looping
-            // Looping GIFs never end, so autoplay should not wait for them
             if (hasGif && !isLoopingGif) {
                 const gifEndedPromise = new Promise((resolve) => {
                     const handler = (event) => {

@@ -49,6 +49,11 @@ class CompositionEditor {
         this.dragLayerStartX = 0;
         this.dragLayerStartY = 0;
 
+        this.canvasSizeMode = "auto"; // "auto" or "custom"
+        this.customCanvasWidth = 1296;
+        this.customCanvasHeight = 720;
+        this.canvasSizeControlsInitialized = false;
+
         this.isPlayingPreview = false;
         this.previewStartTime = null;
         this.previewAnimationId = null;
@@ -216,7 +221,16 @@ class CompositionEditor {
     }
 
     updateCanvasSize() {
-        const { width, height } = this.calculateRequiredCanvasSize();
+        let width, height;
+
+        if (this.canvasSizeMode === "custom") {
+            width = this.customCanvasWidth;
+            height = this.customCanvasHeight;
+        } else {
+            const calculated = this.calculateRequiredCanvasSize();
+            width = calculated.width;
+            height = calculated.height;
+        }
 
         if (this.canvasWidth !== width || this.canvasHeight !== height) {
             this.canvasWidth = width;
@@ -226,6 +240,8 @@ class CompositionEditor {
                 this.canvas.width = width;
                 this.canvas.height = height;
             }
+
+            this.updateCanvasSizeInputs();
         }
     }
 
@@ -241,6 +257,7 @@ class CompositionEditor {
         this.ctx = this.canvas.getContext("2d", { alpha: true, willReadFrequently: false });
 
         this.setupCanvasEventHandlers();
+        this.setupCanvasSizeControls();
     }
 
     getPixelAtPosition(layer, x, y) {
@@ -291,6 +308,12 @@ class CompositionEditor {
             const mouseX = (e.clientX - rect.left) * scaleX;
             const mouseY = (e.clientY - rect.top) * scaleY;
 
+            const isRightClick = e.button === 2;
+
+            if (isRightClick) {
+                e.preventDefault();
+            }
+
             const reversedLayers = [...this.layers].reverse();
             for (const layer of reversedLayers) {
                 if (!layer.visible) continue;
@@ -303,9 +326,16 @@ class CompositionEditor {
                     mouseY >= renderData.y &&
                     mouseY <= renderData.y + renderData.height
                 ) {
-                    const pixel = this.getPixelAtPosition(layer, mouseX, mouseY);
+                    let shouldSelect = false;
 
-                    if (pixel.a > 0) {
+                    if (isRightClick) {
+                        shouldSelect = true;
+                    } else {
+                        const pixel = this.getPixelAtPosition(layer, mouseX, mouseY);
+                        shouldSelect = pixel.a > 0;
+                    }
+
+                    if (shouldSelect) {
                         this.selectLayer(layer.id);
 
                         this.isDragging = true;
@@ -386,6 +416,98 @@ class CompositionEditor {
 
             this.canvas.style.cursor = hovering ? "grab" : "default";
         });
+
+        this.canvas.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+        });
+    }
+
+    setupCanvasSizeControls() {
+        if (this.canvasSizeControlsInitialized) {
+            this.updateCanvasSizeInputs();
+            return;
+        }
+
+        const toggleBtn = document.getElementById("previewCanvasAutoCustomToggle");
+        const inputX = document.getElementById("previewCanvasSizeX");
+        const inputY = document.getElementById("previewCanvasSizeY");
+
+        if (!toggleBtn || !inputX || !inputY) return;
+
+        this.updateCanvasSizeInputs();
+
+        toggleBtn.addEventListener("click", () => {
+            this.canvasSizeMode = this.canvasSizeMode === "auto" ? "custom" : "auto";
+            this.updateCanvasSizeMode();
+        });
+
+        const handleInputChange = () => {
+            if (this.canvasSizeMode === "custom") {
+                const newWidth = parseInt(inputX.value, 10);
+                const newHeight = parseInt(inputY.value, 10);
+
+                if (!isNaN(newWidth) && newWidth > 0) {
+                    this.customCanvasWidth = newWidth;
+                }
+                if (!isNaN(newHeight) && newHeight > 0) {
+                    this.customCanvasHeight = newHeight;
+                }
+
+                this.updateCanvasSize();
+                this.render();
+            }
+        };
+
+        inputX.addEventListener("input", handleInputChange);
+        inputY.addEventListener("input", handleInputChange);
+
+        this.updateCanvasSizeMode();
+
+        this.canvasSizeControlsInitialized = true;
+    }
+
+    updateCanvasSizeMode() {
+        const toggleBtn = document.getElementById("previewCanvasAutoCustomToggle");
+        const inputX = document.getElementById("previewCanvasSizeX");
+        const inputY = document.getElementById("previewCanvasSizeY");
+
+        if (!toggleBtn || !inputX || !inputY) return;
+
+        if (this.canvasSizeMode === "auto") {
+            toggleBtn.textContent = "Auto";
+            toggleBtn.classList.remove("warning");
+            toggleBtn.classList.add("info");
+            inputX.readOnly = true;
+            inputY.readOnly = true;
+            inputX.style.opacity = "0.6";
+            inputY.style.opacity = "0.6";
+            inputX.style.cursor = "default";
+            inputY.style.cursor = "default";
+        } else {
+            toggleBtn.textContent = "Custom";
+            toggleBtn.classList.remove("info");
+            toggleBtn.classList.add("warning");
+            inputX.readOnly = false;
+            inputY.readOnly = false;
+            inputX.style.opacity = "1";
+            inputY.style.opacity = "1";
+            inputX.style.cursor = "text";
+            inputY.style.cursor = "text";
+        }
+
+        this.updateCanvasSize();
+        this.updateCanvasSizeInputs();
+        this.render();
+    }
+
+    updateCanvasSizeInputs() {
+        const inputX = document.getElementById("previewCanvasSizeX");
+        const inputY = document.getElementById("previewCanvasSizeY");
+
+        if (!inputX || !inputY) return;
+
+        inputX.value = this.canvasWidth;
+        inputY.value = this.canvasHeight;
     }
 
     generateDefaultCompositionName() {
@@ -768,6 +890,9 @@ class CompositionEditor {
     }
 
     addLayer(assetData) {
+        const hasExplicitWidth = assetData.width !== undefined && assetData.width !== null && assetData.width !== 0;
+        const hasExplicitHeight = assetData.height !== undefined && assetData.height !== null && assetData.height !== 0;
+
         const layer = {
             id: this.generateId(),
             name: assetData.name || "Layer " + (this.layers.length + 1),
@@ -795,6 +920,9 @@ class CompositionEditor {
             hasKeyframes: assetData.hasKeyframes || false,
             keyframes: assetData.keyframes || [],
             selectedKeyframeIndex: 0,
+
+            _hasExplicitWidth: hasExplicitWidth,
+            _hasExplicitHeight: hasExplicitHeight,
         };
 
         if (layer.type === "sprite" && layer.spriteCanvases.length > 0) {
@@ -809,8 +937,13 @@ class CompositionEditor {
             img.onload = async () => {
                 layer.image = img;
                 layer.imageLoaded = true;
-                layer.width = layer.width || img.width;
-                layer.height = layer.height || img.height;
+
+                if (!layer._hasExplicitWidth) {
+                    layer.width = img.width;
+                }
+                if (!layer._hasExplicitHeight) {
+                    layer.height = img.height;
+                }
 
                 const gifDuration = await this.parseGifDuration(layer.blobUrl);
                 if (gifDuration) {
@@ -1608,15 +1741,13 @@ class CompositionEditor {
         if (layer.keyframes.length >= 1) {
             layer.selectedKeyframeIndex = Math.min(layer.selectedKeyframeIndex, layer.keyframes.length - 1);
             this.updateLayerTypeFromKeyframes(layer);
+            this.updateCanvasSize();
+            this.updateLayersList();
+            this.render();
         } else {
-            layer.hasKeyframes = false;
-            layer.keyframes = [];
-            layer.selectedKeyframeIndex = 0;
+            this.removeLayer(layer.id);
         }
 
-        this.updateCanvasSize();
-        this.updateLayersList();
-        this.render();
         this.showNotification(`Keyframe ejected as layer "${newLayer.name}"`, "success", 3000);
     }
 
@@ -3998,7 +4129,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         let fileExtension;
 
         if (shouldExportAsGif) {
-            blob = await this.renderToGifBlob(true); // true = gallery save
+            blob = await this.renderToGifBlob(true);
             fileExtension = "gif";
             if (!blob) {
                 this.showNotification("Failed to render composition as GIF", "error", 6000);
@@ -4344,6 +4475,14 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
         const editor = new CompositionEditor();
         editor.init();
+
+        if (descriptor.width && descriptor.height) {
+            editor.canvasSizeMode = "custom";
+            editor.customCanvasWidth = descriptor.width;
+            editor.customCanvasHeight = descriptor.height;
+            editor.updateCanvasSize();
+            editor.updateCanvasSizeMode();
+        }
 
         let missingAssets = [];
 

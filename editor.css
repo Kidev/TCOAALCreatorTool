@@ -2657,9 +2657,37 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(0, 0, 0, 0.7);
+    /*background: rgba(0, 0, 0, 0.7);*/
     padding: 1px;
     border-radius: 4px;
+}
+
+.compositor-preview-control-line {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    height: 2vmax;
+}
+
+.composition-preview-canvas-size-control {
+    align-self: start;
+    justify-self: start;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    padding: 1px;
+    border-radius: 4px;
+}
+
+.composition-preview-canvas-size-control input[type="number"] {
+    -moz-appearance: textfield; /* Firefox */
+}
+
+.composition-preview-canvas-size-control input[type="number"]::-webkit-outer-spin-button,
+.composition-preview-canvas-size-control input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none; /* Chrome, Safari, Edge */
+    margin: 0;
 }
 
 #compositionCanvas {

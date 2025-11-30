@@ -1045,8 +1045,6 @@ async function importFromLink() {
         }
 
         updateScenesList();
-
-        //alert("Sequence imported successfully from link!");
     } catch (error) {
         console.error("Error importing from link:", error);
         alert("Error importing from link: " + error.message);
@@ -1152,8 +1150,6 @@ function importSequence() {
             }
 
             updateScenesList();
-
-            //alert("Sequence imported successfully!");
         } catch (error) {
             console.error("Error importing sequence:", error);
             alert("Error importing sequence file: " + error.message);
@@ -1440,6 +1436,18 @@ function toggleVisSpeakerMenu(isUserClick = false) {
     }
 }
 
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        if (menuDialogTypingActive) {
+            menuDialogTypingActive = false;
+        }
+        if (menuToggleTimeout) {
+            clearTimeout(menuToggleTimeout);
+            menuToggleTimeout = null;
+        }
+    }
+});
+
 function setupGalleryOnlyMode() {
     const gameContainer = document.querySelector(".game-container");
     if (gameContainer) {
@@ -1507,11 +1515,11 @@ function setupGalleryOnlyMode() {
                     <button
                         id="playGameButton"
                         class="play-game-btn tcoaal-button"
-                        title="Can Ashley get her brother back from the claws of demons?"
+                        title="When her brother is in danger, or when hussies attack...\nYou can be sure that Ashley's on Duty!\n\nEPISODE 1\nEPISODE 2\nEPISODE 3 - SOON"
                         style="width:35vmax;margin-top:0.5vmax;"
-                        onclick="reopenWithMode('tarsouls')"
+                        onclick="reopenWithMode('ashley-on-duty')"
                     >
-                        Play 'Tar Souls'
+                        Ashley on Duty
                     </button>
                     <button
                         id="helpBtn"
@@ -1615,19 +1623,23 @@ function setupGalleryOnlyMode() {
                 </div>
                 <div class="composition-editor-main">
                     <div class="composition-canvas-panel">
+<div class="compositor-preview-control-line">
                         <div class="composition-preview-bg-controls">
-                            <label for="previewBackgroundFile" style="display: none; font-size: 0.9vmax; color: var(--txt-color);"></label>
+                            <label
+                                for="previewBackgroundFile"
+                                style="display: none; font-size: 0.9vmax; color: var(--txt-color)"
+                            ></label>
                             <input
                                 type="file"
                                 id="previewBackgroundFile"
                                 accept="image/*"
-                                style="display: none;"
+                                style="display: none;height:75%;padding: 5px 5px !important;"
                                 onchange="compositionEditor.loadPreviewBackground(this.files[0])"
                             />
                             <button
                                 id="previewBackgroundSelectBtn"
                                 onclick="document.getElementById('previewBackgroundFile').click()"
-                                style="font-size: 0.8vmax; padding: 4px 8px;"
+                                style="font-size: 0.8vmax;height:75%;padding: 5px 5px !important;"
                                 title="Select background image for preview only"
                             >
                                 Template
@@ -1635,7 +1647,7 @@ function setupGalleryOnlyMode() {
                             <button
                                 id="previewBackgroundToggleBtn"
                                 onclick="compositionEditor.togglePreviewBackground()"
-                                style="font-size: 0.8vmax; padding: 4px 8px; display: none;"
+                                style="font-size: 0.8vmax; display: none;height:75%;padding: 5px 5px !important;"
                                 title="Hide/Show background"
                                 class="success"
                             >
@@ -1644,12 +1656,30 @@ function setupGalleryOnlyMode() {
                             <button
                                 id="previewBackgroundRemoveBtn"
                                 onclick="compositionEditor.removePreviewBackground()"
-                                style="font-size: 0.8vmax; padding: 4px 8px; display: none;"
+                                style="font-size: 0.8vmax; display: none;height:75%;padding: 5px 5px !important;"
                                 title="Remove background"
                                 class="danger"
                             >
                                 ✕
                             </button>
+                        </div>
+                        <div class="composition-preview-canvas-size-control">
+                            <button
+                                    id="previewCanvasAutoCustomToggle"
+                                    style="font-size: 0.8vmax;height:75%;padding: 5px 5px !important;"
+                                    title="Auto/Custom canvas size"
+                                    class="info"
+                            >
+                                Auto
+                            </button>
+                            <div style="display: flex;flex-direction: column;gap: 2px;align-content: center;align-items: center;">
+
+                                <input type="number" id="previewCanvasSizeX" style="width: 4vmax;height:1vmax; opacity: 0.6;" readonly="">                            <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">width</label></div>
+                            <div style="display: flex;flex-direction: column;gap: 2px;align-items: center;">
+
+                                <input type="number" id="previewCanvasSizeY" style="width: 4vmax;height:1vmax; opacity: 0.6;" readonly="">                            <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">height</label></div>
+
+                        </div>
                         </div>
                         <div class="composition-canvas-container">
                             <canvas id="compositionCanvas"></canvas>
@@ -2259,8 +2289,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         document.body.classList.remove("mode-loading");
         document.body.classList.add("mode-ready");
-    } else if (mode === "tarsouls") {
-        await startTarSoulsGame();
+    } else if (mode === "ashley-on-duty") {
+        const episode = parseInt(urlParams.get("episode") || "1");
+        await startAshleyOnDuty(episode);
 
         document.body.classList.remove("mode-loading");
         document.body.classList.add("mode-ready");

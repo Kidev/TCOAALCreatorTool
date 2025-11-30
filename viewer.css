@@ -217,7 +217,7 @@ canvas.background-image {
     align-items: center;
     justify-content: center;
     text-align: center;
-    overflow: hidden;
+    overflow: visible;
     line-height: 1.2;
     font-size: 2vmax;
 }
@@ -601,8 +601,17 @@ canvas.background-image {
         0 0 4px #000000;
 }
 
-.tcoaal-button-tarsouls-small.disabled,
-.tcoaal-button-tarsouls-small:hover {
+.tcoaal-button-tarsouls-small:disabled {
+    background: var(--choice-button-hover);
+    background-size: 100% 100%;
+}
+
+.tcoaal-button-tarsouls-small:disabled:hover {
+    background: var(--choice-button-hover);
+    background-size: 100% 100%;
+}
+
+.tcoaal-button-tarsouls-small:hover:not(:disabled) {
     background: var(--choice-button-hover);
     background-size: 100% 100%;
 }
@@ -922,7 +931,6 @@ canvas.background-image {
     }
 }*/
 
-/* Ensure mobile controls are always hidden and regular controls always visible */
 .mobile-controls-container {
     display: none !important;
 }
@@ -1247,3 +1255,73 @@ canvas.background-image {
 /*#importProgressModal {
     background: rgba(0, 0, 0, 1.0);
 }*/
+
+@keyframes tarSoulsPulseHovered {
+    /*0% {
+        background: radial-gradient(ellipse at center,
+        color-mix(in srgb, var(--play-glow-color) 95%, transparent) 0%,
+        color-mix(in srgb, var(--play-glow-color) 60%, transparent) 80%,
+        color-mix(in srgb, var(--play-glow-color) 30%, transparent) 90%,
+        transparent 100%);
+        filter: blur(13px);
+        opacity: 0.2;
+        height: 115%;
+        width: 80%;
+    }*/
+    0%,
+    100% {
+        background: radial-gradient(
+            ellipse at center,
+            color-mix(in srgb, var(--play-glow-color) 95%, transparent) 0%,
+            color-mix(in srgb, var(--play-glow-color) 60%, transparent) 80%,
+            color-mix(in srgb, var(--play-glow-color) 30%, transparent) 90%,
+            transparent 100%
+        );
+        filter: blur(13px);
+        opacity: 0.9;
+        height: 105%;
+        width: 85%;
+    }
+}
+
+@keyframes tarSoulsPulse {
+    0% {
+        background: radial-gradient(
+            ellipse at center,
+            color-mix(in srgb, var(--play-glow-color) 95%, transparent) 0%,
+            color-mix(in srgb, var(--play-glow-color) 60%, transparent) 80%,
+            color-mix(in srgb, var(--play-glow-color) 30%, transparent) 90%,
+            transparent 100%
+        );
+        filter: blur(13px);
+        opacity: 0.2;
+        height: 125%;
+        width: 80%;
+    }
+    75% {
+        background: radial-gradient(
+            ellipse at center,
+            color-mix(in srgb, var(--play-glow-color) 95%, transparent) 0%,
+            color-mix(in srgb, var(--play-glow-color) 60%, transparent) 80%,
+            color-mix(in srgb, var(--play-glow-color) 30%, transparent) 90%,
+            transparent 100%
+        );
+        filter: blur(13px);
+        opacity: 0.9;
+        height: 110%;
+        width: 85%;
+    }
+    100% {
+        background: radial-gradient(
+            ellipse at center,
+            color-mix(in srgb, var(--play-glow-color) 95%, transparent) 0%,
+            color-mix(in srgb, var(--play-glow-color) 60%, transparent) 80%,
+            color-mix(in srgb, var(--play-glow-color) 30%, transparent) 90%,
+            transparent 100%
+        );
+        filter: blur(13px);
+        opacity: 0.2;
+        height: 80%;
+        width: 95%;
+    }
+}

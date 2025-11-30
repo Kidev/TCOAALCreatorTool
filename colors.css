@@ -34,6 +34,7 @@
     --success-color-deep: #115111;
     --other-color: var(--blue);
     --other-color-deep: #3d74b3;
+    --play-glow-color: var(--purple);
 }
 
 :root {

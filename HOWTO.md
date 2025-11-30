@@ -5,6 +5,9 @@ Create fake sequences of gameplay animations, dialogs, choices, interactions... 
 > [The very first scene of TCOAAL Chapter 1](index.html?use=introduction&autoplay)  
 > [Penny for your thoughts? The infamous scene from Chapter 2](index.html?use=win&autoplay)  
 
+You can also try to beat the two levels of my game **Ashley on Duty** if you are not into creating animations!
+
+
 ## Dialog viewer
 This is where you'll end up when clicking a view link!
  ![viewer-menu](docs/viewer-menu.png)
@@ -311,6 +314,10 @@ Here, the `backgrounds_190.png` will be on top of `backgrounds_263.png`, giving 
 | **⏱**   | Add a timeline, creating a sequence layer                     |
 | **X/Y** | Place the layer on the canvas (mouse on canvas works as well) |
 
+**Drag and drop on the preview with the mouse**
+You can use left mouse hold and drag to select by pixels, allowing you to select layers under others that are visible.  
+You can also use the right click to select by bounding box, but it is limited by the relative depth of the layer: this is useful to select entirely invisible layers for example.  
+
 ### Sequence layers
 These are layers containing a timeline. On this timeline are placed visual keyframes, and those are then played at their respective time when playing the animation. Each keyframe can be placed on the canvas using coordinates or drag and drop on the preview. 
 In a sequence layer, you change your asset over time. So it can start looking left for 1s, then look right, and then walk somewhere: indeed, if they are not at the same place over time, the image is interpolated linearly.  
@@ -342,7 +349,11 @@ If you add any audio asset to the compositor, it will appear in the unique audio
 
 ![audio-track](docs/layers-audio-track.mp4)
 
-### Templating  
+### Canvas size  
+The canvas will, by default, resize itself to accommodate the largest imported asset. If you want to set its size manually, you can click on the **Auto** button next to the canvas size on top of the preview, and you will be able to set the canvas size manually.  
+![canvas](docs/canvas.png)  
+
+### Template  
 You have the possibility to import an image that will replace the black background of the Compositor. This template image will not be exported, even if you leave it visible when exporting. You can hide it, and remove it as you want.  
 It is very useful to reproduce certain scenes in the game with lots of objects that you want precisely placed. For example, the eye animations in the visions.
 ![template-comp](docs/templates.mp4)

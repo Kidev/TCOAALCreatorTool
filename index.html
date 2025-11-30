@@ -35,7 +35,6 @@
                 opacity: 1;
                 transition: opacity 0.15s ease-in;
             }
-            /* Instant feedback on navigation */
             body.mode-transitioning {
                 opacity: 0;
                 transition: opacity 0.12s ease-out;
@@ -48,23 +47,18 @@
                 document.documentElement.className = "mode-loading";
                 window.detectedMode = mode || "viewer";
 
-                // Instant navigation feedback - start fade immediately on click
                 window.startNavigationTransition = function (url) {
                     document.body.classList.remove("mode-ready");
                     document.body.classList.add("mode-transitioning");
-                    // Small delay to allow transition to start, then navigate
                     setTimeout(() => {
                         window.location.href = url;
                     }, 50);
                 };
 
-                // Add instant feedback to all navigation links when DOM loads
                 document.addEventListener("DOMContentLoaded", function () {
-                    // Intercept all internal navigation links
                     document.addEventListener("click", function (e) {
                         const link = e.target.closest('a[href^="."], a[href^="index.html"], a[href^="?"]');
                         if (link && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-                            // Check if it's not opening in new tab
                             const target = link.getAttribute("target");
                             if (!target || target === "_self") {
                                 e.preventDefault();
@@ -173,7 +167,7 @@
                 </div>
             </div>
         </div>
-        <!-- Composition Editor Modal -->
+
         <div id="compositionEditorModal" class="composition-editor-modal" style="display: none">
             <div class="composition-editor-content">
                 <div class="composition-editor-header">
@@ -211,45 +205,100 @@
                 </div>
                 <div class="composition-editor-main">
                     <div class="composition-canvas-panel">
-                        <div class="composition-preview-bg-controls">
-                            <label
-                                for="previewBackgroundFile"
-                                style="display: none; font-size: 0.9vmax; color: var(--txt-color)"
-                            ></label>
-                            <input
-                                type="file"
-                                id="previewBackgroundFile"
-                                accept="image/*"
-                                style="display: none"
-                                onchange="compositionEditor.loadPreviewBackground(this.files[0])"
-                            />
-                            <button
-                                id="previewBackgroundSelectBtn"
-                                onclick="document.getElementById('previewBackgroundFile').click()"
-                                style="font-size: 0.8vmax; padding: 4px 8px"
-                                title="Select background image for preview only"
-                            >
-                                Template
-                            </button>
-                            <button
-                                id="previewBackgroundToggleBtn"
-                                onclick="compositionEditor.togglePreviewBackground()"
-                                style="font-size: 0.8vmax; padding: 4px 8px; display: none"
-                                title="Hide/Show background"
-                                class="success"
-                            >
-                                ☑
-                            </button>
-                            <button
-                                id="previewBackgroundRemoveBtn"
-                                onclick="compositionEditor.removePreviewBackground()"
-                                style="font-size: 0.8vmax; padding: 4px 8px; display: none"
-                                title="Remove background"
-                                class="danger"
-                            >
-                                ✕
-                            </button>
+                        <div class="compositor-preview-control-line">
+                            <div class="composition-preview-bg-controls">
+                                <label
+                                    for="previewBackgroundFile"
+                                    style="display: none; font-size: 0.9vmax; color: var(--txt-color)"
+                                ></label>
+                                <input
+                                    type="file"
+                                    id="previewBackgroundFile"
+                                    accept="image/*"
+                                    style="display: none; height: 75%; padding: 5px 5px !important"
+                                    onchange="compositionEditor.loadPreviewBackground(this.files[0])"
+                                />
+                                <button
+                                    id="previewBackgroundSelectBtn"
+                                    onclick="document.getElementById('previewBackgroundFile').click()"
+                                    style="font-size: 0.8vmax; height: 75%; padding: 5px 5px !important"
+                                    title="Select background image for preview only"
+                                >
+                                    Template
+                                </button>
+                                <button
+                                    id="previewBackgroundToggleBtn"
+                                    onclick="compositionEditor.togglePreviewBackground()"
+                                    style="font-size: 0.8vmax; display: none; height: 75%; padding: 5px 5px !important"
+                                    title="Hide/Show background"
+                                    class="success"
+                                >
+                                    ☑
+                                </button>
+                                <button
+                                    id="previewBackgroundRemoveBtn"
+                                    onclick="compositionEditor.removePreviewBackground()"
+                                    style="font-size: 0.8vmax; display: none; height: 75%; padding: 5px 5px !important"
+                                    title="Remove background"
+                                    class="danger"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <div class="composition-preview-canvas-size-control">
+                                <button
+                                    id="previewCanvasAutoCustomToggle"
+                                    style="font-size: 0.8vmax; height: 75%; padding: 5px 5px !important"
+                                    title="Auto/Custom canvas size"
+                                    class="info"
+                                >
+                                    Auto
+                                </button>
+                                <div
+                                    style="
+                                        display: flex;
+                                        flex-direction: column;
+                                        gap: 2px;
+                                        align-content: center;
+                                        align-items: center;
+                                    "
+                                >
+                                    <input
+                                        type="number"
+                                        id="previewCanvasSizeX"
+                                        style="width: 4vmax; height: 1vmax; opacity: 0.6"
+                                        readonly=""
+                                    />
+                                    <label
+                                        style="
+                                            font-size: 0.7em;
+                                            opacity: 0.7;
+                                            text-transform: uppercase;
+                                            letter-spacing: 0.5px;
+                                        "
+                                        >width</label
+                                    >
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 2px; align-items: center">
+                                    <input
+                                        type="number"
+                                        id="previewCanvasSizeY"
+                                        style="width: 4vmax; height: 1vmax; opacity: 0.6"
+                                        readonly=""
+                                    />
+                                    <label
+                                        style="
+                                            font-size: 0.7em;
+                                            opacity: 0.7;
+                                            text-transform: uppercase;
+                                            letter-spacing: 0.5px;
+                                        "
+                                        >height</label
+                                    >
+                                </div>
+                            </div>
                         </div>
+
                         <div class="composition-canvas-container">
                             <canvas id="compositionCanvas"></canvas>
                         </div>
@@ -623,7 +672,7 @@ Right click to erase the saved dialog"
         </div>
         <label for="fileInput" style="display: none"></label>
         <input accept=".json" id="fileInput" style="display: none" type="file" />
-        <!-- Help Mode Overlay -->
+
         <div class="help-overlay spa-mode" id="helpOverlay" style="display: none" onclick="event.stopPropagation()">
             <div class="editor-header" id="helpHeader">
                 <div class="editor-zone left">
@@ -679,8 +728,28 @@ Right click to erase the saved dialog"
         <script src="js/dialog.js"></script>
         <script src="js/gameImporter.js"></script>
         <script src="js/interface.js"></script>
-        <script src="js/tarSoulsConfig.js"></script>
-        <script src="js/tarSouls.js"></script>
+
+        <script src="js/aod1Config.js"></script>
+        <script src="js/aod2Config.js"></script>
+
+        <script>
+            (function () {
+                const urlParams = new URLSearchParams(window.location.search);
+                const mode = urlParams.get("mode");
+                const episode = urlParams.get("episode") || "1";
+
+                const gameScript = document.createElement("script");
+                if (mode === "ashley-on-duty") {
+                    // Load episode-specific game file
+                    gameScript.src = episode === "1" ? "js/ashleyOnDuty-ep1.js" : `js/ashleyOnDuty-ep${episode}.js`;
+                } else {
+                    // Default: load episode 1 for non-game modes
+                    gameScript.src = "js/ashleyOnDuty-ep1.js";
+                }
+                document.currentScript.parentNode.insertBefore(gameScript, document.currentScript.nextSibling);
+            })();
+        </script>
+
         <script src="js/sequence.js"></script>
         <script src="js/editor.js"></script>
         <script src="js/galleryManager.js"></script>
