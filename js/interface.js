@@ -2106,9 +2106,6 @@ async function checkAssetsAndShowForcedImport() {
                 updateStickyPositions();
             }
 
-            document.body.classList.remove("mode-loading");
-            document.body.classList.add("mode-ready");
-
             return true;
         }
 
@@ -2183,6 +2180,11 @@ document.addEventListener("DOMContentLoaded", async function () {
     window.compositionRecontructedCount = 0;
 
     createLoadingIndicator();
+
+    // Make body visible so loading indicator can be seen
+    document.body.classList.remove("mode-loading");
+    document.body.classList.add("mode-ready");
+
     updateStickyPositions();
     window.addEventListener("resize", updateStickyPositions);
 
@@ -2265,9 +2267,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     if (mode === "gallery") {
         setupGalleryOnlyMode();
-
-        document.body.classList.remove("mode-loading");
-        document.body.classList.add("mode-ready");
     } else if (mode === "editor") {
         enhanceGameActions();
 
@@ -2286,20 +2285,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
 
         openEditor();
-
-        document.body.classList.remove("mode-loading");
-        document.body.classList.add("mode-ready");
     } else if (mode === "ashley-on-duty") {
         const episode = parseInt(urlParams.get("episode") || "1");
         await startAshleyOnDuty(episode);
-
-        document.body.classList.remove("mode-loading");
-        document.body.classList.add("mode-ready");
     } else if (mode === "help") {
         setupHelpMode();
-
-        document.body.classList.remove("mode-loading");
-        document.body.classList.add("mode-ready");
         updateStickyPositions();
     } else {
         enhanceGameActions();
@@ -2332,9 +2322,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             //console.warn("No setup function found in sequence.js. Please define setupScene()");
             dialogFramework.updateDebugInfo();
         }
-
-        document.body.classList.remove("mode-loading");
-        document.body.classList.add("mode-ready");
     }
 
     await checkSavedDataOnLoad();
