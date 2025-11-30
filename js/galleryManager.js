@@ -1215,54 +1215,155 @@ class GalleryManager {
 
         if (asset.isComposition && asset.compositionDescriptor) {
             for (const layerDesc of asset.compositionDescriptor.layers) {
-                const galleryRef = layerDesc.galleryRef;
-                if (!galleryRef) continue;
+                // Handle keyframed layers
+                if (layerDesc.hasKeyframes && layerDesc.keyframes) {
+                    const reconstructedKeyframes = [];
 
-                const match = galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
-                if (!match) continue;
+                    for (const kfDesc of layerDesc.keyframes) {
+                        let kfAsset = null;
+                        let kfBlobUrl = null;
+                        let kfImage = null;
+                        let kfImageLoaded = false;
+                        let kfSpriteCanvases = null;
 
-                const [, srcCategory, srcName] = match;
-                const srcAsset = window.gameImporterAssets.images[srcCategory]?.[srcName];
+                        if (kfDesc.galleryRef) {
+                            const kfMatch = kfDesc.galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                            if (kfMatch) {
+                                const [, kfCategory, kfName] = kfMatch;
+                                kfAsset = window.gameImporterAssets.images[kfCategory]?.[kfName];
 
-                if (!srcAsset) {
-                    console.warn(`Missing asset for layer: ${srcCategory}/${srcName}`);
-                    continue;
-                }
+                                if (kfAsset) {
+                                    kfBlobUrl = kfAsset.url;
 
-                const assetData = {
-                    name: srcName,
-                    type: layerDesc.type,
-                    assetRef: galleryRef,
-                    blobUrl: srcAsset.url,
-                    x: layerDesc.x,
-                    y: layerDesc.y,
-                    width: layerDesc.width,
-                    height: layerDesc.height,
-                };
+                                    if (kfDesc.type === "sprite" && kfAsset.isSprite) {
+                                        try {
+                                            const extractedSprites = await this.extractSpritesFromAsset(
+                                                kfAsset,
+                                                kfName,
+                                                kfDesc.spriteVariant,
+                                            );
+                                            kfSpriteCanvases = extractedSprites.map((s) => s.canvas);
+                                        } catch (error) {
+                                            console.error(
+                                                `Failed to extract sprites for keyframe at time ${kfDesc.time}ms:`,
+                                                error,
+                                            );
+                                        }
+                                    } else {
+                                        kfImage = new Image();
+                                        await new Promise((resolve) => {
+                                            kfImage.onload = () => {
+                                                kfImageLoaded = true;
+                                                resolve();
+                                            };
+                                            kfImage.onerror = () => resolve();
+                                            kfImage.src = kfBlobUrl;
+                                        });
+                                    }
+                                }
+                            }
+                        }
 
-                if (layerDesc.type === "sprite" && srcAsset.isSprite) {
-                    try {
-                        const extractedSprites = await this.extractSpritesFromAsset(
-                            srcAsset,
-                            srcName,
-                            layerDesc.spriteVariant,
-                        );
-                        assetData.isAnimated = layerDesc.isAnimated;
-                        assetData.spriteIndices = layerDesc.spriteIndices;
-                        assetData.animationSpeed = layerDesc.animationSpeed;
-                        assetData.spriteCanvases = extractedSprites.map((s) => s.canvas);
-                        assetData.spriteVariant = layerDesc.spriteVariant;
-                    } catch (error) {
-                        console.error(`Failed to extract sprites for ${srcName}:`, error);
+                        reconstructedKeyframes.push({
+                            id: window.compositionEditor.generateId(),
+                            time: kfDesc.time,
+                            x: kfDesc.x,
+                            y: kfDesc.y,
+                            width: kfDesc.width,
+                            height: kfDesc.height,
+                            assetRef: kfDesc.galleryRef,
+                            blobUrl: kfBlobUrl,
+                            image: kfImage,
+                            imageLoaded: kfImageLoaded,
+                            type: kfDesc.type || layerDesc.type,
+                            spriteIndices: kfDesc.spriteIndices || null,
+                            isAnimated: kfDesc.isAnimated || null,
+                            animationSpeed: kfDesc.animationSpeed || null,
+                            spriteCanvases: kfSpriteCanvases,
+                            spriteVariant: kfDesc.spriteVariant || null,
+                            gifDuration: kfDesc.gifDuration || null,
+                        });
+                    }
+
+                    const firstKf = reconstructedKeyframes[0];
+                    const layerData = {
+                        name: layerDesc.name || "Keyframed Layer",
+                        type: firstKf.type,
+                        assetRef: firstKf.assetRef,
+                        blobUrl: firstKf.blobUrl,
+                        x: firstKf.x,
+                        y: firstKf.y,
+                        width: firstKf.width,
+                        height: firstKf.height,
+                        hasKeyframes: true,
+                        keyframes: reconstructedKeyframes,
+                    };
+
+                    if (firstKf.type === "sprite" && firstKf.spriteCanvases) {
+                        layerData.spriteCanvases = firstKf.spriteCanvases;
+                        layerData.spriteIndices = firstKf.spriteIndices;
+                        layerData.isAnimated = firstKf.isAnimated;
+                        layerData.animationSpeed = firstKf.animationSpeed;
+                        layerData.spriteVariant = firstKf.spriteVariant;
+                    }
+
+                    const layerId = window.compositionEditor.addLayer(layerData);
+
+                    const addedLayer = window.compositionEditor.layers.find((l) => l.id === layerId);
+                    if (addedLayer) {
+                        addedLayer.visible = layerDesc.visible;
+                    }
+                } else {
+                    // Handle non-keyframed layers
+                    const galleryRef = layerDesc.galleryRef;
+                    if (!galleryRef) continue;
+
+                    const match = galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                    if (!match) continue;
+
+                    const [, srcCategory, srcName] = match;
+                    const srcAsset = window.gameImporterAssets.images[srcCategory]?.[srcName];
+
+                    if (!srcAsset) {
+                        console.warn(`Missing asset for layer: ${srcCategory}/${srcName}`);
                         continue;
                     }
-                }
 
-                const layerId = window.compositionEditor.addLayer(assetData);
+                    const assetData = {
+                        name: srcName,
+                        type: layerDesc.type,
+                        assetRef: galleryRef,
+                        blobUrl: srcAsset.url,
+                        x: layerDesc.x,
+                        y: layerDesc.y,
+                        width: layerDesc.width,
+                        height: layerDesc.height,
+                    };
 
-                const addedLayer = window.compositionEditor.layers.find((l) => l.id === layerId);
-                if (addedLayer && addedLayer.visible !== layerDesc.visible) {
-                    addedLayer.visible = layerDesc.visible;
+                    if (layerDesc.type === "sprite" && srcAsset.isSprite) {
+                        try {
+                            const extractedSprites = await this.extractSpritesFromAsset(
+                                srcAsset,
+                                srcName,
+                                layerDesc.spriteVariant,
+                            );
+                            assetData.isAnimated = layerDesc.isAnimated;
+                            assetData.spriteIndices = layerDesc.spriteIndices;
+                            assetData.animationSpeed = layerDesc.animationSpeed;
+                            assetData.spriteCanvases = extractedSprites.map((s) => s.canvas);
+                            assetData.spriteVariant = layerDesc.spriteVariant;
+                        } catch (error) {
+                            console.error(`Failed to extract sprites for ${srcName}:`, error);
+                            continue;
+                        }
+                    }
+
+                    const layerId = window.compositionEditor.addLayer(assetData);
+
+                    const addedLayer = window.compositionEditor.layers.find((l) => l.id === layerId);
+                    if (addedLayer && addedLayer.visible !== layerDesc.visible) {
+                        addedLayer.visible = layerDesc.visible;
+                    }
                 }
             }
         } else {
