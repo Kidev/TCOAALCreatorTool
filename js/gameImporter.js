@@ -40,7 +40,7 @@ class GameImporter {
         const relevantFiles = [];
 
         const folders = [
-            //{ path: "www/data", type: "json", category: "data" },
+            { path: "www/data", type: "json", category: "Data" },
             { path: "www/audio/bgm", type: "ogg", category: "Background songs" },
             { path: "www/audio/bgs", type: "ogg", category: "Background sounds" },
             { path: "www/audio/me", type: "ogg", category: "Event sounds" },

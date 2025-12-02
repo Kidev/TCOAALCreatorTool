@@ -20,8 +20,8 @@ class MemoryManager {
     constructor() {
         this.db = null;
         this.dbName = "TCOAALAssets";
-        this.dbVersion = 3;
-        this.DATA_VERSION = "1.2.1";
+        this.dbVersion = 5;
+        this.DATA_VERSION = "1.3.0";
         this.isReady = false;
         this.initPromise = this.initDB();
         this.haveDataStored = false;
@@ -71,6 +71,21 @@ class MemoryManager {
                 // UI assets store: stores extracted UI elements (buttons, arrows, etc.)
                 if (!db.objectStoreNames.contains("uiAssets")) {
                     const uiAssetsStore = db.createObjectStore("uiAssets", { keyPath: "name" });
+                }
+
+                // External assets store: stores user-added URL-based assets
+                if (!db.objectStoreNames.contains("externalAssets")) {
+                    const externalAssetsStore = db.createObjectStore("externalAssets", {
+                        keyPath: "id",
+                        autoIncrement: true,
+                    });
+                    externalAssetsStore.createIndex("type", "type", { unique: false });
+                    externalAssetsStore.createIndex("url", "url", { unique: false });
+                }
+
+                // Sprite cache store: stores extracted sprite data for fast loading
+                if (!db.objectStoreNames.contains("spriteCache")) {
+                    const spriteCacheStore = db.createObjectStore("spriteCache", { keyPath: "cacheKey" });
                 }
             };
         });
@@ -643,6 +658,205 @@ class MemoryManager {
         }
 
         await this.saveFavourites(favourites);
+    }
+
+    async saveExternalAsset(url, title, type, isSprite = false, format = null, blob = null) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["externalAssets"], "readwrite");
+        const store = transaction.objectStore("externalAssets");
+
+        const assetRecord = {
+            url: url,
+            title: title,
+            type: type,
+            isSprite: isSprite,
+            format: format,
+            blob: blob,
+            timestamp: Date.now(),
+        };
+
+        return new Promise((resolve, reject) => {
+            const request = store.put(assetRecord);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getExternalAssets(type = null) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["externalAssets"], "readonly");
+        const store = transaction.objectStore("externalAssets");
+
+        return new Promise((resolve, reject) => {
+            let request;
+            if (type) {
+                const index = store.index("type");
+                request = index.getAll(type);
+            } else {
+                request = store.getAll();
+            }
+
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async deleteExternalAsset(id) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["externalAssets"], "readwrite");
+        const store = transaction.objectStore("externalAssets");
+
+        return new Promise((resolve, reject) => {
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async deleteAsset(id) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["assets"], "readwrite");
+        const store = transaction.objectStore("assets");
+
+        return new Promise((resolve, reject) => {
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getExternalAssetByUrl(url, type) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["externalAssets"], "readonly");
+        const store = transaction.objectStore("externalAssets");
+        const index = store.index("url");
+
+        return new Promise((resolve, reject) => {
+            const request = index.getAll(url);
+            request.onsuccess = () => {
+                const assets = request.result;
+                const matching = assets.find((a) => a.type === type);
+                resolve(matching || null);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async loadExternalAssets() {
+        await this.ensureReady();
+
+        const allExternal = await this.getExternalAssets();
+
+        if (!window.gameImporterAssets) {
+            window.gameImporterAssets = { images: {}, audio: {} };
+        }
+
+        if (!window.gameImporterAssets.images["External"]) {
+            window.gameImporterAssets.images["External"] = {};
+        }
+        if (!window.gameImporterAssets.audio["External"]) {
+            window.gameImporterAssets.audio["External"] = {};
+        }
+
+        for (const externalAsset of allExternal) {
+            const assetType = externalAsset.type === "images" ? "images" : "audio";
+            const category = "External";
+
+            let blob = externalAsset.blob;
+            if (!blob) {
+                try {
+                    const response = await fetch(externalAsset.url);
+                    if (!response.ok) {
+                        console.warn(`Failed to fetch external asset: ${externalAsset.url}`);
+                        continue;
+                    }
+                    blob = await response.blob();
+
+                    const transaction = this.db.transaction(["externalAssets"], "readwrite");
+                    const store = transaction.objectStore("externalAssets");
+                    externalAsset.blob = blob;
+                    store.put(externalAsset);
+                } catch (error) {
+                    console.error(`Error fetching external asset ${externalAsset.url}:`, error);
+                    continue;
+                }
+            }
+
+            const blobUrl = URL.createObjectURL(blob);
+            let fileName;
+            if (externalAsset.isSprite && externalAsset.format) {
+                fileName = `spritessheet_${externalAsset.format.cols}x${externalAsset.format.rows}_${externalAsset.title}.png`;
+            } else {
+                fileName = `${externalAsset.title}.${assetType === "images" ? "png" : "ogg"}`;
+            }
+
+            const assetData = {
+                url: blobUrl,
+                blob: blob,
+                name: fileName,
+                originalName: fileName,
+                baseFileName: fileName,
+                isSprite: externalAsset.isSprite || false,
+                cropped: false,
+                cropping: false,
+                croppedUrl: undefined,
+                croppedBlob: undefined,
+                externalId: externalAsset.id,
+                externalUrl: externalAsset.url,
+                format: externalAsset.format,
+            };
+
+            if (externalAsset.isSprite && externalAsset.format) {
+                assetData.variants = [externalAsset.format];
+            }
+
+            window.gameImporterAssets[assetType][category][fileName] = assetData;
+        }
+
+        return allExternal.length;
+    }
+
+    async cacheSprites(cacheKey, sprites) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["spriteCache"], "readwrite");
+        const store = transaction.objectStore("spriteCache");
+
+        const cacheRecord = {
+            cacheKey: cacheKey,
+            sprites: sprites,
+            timestamp: Date.now(),
+        };
+
+        return new Promise((resolve, reject) => {
+            const request = store.put(cacheRecord);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getCachedSprites(cacheKey) {
+        await this.ensureReady();
+
+        const transaction = this.db.transaction(["spriteCache"], "readonly");
+        const store = transaction.objectStore("spriteCache");
+
+        return new Promise((resolve, reject) => {
+            const request = store.get(cacheKey);
+            request.onsuccess = () => {
+                if (request.result) {
+                    resolve(request.result.sprites);
+                } else {
+                    reject(new Error("Cache miss"));
+                }
+            };
+            request.onerror = () => reject(request.error);
+        });
     }
 }
 

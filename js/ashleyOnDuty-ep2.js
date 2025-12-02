@@ -868,7 +868,7 @@ class AshleyOnDutyEp2Game {
         // Handle god mode toggle (G key) when debug is enabled
         if (code === "KeyG" && GAME_CONFIG.DEBUG) {
             this.godMode = !this.godMode;
-            console.log(`[GOD MODE] ${this.godMode ? "ENABLED" : "DISABLED"}`);
+            //console.log(`[GOD MODE] ${this.godMode ? "ENABLED" : "DISABLED"}`);
             event.preventDefault();
         }
     }
@@ -1068,9 +1068,9 @@ class AshleyOnDutyEp2Game {
             // Check Julia vision (boxes can block line of sight)
             if (this.julia && this.julia.canSeePlayer(this.player, this.hussyBoxes)) {
                 if (this.godMode) {
-                    console.log(
-                        `[GOD MODE] Prevented death: Julia spotted you at (${this.player.x}, ${this.player.y})`,
-                    );
+                    //console.log(
+                    //    `[GOD MODE] Prevented death: Julia spotted you at (${this.player.x}, ${this.player.y})`,
+                    //);
                 } else {
                     this.audioManager.playSound("spotted");
                     const spottedAnim = new GameAnimation(
@@ -1245,7 +1245,7 @@ class AshleyOnDutyEp2Game {
             // Check collision with player
             if (CollisionDetector.checkStrictCollision(this.player, hussy)) {
                 if (this.godMode) {
-                    console.log(`[GOD MODE] Prevented death: Hussy collision at (${this.player.x}, ${this.player.y})`);
+                    //console.log(`[GOD MODE] Prevented death: Hussy collision at (${this.player.x}, ${this.player.y})`);
                 } else {
                     this.gameOver("You were infected by a hussy!");
                     return;

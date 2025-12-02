@@ -1620,15 +1620,14 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 
 .gallery-item .gallery-item-fav-star {
     position: absolute;
-    top: 0.3vmax;
-    right: 0.3vmax;
+    top: 0.5vmax;
+    right: 0.5vmax;
     width: 1.5vmax;
     height: 1.5vmax;
     object-fit: contain;
     opacity: 0;
     pointer-events: none;
     z-index: 10;
-    image-rendering: pixelated;
 }
 
 .gallery-item span.gallery-item-fav-star {
@@ -1641,6 +1640,37 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 
 .gallery-item.favourite .gallery-item-fav-star {
     opacity: 1;
+}
+
+.external-add-btn {
+    border: 2px dashed var(--border-color);
+    background: var(--bg-color-section-lighter-tr);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+}
+
+.external-add-btn:hover {
+    border-color: var(--accent-color);
+    background: var(--bg-color-section-lighter);
+    transform: scale(1.02);
+}
+
+.external-add-icon {
+    font-size: 3vmax;
+    font-weight: bold;
+    color: var(--accent-color);
+    line-height: 1;
+}
+
+.external-add-audio .external-add-icon {
+    font-size: 2vmax;
+}
+
+.external-add-audio .gallery-item-name {
+    font-size: 0.7vmax;
 }
 
 /* GALLERY-ONLY MODE STYLES */
@@ -1818,6 +1848,11 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     font-size: 1vmax;
     font-weight: bold;
     display: none;
+}
+
+.file-type-warning-text {
+    margin-left: 0.5vmax;
+    font-size: 0.75vmax;
 }
 
 .preview-download-btn.active {
@@ -2069,6 +2104,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     font-size: 0.8vmax;
     margin-bottom: 1vmax;
     text-align: center;
+    overflow-wrap: anywhere;
 }
 
 .audio-player-controls {
@@ -3385,6 +3421,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 
     .asset-filename-subtitle {
         display: none;
+        overflow-wrap: anywhere;
     }
 
     .composition-editor-header h2 {

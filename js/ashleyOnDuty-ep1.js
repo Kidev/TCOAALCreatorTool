@@ -500,7 +500,7 @@ class AudioManager {
         if (sound) {
             sound.currentTime = 0;
             sound.volume = volume;
-            sound.play().catch((e) => console.log("Audio play failed:", e));
+            sound.play().catch((e) => console.warn("Audio play failed:", e));
         } else {
             //console.log(`[AUDIO PLACEHOLDER] ${soundName}`);
         }
@@ -518,7 +518,7 @@ class AudioManager {
             this.currentMusicName = musicName;
             music.loop = true;
             if (!this.musicMuted) {
-                music.play().catch((e) => console.log("Music play failed:", e));
+                music.play().catch((e) => console.warn("Music play failed:", e));
             }
         } else {
             //console.log(`[MUSIC PLACEHOLDER] ${musicName}`);
@@ -539,7 +539,7 @@ class AudioManager {
             if (muted) {
                 this.currentMusic.pause();
             } else {
-                this.currentMusic.play().catch((e) => console.log("Music play failed:", e));
+                this.currentMusic.play().catch((e) => console.warn("Music play failed:", e));
             }
         }
     }
@@ -567,7 +567,7 @@ class AudioManager {
                 this.currentMusic = newMusic;
                 newMusic.loop = true;
                 if (wasPlaying && !this.musicMuted) {
-                    newMusic.play().catch((e) => console.log("Music play failed:", e));
+                    newMusic.play().catch((e) => console.warn("Music play failed:", e));
                 }
             }
         }

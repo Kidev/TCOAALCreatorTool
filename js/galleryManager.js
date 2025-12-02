@@ -387,25 +387,111 @@ class GalleryManager {
         });
     }
 
-    previewSpriteSheet(asset, name, contentDiv, controlsDiv, spriteInfo) {
+    async previewSpriteSheet(asset, name, contentDiv, controlsDiv, spriteInfo) {
         this.updateCropButtonInPreviewTitle(false);
 
         const img = new Image();
-        img.onload = () => {
-            let cols, rows;
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = asset.url;
+        });
 
-            if (spriteInfo) {
-                cols = spriteInfo.cols;
-                rows = spriteInfo.rows;
-            } else {
-                cols = Math.floor(img.width / 48);
-                rows = Math.floor(img.height / 48);
+        let cols, rows;
+        if (spriteInfo) {
+            cols = spriteInfo.cols;
+            rows = spriteInfo.rows;
+        } else {
+            cols = Math.floor(img.width / 48);
+            rows = Math.floor(img.height / 48);
+        }
+
+        const cellWidth = img.width / cols;
+        const cellHeight = img.height / rows;
+        const cacheKey = `spritesheet_${name}_${cols}x${rows}`;
+
+        const gridWidth = cols * cellWidth;
+        const gridHeight = rows * cellHeight;
+        const maxWidth = Math.min(gridWidth, window.innerWidth * 0.8);
+
+        let headerHtml = "";
+        if (asset.variants !== null && asset.variants.length > 0) {
+            const selectId = `variantSelect-${Math.random().toString(36).slice(2)}`;
+            headerHtml = `
+                <h4 class="sprite-sheet-preview-info-title">Sprite Sheet:</h4>
+                <select id="${selectId}" class="preview-control-input inline compact">
+                    ${asset.variants
+                        .map(
+                            (v, idx) =>
+                                `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
+                                    ${v.rows}x${v.cols}
+                                </option>`,
+                        )
+                        .join("")}
+                </select>`;
+        } else {
+            headerHtml = `<h4 class="sprite-sheet-preview-info-title">Sprite Sheet: ${cols}x${rows}</h4>`;
+        }
+
+        contentDiv.innerHTML = `
+            <div class="sprite-sheet-preview">
+                <div style="display: flex; flex-direction: row; align-items: center;">
+                    ${headerHtml}
+                </div>
+                <div style="display: flex; justify-content: center; padding: 10px;">
+                    <img src="${asset.url}" alt="${name}"
+                         style="max-width: ${maxWidth}px; image-rendering: pixelated; display: block;">
+                </div>
+            </div>`;
+        controlsDiv.innerHTML = "";
+
+        if (asset.variants !== null && asset.variants.length > 0) {
+            const select = contentDiv.querySelector("select");
+            if (select) {
+                select.addEventListener("change", (e) => {
+                    const idx = parseInt(e.target.value, 10);
+                    const variant = asset.variants[idx];
+                    this.previewAsset(name, "System sprites", "images", variant);
+                });
             }
+        }
 
-            const cellWidth = img.width / cols;
-            const cellHeight = img.height / rows;
+        let cachedSprites = null;
+        if (window.memoryManager) {
+            try {
+                cachedSprites = await window.memoryManager.getCachedSprites(cacheKey);
+            } catch (e) {
+                // Cache miss, will extract
+            }
+        }
 
+        if (cachedSprites) {
+            this.extractedSprites = await Promise.all(
+                cachedSprites.map(async (spriteData, index) => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = cellWidth;
+                    canvas.height = cellHeight;
+                    const ctx = canvas.getContext("2d", { alpha: true });
+
+                    const spriteImg = new Image();
+                    await new Promise((resolve) => {
+                        spriteImg.onload = resolve;
+                        spriteImg.src = spriteData.dataUrl;
+                    });
+                    ctx.drawImage(spriteImg, 0, 0);
+
+                    return {
+                        canvas: canvas,
+                        index: spriteData.index,
+                        row: spriteData.row,
+                        col: spriteData.col,
+                    };
+                }),
+            );
+        } else {
             this.extractedSprites = [];
+            const spritesToCache = [];
+
             for (let row = 0; row < rows; row++) {
                 for (let col = 0; col < cols; col++) {
                     const canvas = document.createElement("canvas");
@@ -429,97 +515,128 @@ class GalleryManager {
                     const data = imageData.data;
                     for (let i = 0; i < data.length; i += 4) {
                         if (data[i + 3] === 0) {
-                            data[i] = 0; // R
-                            data[i + 1] = 0; // G
-                            data[i + 2] = 0; // B
+                            data[i] = 0;
+                            data[i + 1] = 0;
+                            data[i + 2] = 0;
                         }
                     }
                     ctx.putImageData(imageData, 0, 0);
 
+                    const spriteIndex = row * cols + col;
                     this.extractedSprites.push({
                         canvas: canvas,
-                        index: row * cols + col,
+                        index: spriteIndex,
                         row: row,
                         col: col,
                     });
+
+                    spritesToCache.push({
+                        dataUrl: canvas.toDataURL("image/png"),
+                        index: spriteIndex,
+                        row: row,
+                        col: col,
+                    });
+
+                    // Yield every 10 sprites
+                    if (this.extractedSprites.length % 10 === 0) {
+                        await new Promise((resolve) => setTimeout(resolve, 0));
+                    }
                 }
             }
 
-            if (asset.variants !== null && asset.variants.length > 0) {
-                const selectId = `variantSelect-${Math.random().toString(36).slice(2)}`;
-                contentDiv.innerHTML = `
-                    <div class="sprite-sheet-preview">
-                        <div style="display: flex; flex-direction: row; align-items: center;">
-                        <h4 class="sprite-sheet-preview-info-title">
-                            Sprite Sheet:</h4>
-                        <select id="${selectId}" class="preview-control-input inline compact">
-                            ${asset.variants
-                                .map(
-                                    (v, idx) =>
-                                        `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
-                                            ${v.rows}x${v.cols}
-                                        </option>`,
-                                )
-                                .join("")}
-                        </select></div>
-                        
-                        <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
-                            ${this.extractedSprites
-                                .map(
-                                    (sprite, i) => `
-                                        <div class="sprite-cell-preview"
-                                            data-index="${i}"
-                                            title="${asset.name} #${i}"
-                                            onclick="galleryManager.toggleSpriteSelection(${i})">
-                                            <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
-                                        </div>`,
-                                )
-                                .join("")}
-                        </div>
-                    </div>`;
+            if (window.memoryManager) {
+                try {
+                    await window.memoryManager.cacheSprites(cacheKey, spritesToCache);
+                } catch (e) {
+                    console.warn("Failed to cache sprites:", e);
+                }
+            }
+        }
 
-                const select = contentDiv.querySelector(`#${selectId}`);
-                select.addEventListener("change", (e) => {
-                    const idx = parseInt(e.target.value, 10);
-                    const variant = asset.variants[idx];
-                    this.previewAsset(name, "System sprites", "images", variant);
-                });
-            } else {
-                contentDiv.innerHTML = `
-                    <div class="sprite-sheet-preview">
+        if (asset.variants !== null && asset.variants.length > 0) {
+            const selectId = `variantSelect-${Math.random().toString(36).slice(2)}`;
+            contentDiv.innerHTML = `
+                <div class="sprite-sheet-preview">
                     <div style="display: flex; flex-direction: row; align-items: center;">
-                        <h4 class="sprite-sheet-preview-info-title">Sprite Sheet: ${cols}x${rows}</h4>
-                        </div>
-                        <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
-                            ${this.extractedSprites
-                                .map(
-                                    (sprite, i) => `
-                                        <div class="sprite-cell-preview"
-                                            data-index="${i}"
-                                            title="${asset.name} #${i}"
-                                            onclick="galleryManager.toggleSpriteSelection(${i})">
-                                            <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
-                                        </div>`,
-                                )
-                                .join("")}
-                        </div>
-                    </div>`;
-            }
+                    <h4 class="sprite-sheet-preview-info-title">
+                        Sprite Sheet:</h4>
+                    <select id="${selectId}" class="preview-control-input inline compact">
+                        ${asset.variants
+                            .map(
+                                (v, idx) =>
+                                    `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
+                                        ${v.rows}x${v.cols}
+                                    </option>`,
+                            )
+                            .join("")}
+                    </select></div>
 
-            this.extractedSprites.forEach((sprite, i) => {
-                const targetCanvas = document.getElementById(`sprite-preview-${i}`);
-                if (targetCanvas) {
-                    const ctx = targetCanvas.getContext("2d", { willReadFrequently: this.willReadFrequently });
-                    ctx.drawImage(sprite.canvas, 0, 0);
-                }
+                    <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
+                        ${this.extractedSprites
+                            .map(
+                                (sprite, i) => `
+                                    <div class="sprite-cell-preview"
+                                        data-index="${i}"
+                                        title="${asset.name} #${i}"
+                                        onclick="galleryManager.toggleSpriteSelection(${i})">
+                                        <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
+                                    </div>`,
+                            )
+                            .join("")}
+                    </div>
+                </div>`;
+
+            const select = contentDiv.querySelector(`#${selectId}`);
+            select.addEventListener("change", (e) => {
+                const idx = parseInt(e.target.value, 10);
+                const variant = asset.variants[idx];
+                this.previewAsset(name, "System sprites", "images", variant);
             });
+        } else {
+            contentDiv.innerHTML = `
+                <div class="sprite-sheet-preview">
+                <div style="display: flex; flex-direction: row; align-items: center;">
+                    <h4 class="sprite-sheet-preview-info-title">Sprite Sheet: ${cols}x${rows}</h4>
+                    </div>
+                    <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
+                        ${this.extractedSprites
+                            .map(
+                                (sprite, i) => `
+                                    <div class="sprite-cell-preview"
+                                        data-index="${i}"
+                                        title="${asset.name} #${i}"
+                                        onclick="galleryManager.toggleSpriteSelection(${i})">
+                                        <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
+                                    </div>`,
+                            )
+                            .join("")}
+                    </div>
+                </div>`;
+        }
 
+        this.extractedSprites.forEach((sprite, i) => {
+            const targetCanvas = document.getElementById(`sprite-preview-${i}`);
+            if (targetCanvas) {
+                const ctx = targetCanvas.getContext("2d", { willReadFrequently: this.willReadFrequently });
+                ctx.drawImage(sprite.canvas, 0, 0);
+            }
+        });
+
+        let titleWithoutSize, subtitle;
+        if (asset.externalUrl) {
             let titleName = this.formatAssetTitle(name, "images").split(" ");
             titleName.pop();
-            const titleWithoutSize = titleName.join(" ");
+            titleWithoutSize = titleName.join(" ");
+            subtitle = asset.externalUrl;
+        } else {
+            let titleName = this.formatAssetTitle(name, "images").split(" ");
+            titleName.pop();
+            titleWithoutSize = titleName.join(" ");
+            subtitle = asset.baseFileName;
+        }
 
-            controlsDiv.innerHTML = `
-                <div class="asset-image-preview-title-line"><div class="asset-filename-title">${titleWithoutSize}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
+        controlsDiv.innerHTML = `
+                <div class="asset-image-preview-title-line"><div class="asset-filename-title">${titleWithoutSize}<div class="asset-filename-subtitle">${subtitle}</div></div>
 </div>
                 <div id="previewControlsSheetSpecific">
                 <div class="preview-control-group preview-sprite-controls compact">
@@ -543,34 +660,32 @@ class GalleryManager {
                     </div>
                 </div>
 
-                </div>`;
+            </div>`;
 
-            if (window.compositionEditor.autoOpenButtonManager) {
-                window.compositionEditor.autoOpenButtonManager.attachTo(
-                    document.getElementById("spritesOpenEditorChoiceButton"),
-                    this,
-                    this.addSpriteToCompositionEditor,
-                );
+        if (window.compositionEditor.autoOpenButtonManager) {
+            window.compositionEditor.autoOpenButtonManager.attachTo(
+                document.getElementById("spritesOpenEditorChoiceButton"),
+                this,
+                this.addSpriteToCompositionEditor,
+            );
+        }
+
+        const sheetControlsDiv = document.getElementById("previewControlsSheetSpecific");
+        const addToEditorSpritesButton = document.getElementById("addToEditorSpritesButton");
+        const previewSpriteGifButton = document.getElementById("previewSpriteGifButton");
+        if (this.selectedSprites.length === 0) {
+            sheetControlsDiv.style.display = "none";
+            addToEditorSpritesButton.classList.toggle("hidden", true);
+            previewSpriteGifButton.classList.toggle("hidden", true);
+        } else {
+            sheetControlsDiv.style.display = "block";
+            addToEditorSpritesButton.classList.toggle("hidden", false);
+            if (this.selectedSprites.length > 1) {
+                previewSpriteGifButton.classList.toggle("hidden", false);
             }
+        }
 
-            const sheetControlsDiv = document.getElementById("previewControlsSheetSpecific");
-            const addToEditorSpritesButton = document.getElementById("addToEditorSpritesButton");
-            const previewSpriteGifButton = document.getElementById("previewSpriteGifButton");
-            if (this.selectedSprites.length === 0) {
-                sheetControlsDiv.style.display = "none";
-                addToEditorSpritesButton.classList.toggle("hidden", true);
-                previewSpriteGifButton.classList.toggle("hidden", true);
-            } else {
-                sheetControlsDiv.style.display = "block";
-                addToEditorSpritesButton.classList.toggle("hidden", false);
-                if (this.selectedSprites.length > 1) {
-                    previewSpriteGifButton.classList.toggle("hidden", false);
-                }
-            }
-
-            this.spriteSheetData = { img, cols, rows, cellWidth, cellHeight };
-        };
-        img.src = asset.url;
+        this.spriteSheetData = { img, cols, rows, cellWidth, cellHeight };
     }
 
     previewImage(asset, name, contentDiv, controlsDiv) {
@@ -581,8 +696,11 @@ class GalleryManager {
             <img src="${src}" alt="${name}" class="preview-image" id="previewMainImage">
         </div>`;
 
+        const title = this.formatAssetTitle(name, "images");
+        const subtitle = asset.externalUrl ? asset.externalUrl : asset.baseFileName;
+
         controlsDiv.innerHTML = `
-            <div class="asset-image-preview-title-line"><div class="asset-filename-title">${this.formatAssetTitle(name, "images")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
+            <div class="asset-image-preview-title-line"><div class="asset-filename-title">${title}<div class="asset-filename-subtitle">${subtitle}</div></div>
             </div>
                                         <div class="preview-control-group-add-editor">
                 <div class="split-button" id="imageOpenEditorChoiceButton">
@@ -685,8 +803,11 @@ class GalleryManager {
         if (curTimeEl) curTimeEl.textContent = "0:00";
         if (durEl) durEl.textContent = "0:00";
 
+        const title = this.formatAssetTitle(name, "audio");
+        const subtitle = asset.externalUrl ? asset.externalUrl : asset.baseFileName;
+
         controlsDiv.innerHTML = `
-            <div class="asset-filename-title">${this.formatAssetTitle(name, "audio")}<div class="asset-filename-subtitle">${asset.baseFileName}</div></div>
+            <div class="asset-filename-title">${title}<div class="asset-filename-subtitle">${subtitle}</div></div>
             <div class="preview-control-group-add-editor">
                 <div class="split-button" id="audioOpenEditorChoiceButton">
                     <button class="btn main"></button>
@@ -1094,7 +1215,7 @@ class GalleryManager {
     }
     selectFirstElement() {
         const items = Array.from(document.querySelectorAll(".gallery-item")).filter(
-            (el) => el.style.display !== "none",
+            (el) => el.style.display !== "none" && !el.classList.contains("external-add-btn"),
         );
 
         if (items.length === 0) return;
@@ -1227,10 +1348,83 @@ class GalleryManager {
                         let kfSpriteCanvases = null;
 
                         if (kfDesc.galleryRef) {
-                            const kfMatch = kfDesc.galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                            // Handle External assets with URL suffix: gallery:External/name:URL
+                            let kfMatch = kfDesc.galleryRef.match(/^gallery:External\/([^:]+):(.+)$/);
+                            let kfCategory, kfName, kfUrl;
                             if (kfMatch) {
-                                const [, kfCategory, kfName] = kfMatch;
+                                kfCategory = "External";
+                                kfName = kfMatch[1];
+                                kfUrl = kfMatch[2];
+                            } else {
+                                // Regular gallery reference: gallery:category/name
+                                kfMatch = kfDesc.galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                                if (kfMatch) {
+                                    [, kfCategory, kfName] = kfMatch;
+                                }
+                            }
+                            if (kfMatch) {
                                 kfAsset = window.gameImporterAssets.images[kfCategory]?.[kfName];
+
+                                // If External asset doesn't exist but URL is provided, fetch it
+                                if (!kfAsset && kfUrl) {
+                                    try {
+                                        //console.log(
+                                        //    `Fetching missing External keyframe asset for compositor: ${kfName}`,
+                                        //);
+                                        const response = await fetch(kfUrl);
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP ${response.status}`);
+                                        }
+                                        const blob = await response.blob();
+                                        const blobUrl = URL.createObjectURL(blob);
+
+                                        if (!window.gameImporterAssets.images.External) {
+                                            window.gameImporterAssets.images.External = {};
+                                        }
+
+                                        const isSprite = kfDesc.type === "sprite" && kfDesc.spriteVariant;
+                                        const spriteVariant = isSprite ? kfDesc.spriteVariant : null;
+
+                                        kfAsset = {
+                                            name: kfName,
+                                            url: blobUrl,
+                                            blob: blob,
+                                            category: "External",
+                                            type: "image",
+                                            originalPath: "External",
+                                            cropped: false,
+                                            isSprite: isSprite,
+                                            variants: spriteVariant ? [spriteVariant] : null,
+                                        };
+                                        window.gameImporterAssets.images.External[kfName] = kfAsset;
+
+                                        if (window.memoryManager) {
+                                            try {
+                                                await window.memoryManager.saveExternalAsset(
+                                                    kfUrl,
+                                                    kfName,
+                                                    "images",
+                                                    isSprite,
+                                                    spriteVariant,
+                                                    blob,
+                                                );
+                                            } catch (error) {
+                                                console.error(
+                                                    `Failed to save External keyframe asset: ${kfName}`,
+                                                    error,
+                                                );
+                                            }
+                                        }
+                                        //console.log(
+                                        //    `Successfully fetched External keyframe asset for compositor: ${kfName}`,
+                                        //);
+                                    } catch (error) {
+                                        console.error(
+                                            `Failed to fetch External keyframe asset ${kfName} from ${kfUrl}:`,
+                                            error,
+                                        );
+                                    }
+                                }
 
                                 if (kfAsset) {
                                     kfBlobUrl = kfAsset.url;
@@ -1318,11 +1512,74 @@ class GalleryManager {
                     const galleryRef = layerDesc.galleryRef;
                     if (!galleryRef) continue;
 
-                    const match = galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
-                    if (!match) continue;
+                    // Handle External assets with URL suffix: gallery:External/name:URL
+                    let match = galleryRef.match(/^gallery:External\/([^:]+):(.+)$/);
+                    let srcCategory, srcName, srcUrl;
+                    if (match) {
+                        srcCategory = "External";
+                        srcName = match[1];
+                        srcUrl = match[2];
+                    } else {
+                        // Regular gallery reference: gallery:category/name
+                        match = galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                        if (match) {
+                            [, srcCategory, srcName] = match;
+                        }
+                    }
 
-                    const [, srcCategory, srcName] = match;
-                    const srcAsset = window.gameImporterAssets.images[srcCategory]?.[srcName];
+                    if (!match) continue;
+                    let srcAsset = window.gameImporterAssets.images[srcCategory]?.[srcName];
+
+                    // If External asset doesn't exist but URL is provided, fetch it
+                    if (!srcAsset && srcUrl) {
+                        try {
+                            //console.log(`Fetching missing External asset for compositor: ${srcName}`);
+                            const response = await fetch(srcUrl);
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+                            const blob = await response.blob();
+                            const blobUrl = URL.createObjectURL(blob);
+
+                            if (!window.gameImporterAssets.images.External) {
+                                window.gameImporterAssets.images.External = {};
+                            }
+
+                            const isSprite = layerDesc.type === "sprite" && layerDesc.spriteVariant;
+                            const spriteVariant = isSprite ? layerDesc.spriteVariant : null;
+
+                            srcAsset = {
+                                name: srcName,
+                                url: blobUrl,
+                                blob: blob,
+                                category: "External",
+                                type: "image",
+                                originalPath: "External",
+                                cropped: false,
+                                isSprite: isSprite,
+                                variants: spriteVariant ? [spriteVariant] : null,
+                            };
+                            window.gameImporterAssets.images.External[srcName] = srcAsset;
+
+                            if (window.memoryManager) {
+                                try {
+                                    await window.memoryManager.saveExternalAsset(
+                                        srcUrl,
+                                        srcName,
+                                        "images",
+                                        isSprite,
+                                        spriteVariant,
+                                        blob,
+                                    );
+                                } catch (error) {
+                                    console.error(`Failed to save External asset: ${srcName}`, error);
+                                }
+                            }
+                            //console.log(`Successfully fetched External asset for compositor: ${srcName}`);
+                        } catch (error) {
+                            console.error(`Failed to fetch External asset ${srcName} from ${srcUrl}:`, error);
+                        }
+                    }
 
                     if (!srcAsset) {
                         console.warn(`Missing asset for layer: ${srcCategory}/${srcName}`);
@@ -1372,10 +1629,15 @@ class GalleryManager {
                 assetType = "portrait";
             }
 
+            let assetRef = `gallery:${category}/${name}`;
+            if (category === "External" && asset.externalUrl) {
+                assetRef = `gallery:External/${name}:${asset.externalUrl}`;
+            }
+
             const assetData = {
                 name: name,
                 type: assetType,
-                assetRef: `gallery:${category}/${name}`,
+                assetRef: assetRef,
                 blobUrl: asset.url,
                 x: 0,
                 y: 0,
@@ -1449,10 +1711,19 @@ class GalleryManager {
             return;
         }
 
+        // Include URL suffix for External assets
+        let assetRef = `gallery:${category}/${name}`;
+        if (category === "External") {
+            const asset = window.gameImporterAssets.images[category]?.[name];
+            if (asset && asset.externalUrl) {
+                assetRef = `gallery:External/${name}:${asset.externalUrl}`;
+            }
+        }
+
         const assetData = {
             name: name,
             type: "sprite",
-            assetRef: `gallery:${category}/${name}`,
+            assetRef: assetRef,
             blobUrl: null,
             x: 0,
             y: 0,

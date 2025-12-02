@@ -224,105 +224,295 @@ function openCompositionEditor() {
 
 window.pendingCompositions = window.pendingCompositions || [];
 
+async function importExternalAssetsFromCompositions(compositions) {
+    if (!compositions || compositions.length === 0) return;
+    if (!window.memoryManager) return;
+
+    const externalRefs = new Map();
+
+    compositions.forEach((composition) => {
+        if (!composition.layers) return;
+
+        composition.layers.forEach((layer) => {
+            if (layer.galleryRef && layer.galleryRef.startsWith("gallery:External/")) {
+                const match = layer.galleryRef.match(/^gallery:External\/([^:]+):(.+)$/);
+                if (match) {
+                    const [, name, url] = match;
+                    externalRefs.set(url, { name, url, type: "images" });
+                }
+            }
+
+            if (layer.keyframes && layer.keyframes.length > 0) {
+                layer.keyframes.forEach((kf) => {
+                    if (kf.galleryRef && kf.galleryRef.startsWith("gallery:External/")) {
+                        const match = kf.galleryRef.match(/^gallery:External\/([^:]+):(.+)$/);
+                        if (match) {
+                            const [, name, url] = match;
+                            externalRefs.set(url, { name, url, type: "images" });
+                        }
+                    }
+                });
+            }
+        });
+    });
+
+    if (externalRefs.size === 0) return;
+
+    //console.log(`Importing ${externalRefs.size} external assets from compositions...`);
+
+    for (const { name, url, type } of externalRefs.values()) {
+        try {
+            const existing = await window.memoryManager.getExternalAssetByUrl(url, type);
+            if (existing) {
+                //console.log(`External asset already exists: ${name}`);
+                continue;
+            }
+
+            //console.log(`Fetching external asset: ${url}`);
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.error(`Failed to fetch ${url}: ${response.status}`);
+                continue;
+            }
+
+            const blob = await response.blob();
+
+            let title = name.replace(/\.(png|jpg|jpeg|gif|webp|bmp|svg|ogg|mp3|wav|m4a|flac|aac)$/i, "");
+
+            let isSprite = false;
+            let format = null;
+            const spriteMatch = title.match(/^spritessheet_(\d+)x(\d+)_(.+)$/);
+            if (spriteMatch) {
+                isSprite = true;
+                format = {
+                    cols: parseInt(spriteMatch[1]),
+                    rows: parseInt(spriteMatch[2]),
+                };
+                title = spriteMatch[3];
+            }
+
+            const id = await window.memoryManager.saveExternalAsset(url, title, type, isSprite, format, blob);
+
+            if (!window.gameImporterAssets[type]["External"]) {
+                window.gameImporterAssets[type]["External"] = {};
+            }
+
+            const blobUrl = URL.createObjectURL(blob);
+            window.gameImporterAssets[type]["External"][name] = {
+                url: blobUrl,
+                blob: blob,
+                externalUrl: url,
+                cropped: false,
+                isSprite: isSprite,
+                variants: isSprite ? format : null,
+            };
+
+            //console.log(`Imported external asset: ${title} from ${url}`);
+        } catch (error) {
+            console.error(`Failed to import external asset ${name}:`, error);
+        }
+    }
+}
+
+async function importExternalAssetsFromScenes(scenes) {
+    if (!scenes || scenes.length === 0) return;
+    if (!window.memoryManager) return;
+
+    const externalRefs = new Map();
+
+    scenes.forEach((scene) => {
+        ["image", "bustLeft", "bustRight", "sound", "backgroundMusic"].forEach((field) => {
+            const value = scene[field];
+            if (!value || !value.startsWith("gallery:External/")) return;
+
+            const match = value.match(/^gallery:External\/([^:]+):(.+)$/);
+            if (match) {
+                const [, name, url] = match;
+                const type = ["image", "bustLeft", "bustRight"].includes(field) ? "images" : "audio";
+                externalRefs.set(url, { name, url, type });
+            }
+        });
+    });
+
+    if (externalRefs.size === 0) return;
+
+    for (const { name, url, type } of externalRefs.values()) {
+        try {
+            const existing = await window.memoryManager.getExternalAssetByUrl(url, type);
+            if (existing) continue;
+
+            const title = name.replace(/\.[^/.]+$/, "");
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn(`Failed to fetch external asset from ${url}`);
+                continue;
+            }
+
+            const blob = await response.blob();
+            const id = await window.memoryManager.saveExternalAsset(url, title, type, false, null, blob);
+
+            if (!window.gameImporterAssets) {
+                window.gameImporterAssets = { images: {}, audio: {} };
+            }
+            if (!window.gameImporterAssets[type]["External"]) {
+                window.gameImporterAssets[type]["External"] = {};
+            }
+
+            const blobUrl = URL.createObjectURL(blob);
+
+            const assetData = {
+                url: blobUrl,
+                blob: blob,
+                name: name,
+                originalName: name,
+                baseFileName: name,
+                isSprite: false,
+                cropped: false,
+                cropping: false,
+                croppedUrl: undefined,
+                croppedBlob: undefined,
+                externalId: id,
+                externalUrl: url,
+                format: null,
+            };
+
+            window.gameImporterAssets[type]["External"][name] = assetData;
+
+            if (type === "images") {
+                window.galleryManager?.enqueueCropImage(assetData, name, "External");
+            }
+        } catch (error) {
+            console.warn(`Failed to import external asset from ${url}:`, error);
+        }
+    }
+}
+
 async function reconstructCompositionsToGallery(compositions, source = "user") {
     if (!compositions || compositions.length === 0) {
         return;
     }
 
-    if (!window.gameImporterAssets || Object.keys(window.gameImporterAssets.images || {}).length === 0) {
-        //console.warn("Game assets not loaded yet. Queueing compositions for later reconstruction...");
-        window.pendingCompositions = compositions;
-        window.pendingCompositionsSource = source;
+    if (window.isReconstructingCompositions) {
+        //console.log("Already reconstructing compositions, skipping duplicate call");
         return;
     }
+    window.isReconstructingCompositions = true;
 
-    if (!window.gameImporterAssets.images["Misc"]) {
-        window.gameImporterAssets.images["Misc"] = {};
-    }
+    try {
+        if (!window.gameImporterAssets || Object.keys(window.gameImporterAssets.images || {}).length === 0) {
+            window.pendingCompositions = compositions;
+            window.pendingCompositionsSource = source;
+            return;
+        }
 
-    //console.log(`Reconstructing ${compositions.length} compositions with source="${source}"...`);
+        if (!window.gameImporterAssets.images["Misc"]) {
+            window.gameImporterAssets.images["Misc"] = {};
+        }
 
-    const totalCompositions = compositions.length;
-    let processedCount = 0;
-    showLoadingIndicator("Building compositions");
-    updateLoadingProgress(`Processing composition 0 of ${totalCompositions}`);
+        const totalCompositions = compositions.length;
+        let processedCount = 0;
+        showLoadingIndicator("Building compositions");
+        updateLoadingProgress(`Processing composition 0 of ${totalCompositions}`);
 
-    for (const descriptor of compositions) {
-        try {
-            const hasKeyframes = descriptor.layers?.some((layer) => layer.hasKeyframes && layer.keyframes?.length > 1);
-            const hasSpriteAnimations = descriptor.layers?.some(
-                (layer) => layer.isAnimated && layer.spriteIndices && layer.spriteIndices.length > 0,
-            );
-            const shouldBeGif = hasKeyframes || hasSpriteAnimations;
-            const fileExtension = shouldBeGif ? "gif" : "png";
-            const existingFileName = `${descriptor.name}.${fileExtension}`;
+        for (const descriptor of compositions) {
+            try {
+                updateLoadingProgress(`Building "${descriptor.name}" (${processedCount + 1} of ${totalCompositions})`);
 
-            if (window.gameImporterAssets.images["Misc"][existingFileName]) {
-                //console.log(`Composition "${descriptor.name}" already exists, skipping...`);
-                processedCount++;
-                updateLoadingProgress(`Processing composition ${processedCount} of ${totalCompositions}`);
-                continue;
-            }
+                const pngFile = `${descriptor.name}.png`;
+                const gifFile = `${descriptor.name}.gif`;
+                const existingPng = window.gameImporterAssets.images["Misc"][pngFile];
+                const existingGif = window.gameImporterAssets.images["Misc"][gifFile];
 
-            updateLoadingProgress(`Building "${descriptor.name}" (${processedCount + 1} of ${totalCompositions})`);
+                if (existingPng?.isComposition && existingPng?.compositionId === descriptor.id) {
+                    //console.log(`Composition "${pngFile}" already exists, skipping`);
+                    processedCount++;
+                    continue;
+                }
+                if (existingGif?.isComposition && existingGif?.compositionId === descriptor.id) {
+                    //console.log(`Composition "${gifFile}" already exists, skipping`);
+                    processedCount++;
+                    continue;
+                }
 
-            const blob = await CompositionEditor.reconstructComposition(descriptor);
-
-            if (blob) {
-                const blobUrl = URL.createObjectURL(blob);
-
-                window.gameImporterAssets.images["Misc"][existingFileName] = {
-                    url: blobUrl,
-                    blob: blob,
-                    cropped: false,
-                    isComposition: true,
-                    compositionId: descriptor.id,
-                    compositionDescriptor: descriptor,
-                    compositionSource: source,
-                    isAnimated: shouldBeGif,
-                };
-
-                if (window.memoryManager) {
-                    try {
-                        const assetData = {
-                            name: existingFileName,
-                            originalName: existingFileName,
-                            baseFileName: existingFileName,
-                            blob: blob,
-                            isSprite: false,
-                            variants: null,
-                            isComposition: true,
-                            compositionId: descriptor.id,
-                            compositionDescriptor: descriptor,
-                            compositionSource: source,
-                        };
-
-                        await window.memoryManager.savePartialAsset(assetData, "compositions", "Misc", "images");
-
-                        //console.log(`Reconstructed composition saved to IndexedDB: "${descriptor.name}"`);
-
-                        window.compositionRecontructedCount += 1;
-                    } catch (error) {
-                        console.error(`Failed to save reconstructed composition to IndexedDB:`, error);
+                if (window.gameImporterAssets.images["Misc"][pngFile]) {
+                    delete window.gameImporterAssets.images["Misc"][pngFile];
+                    if (window.memoryManager) {
+                        try {
+                            await window.memoryManager.deleteAsset(`compositions::${pngFile}`);
+                        } catch (e) {}
+                    }
+                }
+                if (window.gameImporterAssets.images["Misc"][gifFile]) {
+                    delete window.gameImporterAssets.images["Misc"][gifFile];
+                    if (window.memoryManager) {
+                        try {
+                            await window.memoryManager.deleteAsset(`compositions::${gifFile}`);
+                        } catch (e) {}
                     }
                 }
 
-                //console.log(`Reconstructed composition: "${descriptor.name}"`);
-                processedCount++;
-            } else {
-                console.warn(`Failed to reconstruct composition: "${descriptor.name}"`);
+                const blob = await CompositionEditor.reconstructComposition(descriptor);
+
+                if (blob) {
+                    const blobUrl = URL.createObjectURL(blob);
+
+                    const isAnimated = blob.type === "image/gif";
+                    const extension = isAnimated ? ".gif" : ".png";
+                    const fileName = `${descriptor.name}${extension}`;
+
+                    window.gameImporterAssets.images["Misc"][fileName] = {
+                        url: blobUrl,
+                        blob: blob,
+                        cropped: false,
+                        isComposition: true,
+                        compositionId: descriptor.id,
+                        compositionDescriptor: descriptor,
+                        compositionSource: source,
+                        isAnimated: isAnimated,
+                    };
+
+                    if (window.memoryManager) {
+                        try {
+                            const assetData = {
+                                name: fileName,
+                                originalName: fileName,
+                                baseFileName: fileName,
+                                blob: blob,
+                                isSprite: false,
+                                variants: null,
+                                isComposition: true,
+                                compositionId: descriptor.id,
+                                compositionDescriptor: descriptor,
+                                compositionSource: source,
+                            };
+
+                            await window.memoryManager.savePartialAsset(assetData, "compositions", "Misc", "images");
+
+                            window.compositionRecontructedCount += 1;
+                        } catch (error) {
+                            console.error(`Failed to save reconstructed composition to IndexedDB:`, error);
+                        }
+                    }
+
+                    processedCount++;
+                } else {
+                    console.warn(`Failed to reconstruct composition: "${descriptor.name}"`);
+                    processedCount++;
+                }
+            } catch (error) {
+                console.error(`Error reconstructing composition "${descriptor.name}":`, error);
                 processedCount++;
             }
-        } catch (error) {
-            console.error(`Error reconstructing composition "${descriptor.name}":`, error);
-            processedCount++;
         }
-    }
 
-    hideLoadingIndicator();
+        hideLoadingIndicator();
 
-    if (typeof updateGalleryCategories === "function") {
-        updateGalleryCategories();
+        if (typeof updateGalleryCategories === "function") {
+            updateGalleryCategories();
+        }
+    } finally {
+        window.isReconstructingCompositions = false;
     }
 }
 
@@ -376,6 +566,18 @@ async function runSequence() {
             }
 
             if (fieldValue.startsWith("gallery:")) {
+                const externalMatch = fieldValue.match(/^gallery:External\/([^:]+):(.+)$/);
+                if (externalMatch) {
+                    const [, name, url] = externalMatch;
+                    const asset = window.gameImporterAssets.images["External"]?.[name];
+                    if (asset) {
+                        sceneWithBlobUrls[field + "BlobUrl"] = asset.url;
+                    } else {
+                        sceneWithBlobUrls[field + "BlobUrl"] = url;
+                    }
+                    return;
+                }
+
                 const match = fieldValue.match(/^gallery:([^/]+)\/(.+)$/);
                 if (match && window.gameImporterAssets) {
                     const [, category, name] = match;
@@ -398,12 +600,23 @@ async function runSequence() {
         const soundValue = scene.sound;
         if (soundValue && !soundValue.startsWith("http")) {
             if (soundValue.startsWith("gallery:")) {
-                const match = soundValue.match(/^gallery:([^/]+)\/(.+)$/);
-                if (match && window.gameImporterAssets) {
-                    const [, category, name] = match;
-                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                const externalMatch = soundValue.match(/^gallery:External\/([^:]+):(.+)$/);
+                if (externalMatch) {
+                    const [, name, url] = externalMatch;
+                    const asset = window.gameImporterAssets.audio["External"]?.[name];
                     if (asset) {
                         sceneWithBlobUrls.soundBlobUrl = asset.url;
+                    } else {
+                        sceneWithBlobUrls.soundBlobUrl = url;
+                    }
+                } else {
+                    const match = soundValue.match(/^gallery:([^/]+)\/(.+)$/);
+                    if (match && window.gameImporterAssets) {
+                        const [, category, name] = match;
+                        const asset = window.gameImporterAssets.audio[category]?.[name];
+                        if (asset) {
+                            sceneWithBlobUrls.soundBlobUrl = asset.url;
+                        }
                     }
                 }
             } else {
@@ -418,12 +631,23 @@ async function runSequence() {
         const bgMusicValue = scene.backgroundMusic;
         if (bgMusicValue && !bgMusicValue.startsWith("http")) {
             if (bgMusicValue.startsWith("gallery:")) {
-                const match = bgMusicValue.match(/^gallery:([^/]+)\/(.+)$/);
-                if (match && window.gameImporterAssets) {
-                    const [, category, name] = match;
-                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                const externalMatch = bgMusicValue.match(/^gallery:External\/([^:]+):(.+)$/);
+                if (externalMatch) {
+                    const [, name, url] = externalMatch;
+                    const asset = window.gameImporterAssets.audio["External"]?.[name];
                     if (asset) {
                         sceneWithBlobUrls.backgroundMusicBlobUrl = asset.url;
+                    } else {
+                        sceneWithBlobUrls.backgroundMusicBlobUrl = url;
+                    }
+                } else {
+                    const match = bgMusicValue.match(/^gallery:([^/]+)\/(.+)$/);
+                    if (match && window.gameImporterAssets) {
+                        const [, category, name] = match;
+                        const asset = window.gameImporterAssets.audio[category]?.[name];
+                        if (asset) {
+                            sceneWithBlobUrls.backgroundMusicBlobUrl = asset.url;
+                        }
                     }
                 }
             } else {
@@ -606,6 +830,24 @@ function addKeyQuotes(jsonString) {
     return jsonString.replace(/([{,])([0-9a-zA-Z!@#$%&*()]):/g, '$1"$2":');
 }
 
+function removeSpacesOutsideQuotes(src) {
+    let out = "";
+    let inQuotes = false;
+    for (let i = 0; i < src.length; i++) {
+        const c = src[i];
+        if (c === '"' && src[i - 1] !== "\\") {
+            inQuotes = !inQuotes;
+            out += c;
+            continue;
+        }
+        if (!inQuotes && c === " ") {
+            continue;
+        }
+        out += c;
+    }
+    return out;
+}
+
 function encodeSequenceToURL(projectData) {
     try {
         const compressedData = compressKeys(projectData);
@@ -654,8 +896,69 @@ function decodeSequenceFromURL(encodedString) {
     }
 }
 
+function encodeCodeToURL(codeString) {
+    try {
+        let compressed = codeString;
+
+        for (const [longKey, shortKey] of Object.entries(KEY_MAP)) {
+            const pattern = `  ${longKey}:`;
+            const patternQuotes = `  "${longKey}":`;
+            const replacement = `"${shortKey}":`;
+            compressed = compressed.split(pattern).join(replacement);
+            compressed = compressed.split(patternQuotes).join(replacement);
+        }
+
+        compressed = compressed
+            .replaceAll("async function setupScene()", "")
+            .replaceAll("function setupScene()", "")
+            .replaceAll("await ", "await_")
+            .replaceAll("\\n", "")
+            .replaceAll("\\", "")
+            .replaceAll("\n", "");
+        compressed = removeSpacesOutsideQuotes(compressed);
+
+        return LZString.compressToEncodedURIComponent(compressed);
+    } catch (error) {
+        console.error("Error encoding code to URL:", error);
+        return null;
+    }
+}
+
+function decodeCodeFromURL(encodedString) {
+    try {
+        const preset = shortPresets.find((p) => p.name === encodedString);
+        if (preset) {
+            encodedString = preset.value;
+        }
+        let decompressed = LZString.decompressFromEncodedURIComponent(encodedString);
+
+        if (!decompressed) {
+            throw new Error("Failed to decompress data");
+        }
+
+        for (const [longKey, shortKey] of Object.entries(KEY_MAP)) {
+            const pattern = `"${shortKey}":`;
+            const replacement = `"${longKey}":`;
+            decompressed = decompressed.split(pattern).join(replacement);
+        }
+        decompressed = decompressed.replaceAll("await_", "await ");
+
+        /*const needsAsync = decompressed.includes("setCompositions");
+        console.log(
+            needsAsync ? `async function setupScene() ${decompressed}` : `function setupScene() ${decompressed}`,
+        );
+        return needsAsync ? `async function setupScene() ${decompressed}` : `function setupScene() ${decompressed}`;*/
+        return `function setupScene() ${decompressed}`;
+    } catch (error) {
+        console.error("Error decoding code from URL:", error);
+        return null;
+    }
+}
+
 function generateShareLink() {
-    const encodedData = encodeSequenceToURL(projectData);
+    generateCode();
+    const codeString = document.getElementById("outputCode").value;
+    const encodedData = encodeCodeToURL(codeString);
 
     if (!encodedData) {
         alert("Failed to generate share link");
@@ -664,8 +967,6 @@ function generateShareLink() {
 
     const baseUrl = window.location.origin + window.location.pathname;
     const shareUrl = `${baseUrl}?mode=viewer&use=${encodedData}`;
-
-    //console.log("Generated URL: " + shareUrl);
 
     navigator.clipboard
         .writeText(shareUrl)
@@ -846,6 +1147,18 @@ function processSceneWithGalleryReferences(scene) {
         }
 
         if (fieldValue.startsWith("gallery:")) {
+            const externalMatch = fieldValue.match(/^gallery:External\/([^:]+):(.+)$/);
+            if (externalMatch) {
+                const [, name, url] = externalMatch;
+                const asset = window.gameImporterAssets.images["External"]?.[name];
+                if (asset) {
+                    processedScene[field + "BlobUrl"] = asset.url;
+                } else {
+                    processedScene[field + "BlobUrl"] = url;
+                }
+                return;
+            }
+
             const match = fieldValue.match(/^gallery:([^/]+)\/(.+)$/);
             if (match && window.gameImporterAssets) {
                 const [, category, name] = match;
@@ -860,12 +1173,23 @@ function processSceneWithGalleryReferences(scene) {
     const soundValue = scene.sound;
     if (soundValue && !soundValue.startsWith("http")) {
         if (soundValue.startsWith("gallery:")) {
-            const match = soundValue.match(/^gallery:([^/]+)\/(.+)$/);
-            if (match && window.gameImporterAssets) {
-                const [, category, name] = match;
-                const asset = window.gameImporterAssets.audio[category]?.[name];
+            const externalMatch = soundValue.match(/^gallery:External\/([^:]+):(.+)$/);
+            if (externalMatch) {
+                const [, name, url] = externalMatch;
+                const asset = window.gameImporterAssets.audio["External"]?.[name];
                 if (asset) {
                     processedScene.soundBlobUrl = asset.url;
+                } else {
+                    processedScene.soundBlobUrl = url;
+                }
+            } else {
+                const match = soundValue.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match && window.gameImporterAssets) {
+                    const [, category, name] = match;
+                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                    if (asset) {
+                        processedScene.soundBlobUrl = asset.url;
+                    }
                 }
             }
         }
@@ -874,12 +1198,23 @@ function processSceneWithGalleryReferences(scene) {
     const bgMusicValue = scene.backgroundMusic;
     if (bgMusicValue && !bgMusicValue.startsWith("http")) {
         if (bgMusicValue.startsWith("gallery:")) {
-            const match = bgMusicValue.match(/^gallery:([^/]+)\/(.+)$/);
-            if (match && window.gameImporterAssets) {
-                const [, category, name] = match;
-                const asset = window.gameImporterAssets.audio[category]?.[name];
+            const externalMatch = bgMusicValue.match(/^gallery:External\/([^:]+):(.+)$/);
+            if (externalMatch) {
+                const [, name, url] = externalMatch;
+                const asset = window.gameImporterAssets.audio["External"]?.[name];
                 if (asset) {
                     processedScene.backgroundMusicBlobUrl = asset.url;
+                } else {
+                    processedScene.backgroundMusicBlobUrl = url;
+                }
+            } else {
+                const match = bgMusicValue.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match && window.gameImporterAssets) {
+                    const [, category, name] = match;
+                    const asset = window.gameImporterAssets.audio[category]?.[name];
+                    if (asset) {
+                        processedScene.backgroundMusicBlobUrl = asset.url;
+                    }
                 }
             }
         }
@@ -1003,7 +1338,16 @@ async function importFromLink() {
             }
         }
 
-        const decodedData = decodeSequenceFromURL(encodedData);
+        let decodedData = null;
+        let decodedCode = decodeCodeFromURL(encodedData);
+
+        if (decodedCode) {
+            decodedData = parseSequenceFile(decodedCode);
+        }
+
+        if (!decodedData) {
+            decodedData = decodeSequenceFromURL(encodedData);
+        }
 
         if (!decodedData) {
             alert("Failed to decode the link or code. Please check that it's correct.");
@@ -1036,6 +1380,14 @@ async function importFromLink() {
         if (currentlyPlayingAudio) {
             currentlyPlayingAudio.pause();
             currentlyPlayingAudio = null;
+        }
+
+        if (decodedData.scenes && decodedData.scenes.length > 0) {
+            await importExternalAssetsFromScenes(decodedData.scenes);
+        }
+
+        if (decodedData.compositions && decodedData.compositions.length > 0) {
+            await importExternalAssetsFromCompositions(decodedData.compositions);
         }
 
         loadProjectData(decodedData);
@@ -1103,6 +1455,8 @@ function importSequence() {
                         const savedAssets = await window.memoryManager.loadSavedAssets();
                         window.gameImporterAssets = savedAssets;
                     }
+
+                    await window.memoryManager.loadExternalAssets();
                 } catch (error) {
                     console.warn("Failed to load saved assets from IndexedDB:", error);
                 }
@@ -1141,6 +1495,14 @@ function importSequence() {
             if (currentlyPlayingAudio) {
                 currentlyPlayingAudio.pause();
                 currentlyPlayingAudio = null;
+            }
+
+            if (parsedData.scenes && parsedData.scenes.length > 0) {
+                await importExternalAssetsFromScenes(parsedData.scenes);
+            }
+
+            if (parsedData.compositions && parsedData.compositions.length > 0) {
+                await importExternalAssetsFromCompositions(parsedData.compositions);
             }
 
             loadProjectData(parsedData);
@@ -1573,7 +1935,10 @@ function setupGalleryOnlyMode() {
                         <div class="gallery-preview-panel" id="galleryPreviewPanel">
                             <div class="preview-panel-header">
                                 <h3 class="preview-title-bar">Preview<span id="previewCropBoxContainer"></span></h3>
-                                <button class="preview-download-btn" id="previewDownloadBtn" onclick="downloadPreviewAsset()">⬇ Download</button>
+                                <div>
+                                    <!--<button class="externals-and-compositions-delete" id="deleteExternalAndCompositions" style="display: none">🗑</button>-->
+                                    <button class="preview-download-btn" id="previewDownloadBtn" onclick="downloadPreviewAsset()">⬇ Download</button>
+                                </div>
                             </div>
                             <div class="preview-panel-content" id="previewPanelContent">
                                 <div class="preview-placeholder">Select an item to preview</div>
@@ -2181,7 +2546,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     createLoadingIndicator();
 
-    // Make body visible so loading indicator can be seen
     document.body.classList.remove("mode-loading");
     document.body.classList.add("mode-ready");
 
@@ -2209,7 +2573,17 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (useParam) {
         try {
             await preloadSavedDataAssets();
-            const decodedData = decodeSequenceFromURL(useParam);
+
+            let decodedData = null;
+            let decodedCode = decodeCodeFromURL(useParam);
+
+            if (decodedCode) {
+                decodedData = parseSequenceFile(decodedCode);
+            }
+
+            if (!decodedData) {
+                decodedData = decodeSequenceFromURL(useParam);
+            }
 
             //console.log("decoded data: ", decodedData);
 
@@ -2273,7 +2647,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         const loadedSaved = useParam ? false : loadSavedSequence();
 
         if (!loadedSaved && !useParam && typeof setupScene === "function") {
-            setupScene();
+            await setupScene();
+            //console.log(`After setupScene: dialogFramework.scenes.length = ${dialogFramework.scenes?.length || 0}`);
             await dialogFramework.preloadAssets();
             dialogFramework.updateDebugInfo();
         }
@@ -2284,6 +2659,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             clearBtn.style.display = "inline-block";
         }
 
+        //console.log(`Before openEditor: dialogFramework.scenes.length = ${dialogFramework.scenes?.length || 0}`);
         openEditor();
     } else if (mode === "ashley-on-duty") {
         const episode = parseInt(urlParams.get("episode") || "1");
@@ -2298,7 +2674,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         const shouldAutoplay = autoplayParam !== null && useParam !== null;
 
         if (!useParam && typeof setupScene === "function") {
-            setupScene();
+            await setupScene();
 
             showLoadingIndicator("Preloading assets");
 
@@ -2457,9 +2833,116 @@ function handleGalleryKeydown(e) {
             galleryManager.toggleAudioPlay();
         }
     }
+
+    // DELETE: Delete External assets or compositions from Misc
+    if (e.key === "Delete") {
+        e.preventDefault();
+        const current = galleryManager.currentAsset;
+        if (!current) return;
+
+        const category = current.category;
+        const name = current.name;
+        const asset = current.asset;
+
+        // Only allow deletion of External assets or compositions in Misc
+        if (category === "External" || (category === "Misc" && asset.isComposition)) {
+            deleteGalleryAsset(category, name, asset, current.type);
+        }
+    }
 }
 
 document.addEventListener("keydown", handleGalleryKeydown);
+
+function checkAssetUsage(category, name, type) {
+    const galleryRef = `gallery:${category}/${name}`;
+    let usedInCurrentProject = false;
+    let usedInSavedSequence = false;
+
+    if (projectData && projectData.scenes) {
+        for (const scene of projectData.scenes) {
+            const sceneStr = JSON.stringify(scene);
+            if (sceneStr.includes(galleryRef)) {
+                usedInCurrentProject = true;
+                break;
+            }
+        }
+    }
+
+    const savedCode = localStorage.getItem("tcoaal_saved_sequence");
+    if (savedCode && savedCode.includes(galleryRef)) {
+        usedInSavedSequence = true;
+    }
+
+    return { usedInCurrentProject, usedInSavedSequence };
+}
+
+async function deleteGalleryAsset(category, name, asset, type) {
+    const isComposition = asset.isComposition;
+    const itemType = isComposition ? "composition" : type === "images" ? "image" : "audio";
+
+    const usage = checkAssetUsage(category, name, type);
+    let warningMessage = "";
+
+    if (usage.usedInCurrentProject || usage.usedInSavedSequence) {
+        warningMessage = "\n\n⚠️ WARNING: This " + itemType + " is actively used in ";
+        if (usage.usedInCurrentProject && usage.usedInSavedSequence) {
+            warningMessage += "your current dialogue AND your saved sequence";
+        } else if (usage.usedInCurrentProject) {
+            warningMessage += "your current dialogue";
+        } else {
+            warningMessage += "your saved sequence";
+        }
+        warningMessage += "!";
+    }
+
+    const confirmMessage = `Are you sure you want to delete "${name}"?${warningMessage}\n\nThis action cannot be undone.`;
+
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+
+    try {
+        if (window.gameImporterAssets && window.gameImporterAssets[type]) {
+            if (window.gameImporterAssets[type][category]) {
+                delete window.gameImporterAssets[type][category][name];
+                //console.log(`Deleted ${itemType} from ${category}: ${name}`);
+            }
+        }
+
+        if (window.memoryManager) {
+            if (category === "External") {
+                const externalAssets = await window.memoryManager.getExternalAssets();
+                const assetToDelete = externalAssets.find((a) => a.title === name && a.type === type);
+                if (assetToDelete) {
+                    await window.memoryManager.deleteExternalAsset(assetToDelete.id);
+                    //console.log(`Deleted External asset from IndexedDB: ${name}`);
+                }
+            } else if (category === "Misc" && isComposition) {
+                const id = `compositions::${name}`;
+                await window.memoryManager.deleteAsset(id);
+                //console.log(`Deleted composition from IndexedDB: ${name}`);
+            }
+        }
+
+        const galleryItem = document.querySelector(`.gallery-item[data-filename="${name}"]`);
+        if (galleryItem) {
+            galleryItem.remove();
+        }
+
+        if (window.galleryManager) {
+            window.galleryManager.clearPreview();
+            window.galleryManager.unselectCurrent();
+        }
+
+        const categoryBtn = document.querySelector(`.gallery-category-btn[data-category="${category}"]`);
+        if (categoryBtn) {
+            categoryBtn.click();
+        }
+    } catch (error) {
+        console.error(`Failed to delete ${itemType}:`, error);
+        alert(`Failed to delete "${name}". Please try again.`);
+    }
+}
 
 async function clearSavedData() {
     if (!window.memoryManager) return;
@@ -2510,6 +2993,8 @@ async function loadGalleryFromSavedData(storageState) {
 
         const savedAssets = await window.memoryManager.loadSavedAssets();
         window.gameImporterAssets = savedAssets;
+
+        await window.memoryManager.loadExternalAssets();
 
         cropAllImages();
 

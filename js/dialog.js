@@ -732,7 +732,25 @@ class DialogFramework {
         this.updateConfig();
     }
 
-    setCompositions(compositions) {}
+    async setCompositions(compositions) {
+        if (!compositions || compositions.length === 0) {
+            return this;
+        }
+
+        if (typeof showLoadingIndicator === "function") {
+            showLoadingIndicator("Building compositions");
+        }
+
+        if (typeof reconstructCompositionsToGallery === "function") {
+            await reconstructCompositionsToGallery(compositions, "preset");
+        }
+
+        if (typeof hideLoadingIndicator === "function") {
+            hideLoadingIndicator();
+        }
+
+        return this;
+    }
 
     updateConfig() {
         const controls = document.getElementById("controlsContainer");

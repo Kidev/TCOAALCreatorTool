@@ -2214,6 +2214,8 @@ class CompositionEditor {
             this.layers.some((l) => l.isAnimated && l.spriteCanvases.length > 0) ||
             this.layers.some((l) => l.hasKeyframes && l.keyframes.length > 1);
 
+        const hasKeyframeAnimations = this.layers.some((l) => l.hasKeyframes && l.keyframes.length > 1);
+
         const hasAudioKeyframes = this.audioKeyframes && this.audioKeyframes.length > 0;
 
         const gifBtn = document.getElementById("exportGifBtn");
@@ -2244,7 +2246,7 @@ class CompositionEditor {
         }
 
         if (playBtn) {
-            if (hasAnimatedLayers || hasAudioKeyframes) {
+            if (hasKeyframeAnimations || hasAudioKeyframes) {
                 playBtn.style.display = "inline-block";
                 playBtn.textContent = this.isPlayingPreview ? "⏸ Pause" : "▶ Play";
                 playBtn.className = this.isPlayingPreview
@@ -3583,19 +3585,17 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                                 const timeInAnimation = currentTime - firstKeyframeTime;
                                 const animSpeed = layer.animationSpeed || 250;
                                 spriteFrameIndex =
-                                    Math.floor(timeInAnimation / animSpeed) % renderData.spriteIndices.length;
+                                    Math.floor(timeInAnimation / animSpeed) % renderData.spriteCanvases.length;
                             } else {
-                                spriteFrameIndex = frameIndex % renderData.spriteIndices.length;
+                                spriteFrameIndex = frameIndex % renderData.spriteCanvases.length;
                             }
 
-                            const spriteIndex = renderData.spriteIndices[spriteFrameIndex];
-                            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                            const spriteCanvas = renderData.spriteCanvases[spriteFrameIndex];
                             if (spriteCanvas) {
                                 frameCtx.drawImage(spriteCanvas, renderX, renderY);
                             }
                         } else {
-                            const spriteIndex = renderData.spriteIndices[0];
-                            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                            const spriteCanvas = renderData.spriteCanvases[0];
                             if (spriteCanvas) {
                                 frameCtx.drawImage(spriteCanvas, renderX, renderY);
                             }
@@ -3905,6 +3905,9 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         for (const [category, assets] of Object.entries(window.gameImporterAssets.images)) {
             for (const [name, asset] of Object.entries(assets)) {
                 if (asset.url === blobUrl || asset.croppedUrl === blobUrl) {
+                    if (category === "External" && asset.externalUrl) {
+                        return `gallery:External/${name}:${asset.externalUrl}`;
+                    }
                     return `gallery:${category}/${name}`;
                 }
             }
@@ -4389,19 +4392,17 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                                 const timeInAnimation = currentTime - firstKeyframeTime;
                                 const animSpeed = layer.animationSpeed || 250;
                                 spriteFrameIndex =
-                                    Math.floor(timeInAnimation / animSpeed) % renderData.spriteIndices.length;
+                                    Math.floor(timeInAnimation / animSpeed) % renderData.spriteCanvases.length;
                             } else {
-                                spriteFrameIndex = frameIndex % renderData.spriteIndices.length;
+                                spriteFrameIndex = frameIndex % renderData.spriteCanvases.length;
                             }
 
-                            const spriteIndex = renderData.spriteIndices[spriteFrameIndex];
-                            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                            const spriteCanvas = renderData.spriteCanvases[spriteFrameIndex];
                             if (spriteCanvas) {
                                 frameCtx.drawImage(spriteCanvas, renderX, renderY);
                             }
                         } else {
-                            const spriteIndex = renderData.spriteIndices[0];
-                            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                            const spriteCanvas = renderData.spriteCanvases[0];
                             if (spriteCanvas) {
                                 frameCtx.drawImage(spriteCanvas, renderX, renderY);
                             }
@@ -4473,6 +4474,22 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             return null;
         }
 
+        //console.log(`[reconstructComposition] Starting reconstruction of "${descriptor.name}"`);
+        /*console.log(
+            `[reconstructComposition] Descriptor layers:`,
+            descriptor.layers.map((l, i) => ({
+                index: i,
+                name: l.name,
+                type: l.type,
+                visible: l.visible,
+                hasKeyframes: l.hasKeyframes,
+                galleryRef: l.galleryRef,
+                isAnimated: l.isAnimated,
+                spriteVariant: l.spriteVariant,
+                spriteIndices: l.spriteIndices,
+            })),
+        );*/
+
         const editor = new CompositionEditor();
         editor.init();
 
@@ -4498,10 +4515,75 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                     let kfSpriteCanvases = null;
 
                     if (kfDesc.galleryRef) {
-                        const kfMatch = kfDesc.galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                        let kfMatch = kfDesc.galleryRef.match(/^gallery:External\/([^:]+):(.+)$/);
+                        let kfCategory, kfName, kfUrl;
                         if (kfMatch) {
-                            const [, kfCategory, kfName] = kfMatch;
+                            kfCategory = "External";
+                            kfName = kfMatch[1];
+                            kfUrl = kfMatch[2];
+                        } else {
+                            kfMatch = kfDesc.galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                            if (kfMatch) {
+                                [, kfCategory, kfName] = kfMatch;
+                            }
+                        }
+                        if (kfMatch) {
                             kfAsset = window.gameImporterAssets.images[kfCategory]?.[kfName];
+
+                            if (!kfAsset && kfUrl) {
+                                try {
+                                    //console.log(`Fetching missing External asset from URL: ${kfName}`);
+                                    const response = await fetch(kfUrl);
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP ${response.status}`);
+                                    }
+                                    const blob = await response.blob();
+                                    const blobUrl = URL.createObjectURL(blob);
+
+                                    if (!window.gameImporterAssets.images.External) {
+                                        window.gameImporterAssets.images.External = {};
+                                    }
+
+                                    const isSprite = kfDesc.type === "sprite" && kfDesc.spriteVariant;
+                                    const spriteVariant = isSprite ? kfDesc.spriteVariant : null;
+
+                                    kfAsset = {
+                                        name: kfName,
+                                        url: blobUrl,
+                                        blob: blob,
+                                        category: "External",
+                                        type: "image",
+                                        originalPath: "External",
+                                        cropped: false,
+                                        isSprite: isSprite,
+                                        variants: spriteVariant ? [spriteVariant] : null,
+                                    };
+                                    window.gameImporterAssets.images.External[kfName] = kfAsset;
+
+                                    if (window.memoryManager) {
+                                        try {
+                                            await window.memoryManager.saveExternalAsset(
+                                                kfUrl,
+                                                kfName,
+                                                "images",
+                                                isSprite,
+                                                spriteVariant,
+                                                blob,
+                                            );
+                                            //console.log(`Successfully created and saved External asset: ${kfName}`);
+                                        } catch (error) {
+                                            console.error(
+                                                `Failed to save External asset to IndexedDB: ${kfName}`,
+                                                error,
+                                            );
+                                        }
+                                    } else {
+                                        //console.log(`Successfully created External asset: ${kfName}`);
+                                    }
+                                } catch (error) {
+                                    console.error(`Failed to fetch External asset ${kfName} from ${kfUrl}:`, error);
+                                }
+                            }
 
                             if (kfAsset) {
                                 kfBlobUrl = kfAsset.url;
@@ -4513,7 +4595,14 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                                             kfName,
                                             kfDesc.spriteVariant,
                                         );
-                                        kfSpriteCanvases = extractedSprites.map((s) => s.canvas);
+
+                                        if (kfDesc.spriteIndices && Array.isArray(kfDesc.spriteIndices)) {
+                                            kfSpriteCanvases = kfDesc.spriteIndices
+                                                .map((idx) => extractedSprites[idx]?.canvas)
+                                                .filter((c) => c);
+                                        } else {
+                                            kfSpriteCanvases = extractedSprites.map((s) => s.canvas);
+                                        }
                                     } catch (error) {
                                         console.error(
                                             `Failed to extract sprites for keyframe at time ${kfDesc.time}ms:`,
@@ -4582,8 +4671,18 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
                 const addedLayer = editor.layers.find((l) => l.id === layerId);
                 if (addedLayer) {
-                    addedLayer.visible = layerDesc.visible;
+                    addedLayer.visible = layerDesc.visible !== false;
                 }
+
+                /*console.log(`[reconstructComposition] Added keyframed layer:`, {
+                    layerId,
+                    name: layerData.name,
+                    type: layerData.type,
+                    visible: addedLayer?.visible,
+                    hasKeyframes: addedLayer?.hasKeyframes,
+                    keyframeCount: addedLayer?.keyframes?.length,
+                    spriteCanvasCount: addedLayer?.spriteCanvases?.length,
+                });*/
             } else {
                 const galleryRef = layerDesc.galleryRef;
                 if (!galleryRef) {
@@ -4591,14 +4690,77 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                     continue;
                 }
 
-                const match = galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                let match = galleryRef.match(/^gallery:External\/([^:]+):(.+)$/);
+                let category, name, url;
+                if (match) {
+                    category = "External";
+                    name = match[1];
+                    url = match[2];
+                } else {
+                    match = galleryRef.match(/^gallery:([^/]+)\/(.+)$/);
+                    if (match) {
+                        [, category, name] = match;
+                    }
+                }
+
                 if (!match) {
                     console.warn(`Invalid gallery reference format: ${galleryRef}`);
                     continue;
                 }
 
-                const [, category, name] = match;
-                const asset = window.gameImporterAssets.images[category]?.[name];
+                let asset = window.gameImporterAssets.images[category]?.[name];
+
+                if (!asset && url) {
+                    try {
+                        //console.log(`Fetching missing External asset from URL: ${name}`);
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        const blob = await response.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+
+                        if (!window.gameImporterAssets.images.External) {
+                            window.gameImporterAssets.images.External = {};
+                        }
+
+                        const isSprite = layerDesc.type === "sprite" && layerDesc.spriteVariant;
+                        const spriteVariant = isSprite ? layerDesc.spriteVariant : null;
+
+                        asset = {
+                            name: name,
+                            url: blobUrl,
+                            blob: blob,
+                            category: "External",
+                            type: "image",
+                            originalPath: "External",
+                            cropped: false,
+                            isSprite: isSprite,
+                            variants: spriteVariant ? [spriteVariant] : null,
+                        };
+                        window.gameImporterAssets.images.External[name] = asset;
+
+                        if (window.memoryManager) {
+                            try {
+                                await window.memoryManager.saveExternalAsset(
+                                    url,
+                                    name,
+                                    "images",
+                                    isSprite,
+                                    spriteVariant,
+                                    blob,
+                                );
+                                //console.log(`Successfully created and saved External asset: ${name}`);
+                            } catch (error) {
+                                console.error(`Failed to save External asset to IndexedDB: ${name}`, error);
+                            }
+                        } else {
+                            //console.log(`Successfully created External asset: ${name}`);
+                        }
+                    } catch (error) {
+                        console.error(`Failed to fetch External asset ${name} from ${url}:`, error);
+                    }
+                }
 
                 if (!asset) {
                     console.warn(`Missing asset: ${category}/${name}`);
@@ -4627,7 +4789,15 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                         assetData.isAnimated = layerDesc.isAnimated;
                         assetData.spriteIndices = layerDesc.spriteIndices;
                         assetData.animationSpeed = layerDesc.animationSpeed;
-                        assetData.spriteCanvases = extractedSprites.map((s) => s.canvas);
+
+                        if (layerDesc.spriteIndices && Array.isArray(layerDesc.spriteIndices)) {
+                            assetData.spriteCanvases = layerDesc.spriteIndices
+                                .map((idx) => extractedSprites[idx]?.canvas)
+                                .filter((c) => c);
+                        } else {
+                            assetData.spriteCanvases = extractedSprites.map((s) => s.canvas);
+                        }
+
                         assetData.spriteVariant = layerDesc.spriteVariant;
                     } catch (error) {
                         console.error(`Failed to extract sprites for ${name}:`, error);
@@ -4638,9 +4808,18 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                 const layerId = editor.addLayer(assetData);
 
                 const addedLayer = editor.layers.find((l) => l.id === layerId);
-                if (addedLayer && addedLayer.visible !== layerDesc.visible) {
-                    addedLayer.visible = layerDesc.visible;
+                if (addedLayer) {
+                    addedLayer.visible = layerDesc.visible !== false;
                 }
+
+                /*console.log(`[reconstructComposition] Added non-keyframed layer:`, {
+                    layerId,
+                    name: assetData.name,
+                    type: assetData.type,
+                    visible: addedLayer?.visible,
+                    isAnimated: addedLayer?.isAnimated,
+                    spriteCanvasCount: addedLayer?.spriteCanvases?.length,
+                });*/
             }
         }
 
@@ -4684,7 +4863,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
         const hasKeyframes = editor.layers.some((l) => l.hasKeyframes && l.keyframes.length > 1);
         const hasSpriteAnimations = editor.layers.some(
-            (l) => l.visible && l.isAnimated && l.spriteCanvases && l.spriteCanvases.length > 0,
+            (l) => l.visible && l.isAnimated && l.spriteCanvases && l.spriteCanvases.length > 1,
         );
         const shouldRenderAsGif = hasKeyframes || hasSpriteAnimations;
 

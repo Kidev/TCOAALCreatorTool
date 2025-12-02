@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 -->
 <!doctype html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/html">
     <head>
         <meta charset="UTF-8" />
         <link href="favicon.ico" rel="icon" type="image/x-icon" />
@@ -155,9 +155,12 @@
                                 <div class="bar" id="croppingProgressBarModal"></div>
                                 <span class="label" id="croppingProgressSpanModal">Cropping...</span>
                             </div>
-                            <button class="preview-download-btn" id="previewDownloadBtn" style="display: none">
-                                ⏎ Use
-                            </button>
+                            <div>
+                                <!--<button class="externals-and-compositions-delete" id="deleteExternalAndCompositions" style="display: none">🗑</button>-->
+                                <button class="preview-download-btn" id="previewDownloadBtn" style="display: none">
+                                    ⏎ Use
+                                </button>
+                            </div>
                         </div>
                         <div class="preview-panel-content" id="previewPanelContent">
                             <div class="preview-placeholder">Select an item to preview</div>
@@ -728,7 +731,6 @@ Right click to erase the saved dialog"
         <script src="js/dialog.js"></script>
         <script src="js/gameImporter.js"></script>
         <script src="js/interface.js"></script>
-
         <script src="js/aod1Config.js"></script>
         <script src="js/aod2Config.js"></script>
 
@@ -740,11 +742,7 @@ Right click to erase the saved dialog"
 
                 const gameScript = document.createElement("script");
                 if (mode === "ashley-on-duty") {
-                    // Load episode-specific game file
-                    gameScript.src = episode === "1" ? "js/ashleyOnDuty-ep1.js" : `js/ashleyOnDuty-ep${episode}.js`;
-                } else {
-                    // Default: load episode 1 for non-game modes
-                    gameScript.src = "js/ashleyOnDuty-ep1.js";
+                    gameScript.src = `js/ashleyOnDuty-ep${episode}.js`;
                 }
                 document.currentScript.parentNode.insertBefore(gameScript, document.currentScript.nextSibling);
             })();

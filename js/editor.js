@@ -535,6 +535,10 @@ async function loadProjectData(data) {
         }
     }
 
+    if (typeof importExternalAssetsFromScenes === "function") {
+        await importExternalAssetsFromScenes(projectData.scenes);
+    }
+
     await loadLocalFilesForScenes();
 
     updateScenesList();
@@ -684,6 +688,7 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, 
     const fieldId = isSound ? "sound" : isBackgroundMusic ? "backgroundMusic" : field;
     const isUrl = currentValue && (currentValue.startsWith("http://") || currentValue.startsWith("https://"));
     const isGallery = currentValue && currentValue.startsWith("gallery:");
+    const isExternal = currentValue && currentValue.startsWith("gallery:External/");
     const hasFile = isBackgroundMusic
         ? backgroundMusicMap.has(sceneIndex)
         : isSound
@@ -768,6 +773,7 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, 
                 <span class="filename">${buttonText}</span>
                 ${fileName ? `<button class="file-clear-button" onclick="event.stopPropagation(); clearFile(${sceneIndex}, '${field}', ${isSound}, ${isBackgroundMusic})">☓</button>` : ""}
             </button>
+            <div class="file-type-warning-text">${selectValue === "local" ? "⚠️ Local files cannot be shared" : ""}</div>
         `;
     } else if (selectValue === "url") {
         const urlHandler = isBackgroundMusic ? "BackgroundMusic" : isSound ? "Sound" : "Image";
@@ -784,9 +790,14 @@ function createFileSelectHTML(sceneIndex, field, currentValue, isSound = false, 
         let displayName = "Select from gallery";
         const hasGalleryAsset = isGallery && currentValue !== "gallery:";
         if (hasGalleryAsset) {
-            const match = currentValue.match(/^gallery:([^/]+)\/(.+)$/);
-            if (match) {
-                displayName = match[2];
+            const externalMatch = currentValue.match(/^gallery:External\/([^:]+):(.+)$/);
+            if (externalMatch) {
+                displayName = externalMatch[1]; // Only show the name, not the :URL part
+            } else {
+                const match = currentValue.match(/^gallery:([^/]+)\/(.+)$/);
+                if (match) {
+                    displayName = match[2];
+                }
             }
         }
         html += `
@@ -927,15 +938,19 @@ function useGalleryAsset(name, category) {
 
     const { sceneIndex, field, isSound } = galleryContext;
 
-    const galleryRef = `gallery:${category}/${name}`;
-
-    projectData.scenes[sceneIndex][field] = galleryRef;
-
     const assets =
         currentGalleryTab === "images"
             ? window.gameImporterAssets.images[category]
             : window.gameImporterAssets.audio[category];
     const asset = assets[name];
+
+    let galleryRef = `gallery:${category}/${name}`;
+
+    if (category === "External" && asset && asset.externalUrl) {
+        galleryRef = `gallery:External/${name}:${asset.externalUrl}`;
+    }
+
+    projectData.scenes[sceneIndex][field] = galleryRef;
 
     if (asset) {
         if (field === "backgroundMusic") {
@@ -2018,6 +2033,61 @@ function updateSpeakerDropdownColor(index) {
     }
 }
 
+async function autoSaveUrlAssetToExternal(url, assetType) {
+    if (!url || !url.startsWith("http")) return;
+    if (!window.memoryManager) return;
+
+    try {
+        const existing = await window.memoryManager.getExternalAssetByUrl(url, assetType);
+        if (existing) return;
+
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname;
+        const filename = pathname.substring(pathname.lastIndexOf("/") + 1);
+        const title = filename.replace(/\.[^/.]+$/, "") || `External ${assetType === "images" ? "image" : "sound"}`;
+
+        const response = await fetch(url);
+        if (!response.ok) return;
+
+        const blob = await response.blob();
+        const id = await window.memoryManager.saveExternalAsset(url, title, assetType, false, null, blob);
+
+        if (!window.gameImporterAssets) {
+            window.gameImporterAssets = { images: {}, audio: {} };
+        }
+        if (!window.gameImporterAssets[assetType]["External"]) {
+            window.gameImporterAssets[assetType]["External"] = {};
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        const fileName = `${title}.${assetType === "images" ? "png" : "ogg"}`;
+
+        const assetData = {
+            url: blobUrl,
+            blob: blob,
+            name: fileName,
+            originalName: fileName,
+            baseFileName: fileName,
+            isSprite: false,
+            cropped: false,
+            cropping: false,
+            croppedUrl: undefined,
+            croppedBlob: undefined,
+            externalId: id,
+            externalUrl: url,
+            format: null,
+        };
+
+        window.gameImporterAssets[assetType]["External"][fileName] = assetData;
+
+        if (assetType === "images") {
+            window.galleryManager?.enqueueCropImage(assetData, fileName, "External");
+        }
+    } catch (error) {
+        console.warn("Failed to auto-save URL asset:", error);
+    }
+}
+
 function updateSceneValue(index, field, value) {
     if (["line1", "line2"].includes(field)) {
         const scene = projectData.scenes[index];
@@ -2064,6 +2134,12 @@ function updateSceneValue(index, field, value) {
             updateTimingPresetDropdown(index, side === "Left" ? "portraitLeft" : "portraitRight");
         } else {
             projectData.scenes[index][field] = value;
+
+            if (["image", "bustLeft", "bustRight"].includes(field) && value) {
+                autoSaveUrlAssetToExternal(value, "images");
+            } else if (["sound", "backgroundMusic"].includes(field) && value) {
+                autoSaveUrlAssetToExternal(value, "audio");
+            }
 
             if (["speaker", "censorSpeaker", "demonSpeaker", "centerDialog", "hideDialogBox"].includes(field)) {
                 updateScenesList(index);
@@ -3075,6 +3151,22 @@ function generateCode() {
     updateConfig();
     updateGlitchConfig();
 
+    /*let needsAsync = false;
+    if (window.gameImporterAssets && window.gameImporterAssets.images["Misc"]) {
+        projectData.scenes.forEach((scene) => {
+            const fieldsToCheck = [scene.image, scene.bustLeft, scene.bustRight];
+            fieldsToCheck.forEach((field) => {
+                if (field && typeof field === "string" && field.startsWith("gallery:Misc/")) {
+                    const filename = field.replace("gallery:Misc/", "");
+                    const asset = window.gameImporterAssets.images["Misc"][filename];
+                    if (asset && (asset.isComposition || asset.originalPath === "compositions")) {
+                        needsAsync = true;
+                    }
+                }
+            });
+        });
+    }*/
+
     let code = `function setupScene() {`;
 
     const configEntries = [];
@@ -3164,54 +3256,6 @@ function generateCode() {
 `;
     }
 
-    code += `
-        dialogFramework`;
-
-    projectData.scenes.forEach((scene, index) => {
-        const sceneEntries = [];
-
-        Object.keys(scene).forEach((key) => {
-            if (key.endsWith("BlobUrl")) return;
-
-            if (key.match(/^portrait(Left|Right)(FadeIn|FadeOut|DelayIn|DelayOut)$/)) return;
-
-            const value = scene[key];
-            const defaultValue = DEFAULTS.scene[key];
-
-            if (isDefault(value, defaultValue)) return;
-
-            if (value === null) {
-                sceneEntries.push(`${key}: null`);
-            } else if (typeof value === "string") {
-                sceneEntries.push(`${key}: "${value.replace(/"/g, '\\"')}"`);
-            } else if (typeof value === "boolean") {
-                sceneEntries.push(`${key}: ${value}`);
-            } else if (typeof value === "number") {
-                sceneEntries.push(`${key}: ${value}`);
-            } else if (Array.isArray(value)) {
-                if (key === "choicesList") {
-                    const validChoices = value.filter((c) => c && c.trim() !== "");
-                    if (validChoices.length > 0) {
-                        sceneEntries.push(
-                            `${key}: [${validChoices.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(", ")}]`,
-                        );
-                    }
-                } else {
-                    sceneEntries.push(`${key}: ${JSON.stringify(value)}`);
-                }
-            } else if (typeof value === "object") {
-                sceneEntries.push(`${key}: ${JSON.stringify(value)}`);
-            }
-        });
-
-        code += `
-        .addScene({
-            ${sceneEntries.join(",\n            ")}
-        })`;
-    });
-
-    code += `;`;
-
     const compositionsToExport = new Map();
 
     if (window.gameImporterAssets && window.gameImporterAssets.images["Misc"]) {
@@ -3253,14 +3297,64 @@ function generateCode() {
         });
     }
 
+    if (projectData.scenes.length > 0) {
+        code += `
+        dialogFramework`;
+
+        projectData.scenes.forEach((scene, index) => {
+            const sceneEntries = [];
+
+            Object.keys(scene).forEach((key) => {
+                if (key.endsWith("BlobUrl")) return;
+
+                if (key.match(/^portrait(Left|Right)(FadeIn|FadeOut|DelayIn|DelayOut)$/)) return;
+
+                const value = scene[key];
+                const defaultValue = DEFAULTS.scene[key];
+
+                if (isDefault(value, defaultValue)) return;
+
+                if (value === null) {
+                    sceneEntries.push(`${key}: null`);
+                } else if (typeof value === "string") {
+                    sceneEntries.push(`${key}: "${value.replace(/"/g, '\\"')}"`);
+                } else if (typeof value === "boolean") {
+                    sceneEntries.push(`${key}: ${value}`);
+                } else if (typeof value === "number") {
+                    sceneEntries.push(`${key}: ${value}`);
+                } else if (Array.isArray(value)) {
+                    if (key === "choicesList") {
+                        const validChoices = value.filter((c) => c && c.trim() !== "");
+                        if (validChoices.length > 0) {
+                            sceneEntries.push(
+                                `${key}: [${validChoices.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(", ")}]`,
+                            );
+                        }
+                    } else {
+                        sceneEntries.push(`${key}: ${JSON.stringify(value)}`);
+                    }
+                } else if (typeof value === "object") {
+                    sceneEntries.push(`${key}: ${JSON.stringify(value)}`);
+                }
+            });
+
+            code += `
+            .addScene({
+                ${sceneEntries.join(",\n            ")}
+            })`;
+        });
+
+        code += `;`;
+    }
+
     if (compositionsToExport.size > 0) {
         const compositionsArray = Array.from(compositionsToExport.values());
         code += `
-
-        dialogFramework.setCompositions(${JSON.stringify(compositionsArray, null, 8).replace(/\n/g, "\n        ")});`;
+        dialogFramework.setCompositions(${JSON.stringify(compositionsArray, null, 8).replace(/\n/g, "\n        ")});
+`;
     }
 
-    code += `
+    code += `;
 }`;
 
     document.getElementById("outputCode").value = code;
@@ -3484,6 +3578,8 @@ async function preloadSavedDataAssets(shouldCrop = false) {
                 const savedAssets = await window.memoryManager.loadSavedAssets();
                 window.gameImporterAssets = savedAssets;
 
+                await window.memoryManager.loadExternalAssets();
+
                 if (window.pendingCompositions && window.pendingCompositions.length > 0) {
                     //console.log(`Processing ${window.pendingCompositions.length} pending compositions after loading assets...`,);
                     const pending = window.pendingCompositions;
@@ -3652,6 +3748,11 @@ function updateGalleryCategories() {
 
     const isImageTab = currentGalleryTab === "images";
     const assets = isImageTab ? window.gameImporterAssets.images : window.gameImporterAssets.audio;
+
+    if (!assets["External"]) {
+        assets["External"] = {};
+    }
+
     const categories = Object.keys(assets);
 
     const lineDiv = document.createElement("div");
@@ -3881,12 +3982,31 @@ async function updateGalleryContent() {
         document.getElementById("bustsFilterSelect").remove();
     }
 
+    if (currentGalleryCategory === "External") {
+        const addButton = document.createElement("div");
+        addButton.className = "gallery-item external-add-btn";
+        if (currentGalleryTab === "audio") {
+            addButton.innerHTML = `
+                <div class="gallery-item-audio compact external-add-audio">
+                    <div class="external-add-icon">+</div>
+                    <div class="gallery-item-name">Add external sound</div>
+                </div>`;
+        } else {
+            addButton.innerHTML = `
+                <div class="external-add-icon">+</div>
+                <div class="gallery-item-name">Add external image</div>`;
+        }
+        addButton.onclick = () => openAddExternalAssetModal(currentGalleryTab);
+        contentContainer.appendChild(addButton);
+    }
+
     assetEntries.forEach(([name, asset], index) => {
         if (currentGalleryTab === "images" && currentGalleryCategory === "Portraits" && bustFilterValue !== "All") {
             const baseName = name.toLowerCase().replace(/\.[^/.]+$/, "");
             if (!baseName.startsWith(bustFilterValue.toLowerCase() + "_")) return;
         }
         const formatName = window.galleryManager.formatAssetTitle(name, currentGalleryCategory, currentGalleryTab);
+        const displayName = formatName;
         const favKey = window.memoryManager?.generateFavouriteKey(currentGalleryTab, currentGalleryCategory, name);
         const isFav = favouritesSet.has(favKey);
 
@@ -3899,6 +4019,12 @@ async function updateGalleryContent() {
         item.dataset.formatName = formatName;
         item.dataset.category = currentGalleryCategory;
         item.dataset.type = currentGalleryTab;
+        if (asset.externalId) {
+            item.dataset.externalId = asset.externalId;
+        }
+        if (asset.externalUrl) {
+            item.dataset.externalUrl = asset.externalUrl;
+        }
         item.onclick = function (ev) {
             document.querySelectorAll(".gallery-item").forEach((it) => {
                 it.classList.remove("selected");
@@ -3929,13 +4055,13 @@ async function updateGalleryContent() {
             item.innerHTML = `
                 ${starHtml}
                 <img src="${asset.croppedUrl || asset.url}" alt="${name}" loading="lazy">
-                <div class="gallery-item-name">${formatName}</div>`;
+                <div class="gallery-item-name">${displayName}</div>`;
         } else {
             item.innerHTML = `
                 ${starHtml}
                 <div class="gallery-item-audio compact">
                 <div class="audio-icon">🎵</div>
-                <div class="gallery-item-name">${formatName}</div>
+                <div class="gallery-item-name">${displayName}</div>
                 </div>`;
         }
         contentContainer.appendChild(item);
@@ -3955,6 +4081,234 @@ async function updateGalleryContent() {
         galleryManager.unselectCurrent();
         galleryManager.selectFirstElement();
     }
+}
+
+function openAddExternalAssetModal(assetType) {
+    const modal = document.createElement("div");
+    modal.className = "preset-sequence-modal";
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        backdrop-filter: blur(4px);
+    `;
+
+    const modalContent = document.createElement("div");
+    modalContent.className = "preset-sequence-content";
+    modalContent.style.cssText = `
+        background: var(--bg-color);
+        border-radius: 8px;
+        padding: 2rem;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    `;
+
+    const typeLabel = assetType === "images" ? "Image" : "Sound";
+
+    modalContent.innerHTML = `
+        <h2 style="margin: 0 0 1.5rem 0; color: var(--txt-color);">Add External ${typeLabel}</h2>
+
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; color: var(--txt-color);">
+                    URL <span style="color: var(--red);">*</span>
+                </label>
+                <input type="text" id="externalAssetUrl"
+                    placeholder="https://example.com/asset.${assetType === "images" ? "png" : "ogg"}"
+                    style="width: 100%; padding: 0.5rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--txt-color); border-radius: 4px;">
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; color: var(--txt-color);">
+                    Title <span style="color: var(--red);">*</span>
+                </label>
+                <input type="text" id="externalAssetTitle"
+                    placeholder="${typeLabel} title"
+                    style="width: 100%; padding: 0.5rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--txt-color); border-radius: 4px;">
+            </div>
+
+            ${
+                assetType === "images"
+                    ? `
+            <div>
+                <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--txt-color); cursor: pointer;">
+                    <input type="checkbox" id="externalAssetIsSprite"
+                        onchange="document.getElementById('spriteFormatFields').style.display = this.checked ? 'flex' : 'none';">
+                    Is sprite sheet
+                </label>
+            </div>
+
+            <div id="spriteFormatFields" style="display: none; flex-direction: row; gap: 1rem;">
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--txt-color);">
+                        Columns
+                    </label>
+                    <input type="number" id="externalAssetCols"
+                        placeholder="12" min="1" value="12"
+                        style="width: 100%; padding: 0.5rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--txt-color); border-radius: 4px;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--txt-color);">
+                        Rows
+                    </label>
+                    <input type="number" id="externalAssetRows"
+                        placeholder="8" min="1" value="8"
+                        style="width: 100%; padding: 0.5rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--txt-color); border-radius: 4px;">
+                </div>
+            </div>
+            `
+                    : ""
+            }
+
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+                <button class="tcoaal-button-menu" id="cancelExternalAssetBtn">Cancel</button>
+                <button class="tcoaal-button-menu success" id="addExternalAssetBtn">Add ${typeLabel}</button>
+            </div>
+        </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    const urlInput = document.getElementById("externalAssetUrl");
+    const titleInput = document.getElementById("externalAssetTitle");
+    const isSpriteCheckbox = document.getElementById("externalAssetIsSprite");
+    const colsInput = document.getElementById("externalAssetCols");
+    const rowsInput = document.getElementById("externalAssetRows");
+
+    const closeModal = () => {
+        modal.remove();
+    };
+
+    document.getElementById("cancelExternalAssetBtn").onclick = closeModal;
+
+    document.getElementById("addExternalAssetBtn").onclick = async () => {
+        const url = urlInput.value.trim();
+        const title = titleInput.value.trim();
+
+        if (!url || !title) {
+            alert("Please fill in URL and Title");
+            return;
+        }
+
+        if (assetType === "images") {
+            const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"];
+            const hasImageExt = imageExtensions.some((ext) => url.toLowerCase().includes(ext));
+            if (!hasImageExt) {
+                alert(
+                    "URL does not appear to point to an image file.\nExpected extensions: .png, .jpg, .jpeg, .gif, .webp, .bmp, .svg",
+                );
+                return;
+            }
+        } else if (assetType === "audio") {
+            const audioExtensions = [".mp3", ".ogg", ".wav", ".m4a", ".flac", ".aac"];
+            const hasAudioExt = audioExtensions.some((ext) => url.toLowerCase().includes(ext));
+            if (!hasAudioExt) {
+                alert(
+                    "URL does not appear to point to an audio file.\nExpected extensions: .mp3, .ogg, .wav, .m4a, .flac, .aac",
+                );
+                return;
+            }
+        }
+
+        let isSprite = false;
+        let format = null;
+
+        if (assetType === "images" && isSpriteCheckbox && isSpriteCheckbox.checked) {
+            isSprite = true;
+            const cols = parseInt(colsInput.value) || 12;
+            const rows = parseInt(rowsInput.value) || 8;
+            format = { cols, rows };
+        }
+
+        try {
+            showLoadingIndicator(`Fetching ${typeLabel.toLowerCase()} from URL...`);
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+
+            const id = await window.memoryManager.saveExternalAsset(url, title, assetType, isSprite, format, blob);
+
+            if (!window.gameImporterAssets) {
+                window.gameImporterAssets = { images: {}, audio: {} };
+            }
+            if (!window.gameImporterAssets[assetType]["External"]) {
+                window.gameImporterAssets[assetType]["External"] = {};
+            }
+
+            const blobUrl = URL.createObjectURL(blob);
+            let fileName;
+            if (isSprite && format) {
+                fileName = `spritessheet_${format.cols}x${format.rows}_${title}.png`;
+            } else {
+                fileName = `${title}.${assetType === "images" ? "png" : "ogg"}`;
+            }
+
+            const assetData = {
+                url: blobUrl,
+                blob: blob,
+                name: fileName,
+                originalName: fileName,
+                baseFileName: fileName,
+                isSprite: isSprite,
+                cropped: false,
+                cropping: false,
+                croppedUrl: undefined,
+                croppedBlob: undefined,
+                externalId: id,
+                externalUrl: url,
+                format: format,
+            };
+
+            if (isSprite && format) {
+                assetData.variants = [format];
+            }
+
+            window.gameImporterAssets[assetType]["External"][fileName] = assetData;
+
+            if (assetType === "images" && !isSprite) {
+                window.galleryManager?.enqueueCropImage(assetData, fileName, "External");
+            }
+
+            hideLoadingIndicator();
+            closeModal();
+
+            updateGalleryContent();
+        } catch (error) {
+            hideLoadingIndicator();
+            alert(`Error adding external ${typeLabel.toLowerCase()}: ${error.message}`);
+        }
+    };
+
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+
+    document.addEventListener(
+        "keydown",
+        function escHandler(e) {
+            if (e.key === "Escape") {
+                document.removeEventListener("keydown", escHandler);
+                closeModal();
+            }
+        },
+        { once: true },
+    );
 }
 
 async function cropAllImages() {
