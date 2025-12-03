@@ -25,6 +25,7 @@ class GalleryManager {
         this.currentTab = "images";
         this.lastImageCategory = "Portraits";
         this.lastAudioCategory = "Background songs";
+        this.lastDataCategory = "Data";
         this.audioContext = null;
         this.isLooping = false;
         this.spriteSheetData = null;
@@ -35,12 +36,13 @@ class GalleryManager {
         this.isCropping = false;
         this.willReadFrequently = true;
         this.favouriteStarUrl = null;
+        this.currentSpriteExtractionId = 0;
     }
 
     async extractFavouriteStar() {
         if (this.favouriteStarUrl) return this.favouriteStarUrl;
 
-        const spriteSheetName = "spritessheet_12x8_characters_14.png";
+        const spriteSheetName = "spritessheet_12x8_characters_7.png";
         const spriteIndex = 6;
         const cols = 12;
         const rows = 8;
@@ -177,7 +179,11 @@ class GalleryManager {
 
     previewAsset(name, category, type, variant = null) {
         const assets =
-            type === "images" ? window.gameImporterAssets.images[category] : window.gameImporterAssets.audio[category];
+            type === "images"
+                ? window.gameImporterAssets.images[category]
+                : type === "data"
+                  ? window.gameImporterAssets.data[category]
+                  : window.gameImporterAssets.audio[category];
 
         const asset = assets[name];
         if (!asset) return;
@@ -214,10 +220,12 @@ class GalleryManager {
                 spriteInfo = this.detectSpriteSheetFromName(name);
             }
             if (spriteInfo && asset.isSprite) {
-                this.previewSpriteSheet(asset, name, contentDiv, controlsDiv, spriteInfo);
+                this.previewSpriteSheet(asset, name, category, contentDiv, controlsDiv, spriteInfo);
             } else {
                 this.previewImage(asset, name, contentDiv, controlsDiv);
             }
+        } else if (type === "data") {
+            this.previewData(asset, name, contentDiv, controlsDiv);
         } else {
             this.previewAudio(asset, name, contentDiv, controlsDiv);
         }
@@ -324,9 +332,11 @@ class GalleryManager {
     }
 
     async extractSpritesFromAsset(asset, name, spriteInfo = null) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             const img = new Image();
-            img.onload = () => {
+
+            // Extract sprites (no caching)
+            img.onload = async () => {
                 let cols, rows;
 
                 if (spriteInfo) {
@@ -352,6 +362,7 @@ class GalleryManager {
                 const cellHeight = img.height / rows;
 
                 const extractedSprites = [];
+
                 for (let row = 0; row < rows; row++) {
                     for (let col = 0; col < cols; col++) {
                         const canvas = document.createElement("canvas");
@@ -371,9 +382,10 @@ class GalleryManager {
                             cellHeight,
                         );
 
+                        const spriteIndex = row * cols + col;
                         extractedSprites.push({
                             canvas: canvas,
-                            index: row * cols + col,
+                            index: spriteIndex,
                             row: row,
                             col: col,
                         });
@@ -387,8 +399,11 @@ class GalleryManager {
         });
     }
 
-    async previewSpriteSheet(asset, name, contentDiv, controlsDiv, spriteInfo) {
+    async previewSpriteSheet(asset, name, category, contentDiv, controlsDiv, spriteInfo) {
         this.updateCropButtonInPreviewTitle(false);
+
+        // Generate unique ID for this extraction to handle race conditions
+        const extractionId = ++this.currentSpriteExtractionId;
 
         const img = new Image();
         await new Promise((resolve, reject) => {
@@ -396,6 +411,16 @@ class GalleryManager {
             img.onerror = reject;
             img.src = asset.url;
         });
+
+        // Check if this extraction is still current
+        if (extractionId !== this.currentSpriteExtractionId) {
+            return; // User switched to another sprite sheet, abort
+        }
+
+        // Check if user navigated away from this asset
+        if (!this.currentAsset || this.currentAsset.name !== name || this.currentAsset.category !== category) {
+            return; // User navigated to different asset/category, abort
+        }
 
         let cols, rows;
         if (spriteInfo) {
@@ -408,11 +433,6 @@ class GalleryManager {
 
         const cellWidth = img.width / cols;
         const cellHeight = img.height / rows;
-        const cacheKey = `spritesheet_${name}_${cols}x${rows}`;
-
-        const gridWidth = cols * cellWidth;
-        const gridHeight = rows * cellHeight;
-        const maxWidth = Math.min(gridWidth, window.innerWidth * 0.8);
 
         let headerHtml = "";
         if (asset.variants !== null && asset.variants.length > 0) {
@@ -438,9 +458,8 @@ class GalleryManager {
                 <div style="display: flex; flex-direction: row; align-items: center;">
                     ${headerHtml}
                 </div>
-                <div style="display: flex; justify-content: center; padding: 10px;">
-                    <img src="${asset.url}" alt="${name}"
-                         style="max-width: ${maxWidth}px; image-rendering: pixelated; display: block;">
+                <div style="display: flex; justify-content: center; align-items: center; padding: 60px;">
+                    <div class="spinner" style="border: 4px solid rgba(255, 255, 255, 0.3); border-top: 4px solid #fff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
                 </div>
             </div>`;
         controlsDiv.innerHTML = "";
@@ -456,101 +475,69 @@ class GalleryManager {
             }
         }
 
-        let cachedSprites = null;
-        if (window.memoryManager) {
-            try {
-                cachedSprites = await window.memoryManager.getCachedSprites(cacheKey);
-            } catch (e) {
-                // Cache miss, will extract
+        // Extract sprites (no caching)
+        this.extractedSprites = [];
+
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const canvas = document.createElement("canvas");
+                canvas.width = cellWidth;
+                canvas.height = cellHeight;
+                const ctx = canvas.getContext("2d", { alpha: true });
+
+                ctx.drawImage(
+                    img,
+                    col * cellWidth,
+                    row * cellHeight,
+                    cellWidth,
+                    cellHeight,
+                    0,
+                    0,
+                    cellWidth,
+                    cellHeight,
+                );
+
+                const imageData = ctx.getImageData(0, 0, cellWidth, cellHeight);
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    if (data[i + 3] === 0) {
+                        data[i] = 0;
+                        data[i + 1] = 0;
+                        data[i + 2] = 0;
+                    }
+                }
+                ctx.putImageData(imageData, 0, 0);
+
+                const spriteIndex = row * cols + col;
+                this.extractedSprites.push({
+                    canvas: canvas,
+                    index: spriteIndex,
+                    row: row,
+                    col: col,
+                });
+
+                // Yield every 10 sprites
+                if (this.extractedSprites.length % 10 === 0) {
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+                    // Check if this extraction is still current after yielding
+                    if (extractionId !== this.currentSpriteExtractionId) {
+                        return; // User switched to another sprite sheet, abort
+                    }
+                    // Check if user navigated away
+                    if (!this.currentAsset || this.currentAsset.name !== name || this.currentAsset.category !== category) {
+                        return; // User navigated away, abort
+                    }
+                }
             }
         }
 
-        if (cachedSprites) {
-            this.extractedSprites = await Promise.all(
-                cachedSprites.map(async (spriteData, index) => {
-                    const canvas = document.createElement("canvas");
-                    canvas.width = cellWidth;
-                    canvas.height = cellHeight;
-                    const ctx = canvas.getContext("2d", { alpha: true });
-
-                    const spriteImg = new Image();
-                    await new Promise((resolve) => {
-                        spriteImg.onload = resolve;
-                        spriteImg.src = spriteData.dataUrl;
-                    });
-                    ctx.drawImage(spriteImg, 0, 0);
-
-                    return {
-                        canvas: canvas,
-                        index: spriteData.index,
-                        row: spriteData.row,
-                        col: spriteData.col,
-                    };
-                }),
-            );
-        } else {
-            this.extractedSprites = [];
-            const spritesToCache = [];
-
-            for (let row = 0; row < rows; row++) {
-                for (let col = 0; col < cols; col++) {
-                    const canvas = document.createElement("canvas");
-                    canvas.width = cellWidth;
-                    canvas.height = cellHeight;
-                    const ctx = canvas.getContext("2d", { alpha: true });
-
-                    ctx.drawImage(
-                        img,
-                        col * cellWidth,
-                        row * cellHeight,
-                        cellWidth,
-                        cellHeight,
-                        0,
-                        0,
-                        cellWidth,
-                        cellHeight,
-                    );
-
-                    const imageData = ctx.getImageData(0, 0, cellWidth, cellHeight);
-                    const data = imageData.data;
-                    for (let i = 0; i < data.length; i += 4) {
-                        if (data[i + 3] === 0) {
-                            data[i] = 0;
-                            data[i + 1] = 0;
-                            data[i + 2] = 0;
-                        }
-                    }
-                    ctx.putImageData(imageData, 0, 0);
-
-                    const spriteIndex = row * cols + col;
-                    this.extractedSprites.push({
-                        canvas: canvas,
-                        index: spriteIndex,
-                        row: row,
-                        col: col,
-                    });
-
-                    spritesToCache.push({
-                        dataUrl: canvas.toDataURL("image/png"),
-                        index: spriteIndex,
-                        row: row,
-                        col: col,
-                    });
-
-                    // Yield every 10 sprites
-                    if (this.extractedSprites.length % 10 === 0) {
-                        await new Promise((resolve) => setTimeout(resolve, 0));
-                    }
-                }
-            }
-
-            if (window.memoryManager) {
-                try {
-                    await window.memoryManager.cacheSprites(cacheKey, spritesToCache);
-                } catch (e) {
-                    console.warn("Failed to cache sprites:", e);
-                }
-            }
+        // Final check before updating UI
+        if (extractionId !== this.currentSpriteExtractionId) {
+            return; // User switched to another sprite sheet, abort
+        }
+        // Check if user navigated away
+        if (!this.currentAsset || this.currentAsset.name !== name || this.currentAsset.category !== category) {
+            return; // User navigated away, abort
         }
 
         if (asset.variants !== null && asset.variants.length > 0) {
@@ -782,13 +769,11 @@ class GalleryManager {
                     <span id="pitchValue" style="font-size: 12px; font-weight: bold; min-width: 80px; text-align: right;">Pitch: +0.0</span>
                 </div>
 
-            
+
             </div>
             </div>
             <div class="audio-player-progress">
-            <div class="audio-progress-bar" onclick="galleryManager.seekAudio(event)">
-            <div class="audio-progress-fill" id="audioProgressFill" style="width: 0%;"></div>
-            </div>
+            <canvas id="audioWaveformCanvas" width="800" height="60" style="width: 100%; height: 50px; cursor: pointer; background: rgba(0,0,0,0.3); border-radius: 4px;"></canvas>
             <div class="audio-player-time">
             <span id="audioCurrentTime">0:00</span>
             <span id="audioDuration">0:00</span>
@@ -796,12 +781,40 @@ class GalleryManager {
             </div>
             </div>`;
 
-        const progressFill = document.getElementById("audioProgressFill");
         const curTimeEl = document.getElementById("audioCurrentTime");
         const durEl = document.getElementById("audioDuration");
-        if (progressFill) progressFill.style.width = "0%";
         if (curTimeEl) curTimeEl.textContent = "0:00";
         if (durEl) durEl.textContent = "0:00";
+
+        const waveformCanvas = document.getElementById("audioWaveformCanvas");
+        this.currentWaveformCanvas = waveformCanvas;
+
+        let isDragging = false;
+        const handleSeek = (e) => {
+            if (!this.currentAudio) return;
+            const rect = waveformCanvas.getBoundingClientRect();
+            const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            this.currentAudio.currentTime = percent * this.currentAudio.duration;
+        };
+
+        waveformCanvas.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            handleSeek(e);
+        });
+
+        waveformCanvas.addEventListener("mousemove", (e) => {
+            if (isDragging) {
+                handleSeek(e);
+            }
+        });
+
+        waveformCanvas.addEventListener("mouseup", () => {
+            isDragging = false;
+        });
+
+        waveformCanvas.addEventListener("mouseleave", () => {
+            isDragging = false;
+        });
 
         const title = this.formatAssetTitle(name, "audio");
         const subtitle = asset.externalUrl ? asset.externalUrl : asset.baseFileName;
@@ -832,12 +845,13 @@ class GalleryManager {
         this._onLoadedMeta = () => {
             if (sessionId !== this._audioSessionId) return;
             if (durEl) durEl.textContent = this.formatTime(audio.duration);
+            this.generateWaveform(asset.url, waveformCanvas);
         };
         this._onTimeUpdate = () => {
             if (sessionId !== this._audioSessionId) return;
             const pct = audio.duration && isFinite(audio.duration) ? (audio.currentTime / audio.duration) * 100 : 0;
-            if (progressFill) progressFill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
             if (curTimeEl) curTimeEl.textContent = this.formatTime(audio.currentTime);
+            this.updateWaveformProgress(waveformCanvas, pct);
         };
         this._onEnded = () => {
             if (sessionId !== this._audioSessionId) return;
@@ -869,6 +883,317 @@ class GalleryManager {
         }
     }
 
+    renderInteractiveJson(data, depth = 0, startCollapsed = false) {
+        const maxDepth = 20;
+        const largeArrayThreshold = 50;
+
+        if (depth > maxDepth) {
+            return '<span class="json-ellipsis">...</span>';
+        }
+
+        const bgIndex = depth % 3;
+        const indent = "  ".repeat(depth);
+        const shouldCollapse = startCollapsed && depth > 0;
+
+        if (data === null) {
+            return '<span class="json-null">null</span>';
+        }
+        if (typeof data === "boolean") {
+            return `<span class="json-boolean">${data}</span>`;
+        }
+        if (typeof data === "number") {
+            return `<span class="json-number">${data}</span>`;
+        }
+        if (typeof data === "string") {
+            return `<span class="json-string">"${this.escapeHtml(data)}"</span>`;
+        }
+
+        if (Array.isArray(data)) {
+            if (data.length === 0) {
+                return '<span class="json-bracket">[]</span>';
+            }
+
+            const isLargeNumericArray =
+                data.length > largeArrayThreshold &&
+                data.every((item) => typeof item === "number" || typeof item === "string");
+
+            const collapseId = "collapse-" + Math.random().toString(36).substr(2, 9);
+            const arrayClass = isLargeNumericArray ? "json-array-large" : "json-array";
+
+            const initiallyCollapsed = shouldCollapse || isLargeNumericArray;
+            const btnIcon = initiallyCollapsed ? "▶" : "▼";
+            const contentDisplay = initiallyCollapsed ? 'style="display:none;"' : "";
+
+            let html = `<span class="json-collapsible ${arrayClass}" data-depth="${depth}" data-bg="${bgIndex}">`;
+            html += `<span class="json-collapse-btn" onclick="galleryManager.toggleJsonCollapse('${collapseId}')">${btnIcon}</span>`;
+            html += `<span class="json-bracket">[</span>`;
+
+            if (isLargeNumericArray) {
+                html += `<span class="json-array-collapsed" id="${collapseId}-collapsed" onclick="galleryManager.toggleJsonCollapse('${collapseId}')" ${initiallyCollapsed ? "" : 'style="display:none;"'}>${data.length} items...</span>`;
+                html += `<span class="json-array-expanded" id="${collapseId}" ${contentDisplay}>`;
+            } else {
+                html += `<span class="json-content" id="${collapseId}" ${contentDisplay}>`;
+            }
+
+            data.forEach((item, index) => {
+                html += "\n" + indent + "  ";
+                html += this.renderInteractiveJson(item, depth + 1, startCollapsed);
+                if (index < data.length - 1) html += '<span class="json-comma">,</span>';
+            });
+
+            html += "\n" + indent + "</span>";
+            html += `<span class="json-bracket">]</span>`;
+            html += "</span>";
+
+            return html;
+        }
+
+        if (typeof data === "object") {
+            const entries = Object.entries(data);
+            if (entries.length === 0) {
+                return '<span class="json-bracket">{}</span>';
+            }
+
+            const collapseId = "collapse-" + Math.random().toString(36).substr(2, 9);
+            const btnIcon = shouldCollapse ? "▶" : "▼";
+            const contentDisplay = shouldCollapse ? 'style="display:none;"' : "";
+
+            let html = `<span class="json-collapsible json-object" data-depth="${depth}" data-bg="${bgIndex}">`;
+            html += `<span class="json-collapse-btn" onclick="galleryManager.toggleJsonCollapse('${collapseId}')">${btnIcon}</span>`;
+            html += `<span class="json-bracket">{</span>`;
+            html += `<span class="json-content" id="${collapseId}" ${contentDisplay}>`;
+
+            entries.forEach(([key, value], index) => {
+                html += "\n" + indent + "  ";
+                html += `<span class="json-key">"${this.escapeHtml(key)}"</span>: `;
+                html += this.renderInteractiveJson(value, depth + 1, startCollapsed);
+                if (index < entries.length - 1) html += '<span class="json-comma">,</span>';
+            });
+
+            html += "\n" + indent + "</span>";
+            html += `<span class="json-bracket">}</span>`;
+            html += "</span>";
+
+            return html;
+        }
+
+        return String(data);
+    }
+
+    toggleJsonCollapse(collapseId) {
+        const content = document.getElementById(collapseId);
+        const collapsed = document.getElementById(collapseId + "-collapsed");
+        const btn = content?.parentElement.querySelector(".json-collapse-btn");
+
+        if (!content) return;
+
+        const isHidden = content.style.display === "none";
+        content.style.display = isHidden ? "" : "none";
+        if (btn) btn.textContent = isHidden ? "▼" : "▶";
+        if (collapsed) collapsed.style.display = isHidden ? "none" : "";
+    }
+
+    toggleLineMarker(lineNum) {
+        const lineElem = document.querySelector(`.json-line-num[data-line="${lineNum}"]`);
+        if (!lineElem) return;
+
+        if (lineElem.classList.contains("marked")) {
+            lineElem.classList.remove("marked");
+        } else {
+            lineElem.classList.add("marked");
+        }
+    }
+
+    async previewData(asset, name, contentDiv, controlsDiv) {
+        this.updateCropButtonInPreviewTitle(false);
+
+        contentDiv.innerHTML = `
+            <div class="json-preview-container">
+                <div class="json-preview-loading">
+                    <div class="loading-spinner"></div>
+                    <div>Loading JSON...</div>
+                </div>
+            </div>
+        `;
+
+        const category = this.currentAsset?.category || "Data";
+        const title = this.formatAssetTitle(name, category, "data");
+        const subtitle = asset.baseFileName;
+        const isMaps = category === "Maps";
+
+        if (isMaps) {
+            controlsDiv.innerHTML = "";
+        } else {
+            controlsDiv.innerHTML = `
+                <div class="asset-filename-title">${title}<div class="asset-filename-subtitle">${subtitle}</div></div>
+                <div class="preview-control-group-add-editor">
+                    <div class="split-button disabled" id="dataOpenEditorChoiceButton">
+                        <button class="btn main" disabled></button>
+                        <button class="btn arrow" disabled>▼</button>
+                        <div class="menu"></div>
+                    </div>
+                </div>`;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        try {
+            const jsonData = JSON.parse(asset.jsonText || "{}");
+
+            const toolbarInfo = isMaps
+                ? `<span class="json-info"><strong>${title}</strong><br/><span style="font-size: 0.85em; opacity: 0.8;">${subtitle}</span></span>`
+                : `<span class="json-info">${asset.isValid ? "Valid JSON" : "Invalid JSON"}</span>`;
+
+            contentDiv.innerHTML = `
+                <div class="json-preview-container">
+                    <div class="json-preview-toolbar">
+                        ${toolbarInfo}
+                        <div class="json-toolbar-buttons">
+                            <button class="json-tool-btn" onclick="galleryManager.togglePreviewExpand()" title="Expand preview">⛶</button>
+                        </div>
+                    </div>
+                    <div class="json-viewer-wrapper" id="jsonViewerWrapper"></div>
+                </div>
+            `;
+
+            const viewerWrapper = contentDiv.querySelector("#jsonViewerWrapper");
+            const jsonViewer = document.createElement("andypf-json-viewer");
+
+            jsonViewer.data = jsonData;
+            jsonViewer.setAttribute("indent", "4");
+            jsonViewer.setAttribute("expanded", "1");
+            jsonViewer.setAttribute("theme", "tcoaal-dark");
+            jsonViewer.setAttribute("show-data-types", "false");
+            jsonViewer.setAttribute("show-toolbar", "true");
+            jsonViewer.setAttribute("expand-icon-type", "arrow");
+            jsonViewer.setAttribute("show-copy", "true");
+            jsonViewer.setAttribute("show-size", "false");
+
+            viewerWrapper.appendChild(jsonViewer);
+        } catch (error) {
+            console.error("Failed to render JSON:", error);
+            contentDiv.innerHTML = `
+                <div class="json-preview-container">
+                    <div class="json-error">Error rendering JSON: ${error.message}</div>
+                    <pre>${this.escapeHtml(asset.jsonText || "{}")}</pre>
+                </div>
+            `;
+        }
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    copyJsonToClipboard() {
+        if (this.currentAsset && this.currentAsset.type === "data") {
+            const jsonText = this.currentAsset.asset.jsonText;
+            navigator.clipboard
+                .writeText(jsonText)
+                .then(() => {
+                    console.log("JSON copied to clipboard");
+                })
+                .catch((err) => {
+                    console.error("Failed to copy JSON:", err);
+                });
+        }
+    }
+
+    filterJsonLines() {
+        const searchInput = document.getElementById("jsonSearchInput");
+        if (!searchInput) return;
+
+        const searchTerm = searchInput.value.toLowerCase();
+        const codeElement = document.querySelector(".json-code-wrapper code");
+        if (!codeElement) return;
+
+        if (!searchTerm) {
+            if (this.currentAsset && this.currentAsset.type === "data") {
+                const jsonCode = this.currentAsset.asset.jsonText || "{}";
+                const highlightedCode =
+                    typeof Prism !== "undefined"
+                        ? Prism.highlight(jsonCode, Prism.languages.javascript, "javascript")
+                        : this.escapeHtml(jsonCode);
+                codeElement.innerHTML = highlightedCode;
+            }
+            return;
+        }
+
+        const originalText = this.currentAsset.asset.jsonText || "{}";
+        const highlightedCode =
+            typeof Prism !== "undefined"
+                ? Prism.highlight(originalText, Prism.languages.javascript, "javascript")
+                : this.escapeHtml(originalText);
+
+        const searchRegex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+        const highlighted = highlightedCode.replace(
+            searchRegex,
+            '<mark style="background-color: yellow; color: black;">$1</mark>',
+        );
+
+        codeElement.innerHTML = highlighted;
+    }
+
+    collapseAllJsonBlocks() {
+        console.log("Collapse all JSON blocks - not implemented yet");
+    }
+
+    expandAllJsonBlocks() {
+        console.log("Expand all JSON blocks - not implemented yet");
+    }
+
+    searchInJson() {
+        const searchBox = document.getElementById("jsonSearchBox");
+        if (searchBox) {
+            searchBox.style.display = "flex";
+            document.getElementById("jsonSearchInput")?.focus();
+        }
+    }
+
+    closeJsonSearch() {
+        const searchBox = document.getElementById("jsonSearchBox");
+        if (searchBox) {
+            searchBox.style.display = "none";
+        }
+    }
+
+    togglePreviewExpand() {
+        const previewPanel = document.getElementById("galleryPreviewPanel");
+        if (!previewPanel) return;
+
+        const isExpanded = previewPanel.classList.contains("expanded");
+
+        const galleryMainContainer = document.querySelector(".gallery-main-container");
+        const galleryEmbeddedContainer = document.querySelector(".gallery-embedded-container");
+        const sectionContent = document.querySelector(".section-content.gallery-flex");
+
+        if (isExpanded) {
+            previewPanel.classList.remove("expanded");
+            if (galleryMainContainer) galleryMainContainer.classList.remove("preview-expanded");
+            if (galleryEmbeddedContainer) galleryEmbeddedContainer.classList.remove("preview-expanded");
+            if (sectionContent) sectionContent.classList.remove("preview-expanded");
+
+            const expandBtn = document.querySelector('.json-tool-btn[title="Collapse preview"]');
+            if (expandBtn) {
+                expandBtn.textContent = "⛶";
+                expandBtn.title = "Expand preview";
+            }
+        } else {
+            previewPanel.classList.add("expanded");
+            if (galleryMainContainer) galleryMainContainer.classList.add("preview-expanded");
+            if (galleryEmbeddedContainer) galleryEmbeddedContainer.classList.add("preview-expanded");
+            if (sectionContent) sectionContent.classList.add("preview-expanded");
+
+            const expandBtn = document.querySelector('.json-tool-btn[title="Expand preview"]');
+            if (expandBtn) {
+                expandBtn.textContent = "⛶";
+                expandBtn.title = "Collapse preview";
+            }
+        }
+    }
+
     formatAssetTitle(rawName, category = null, type = null) {
         const withExt = rawName;
         const base = rawName.replace(/\.[^/.]+$/, "");
@@ -881,6 +1206,13 @@ class GalleryManager {
             const rest = parts.slice(1).map((w) => w.toLowerCase());
             return [first, ...rest].join(" ");
         };
+
+        if (type === "data" || category === "Data") {
+            const mData = lower.match(/^data_(\d+)$/);
+            if (mData) {
+                return `Data #${mData[1]}`;
+            }
+        }
 
         {
             const m = lower.match(/^spritessheet_(\d+)x(\d+)_([^_]+)_(\d+)$/);
@@ -1153,6 +1485,143 @@ class GalleryManager {
         this.currentAudio.currentTime = percent * this.currentAudio.duration;
     }
 
+    seekAudioFromWaveform(event) {
+        if (!this.currentAudio) return;
+
+        const canvas = event.currentTarget;
+        const rect = canvas.getBoundingClientRect();
+        const percent = (event.clientX - rect.left) / rect.width;
+
+        this.currentAudio.currentTime = percent * this.currentAudio.duration;
+    }
+
+    async generateWaveform(audioUrl, canvas) {
+        if (!canvas) return;
+
+        try {
+            const response = await fetch(audioUrl);
+            const arrayBuffer = await response.arrayBuffer();
+
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            const rawData = audioBuffer.getChannelData(0);
+            const samples = 800;
+            const blockSize = Math.floor(rawData.length / samples);
+            const filteredData = [];
+
+            for (let i = 0; i < samples; i++) {
+                const blockStart = blockSize * i;
+                let sum = 0;
+                for (let j = 0; j < blockSize; j++) {
+                    sum += Math.abs(rawData[blockStart + j]);
+                }
+                filteredData.push(sum / blockSize);
+            }
+
+            const maxVal = Math.max(...filteredData);
+            const normalizedData = filteredData.map((n) => n / maxVal);
+
+            this.currentWaveformData = normalizedData;
+            this.drawWaveform(canvas, normalizedData, 0);
+
+            await audioContext.close();
+        } catch (error) {
+            console.error("Error generating waveform:", error);
+        }
+    }
+
+    drawWaveform(canvas, data, progress = 0) {
+        if (!canvas || !data) return;
+
+        const ctx = canvas.getContext("2d");
+        const width = canvas.width;
+        const height = canvas.height;
+        const middle = height / 2;
+
+        ctx.clearRect(0, 0, width, height);
+
+        const progressX = width * (progress / 100);
+        const step = width / data.length;
+
+        if (progress > 0) {
+            ctx.fillStyle = "#ec83c3";
+            ctx.beginPath();
+            ctx.moveTo(0, middle);
+
+            for (let i = 0; i < data.length; i++) {
+                const x = i * step;
+                if (x > progressX) break;
+                const amplitude = data[i] * (height * 0.4);
+                ctx.lineTo(x, middle - amplitude);
+            }
+
+            for (let i = Math.floor(progressX / step); i >= 0; i--) {
+                const x = i * step;
+                const amplitude = data[i] * (height * 0.4);
+                ctx.lineTo(x, middle + amplitude);
+            }
+
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        if (progress < 100) {
+            ctx.fillStyle = "#596891";
+            ctx.beginPath();
+            const startIdx = Math.floor(progressX / step);
+            ctx.moveTo(progressX, middle);
+
+            for (let i = startIdx; i < data.length; i++) {
+                const x = i * step;
+                const amplitude = data[i] * (height * 0.4);
+                ctx.lineTo(x, middle - amplitude);
+            }
+
+            for (let i = data.length - 1; i >= startIdx; i--) {
+                const x = i * step;
+                const amplitude = data[i] * (height * 0.4);
+                ctx.lineTo(x, middle + amplitude);
+            }
+
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, middle);
+
+        for (let i = 0; i < data.length; i++) {
+            const x = i * step;
+            const amplitude = data[i] * (height * 0.4);
+            ctx.lineTo(x, middle - amplitude);
+        }
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, middle);
+        for (let i = 0; i < data.length; i++) {
+            const x = i * step;
+            const amplitude = data[i] * (height * 0.4);
+            ctx.lineTo(x, middle + amplitude);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(progressX, 0);
+        ctx.lineTo(progressX, height);
+        ctx.stroke();
+    }
+
+    updateWaveformProgress(canvas, progressPercent) {
+        if (!canvas || !this.currentWaveformData) return;
+        this.drawWaveform(canvas, this.currentWaveformData, progressPercent);
+    }
+
     formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
@@ -1173,6 +1642,18 @@ class GalleryManager {
         this.selectedSprites = [];
         this.extractedSprites = [];
         this.spriteSheetData = null;
+
+        const previewPanel = document.getElementById("galleryPreviewPanel");
+        if (previewPanel) {
+            previewPanel.classList.remove("expanded");
+        }
+
+        const galleryMainContainer = document.querySelector(".gallery-main-container");
+        const galleryEmbeddedContainer = document.querySelector(".gallery-embedded-container");
+        const sectionContent = document.querySelector(".section-content.gallery-flex");
+        if (galleryMainContainer) galleryMainContainer.classList.remove("preview-expanded");
+        if (galleryEmbeddedContainer) galleryEmbeddedContainer.classList.remove("preview-expanded");
+        if (sectionContent) sectionContent.classList.remove("preview-expanded");
 
         document.getElementById("previewPanelContent").innerHTML =
             '<div class="preview-placeholder">Select an item to preview</div>';
@@ -1215,7 +1696,10 @@ class GalleryManager {
     }
     selectFirstElement() {
         const items = Array.from(document.querySelectorAll(".gallery-item")).filter(
-            (el) => el.style.display !== "none" && !el.classList.contains("external-add-btn"),
+            (el) =>
+                el.style.display !== "none" &&
+                !el.classList.contains("external-add-btn") &&
+                !el.classList.contains("external-add-btn-audio"),
         );
 
         if (items.length === 0) return;
@@ -1436,7 +1920,17 @@ class GalleryManager {
                                                 kfName,
                                                 kfDesc.spriteVariant,
                                             );
-                                            kfSpriteCanvases = extractedSprites.map((s) => s.canvas);
+                                            // Extract all sprites from the sheet
+                                            const allCanvases = extractedSprites.map((s) => s.canvas);
+
+                                            if (kfDesc.spriteIndices && Array.isArray(kfDesc.spriteIndices)) {
+                                                // Map the selected sprite canvases only
+                                                kfSpriteCanvases = kfDesc.spriteIndices
+                                                    .map((idx) => allCanvases[idx])
+                                                    .filter((c) => c);
+                                            } else {
+                                                kfSpriteCanvases = allCanvases;
+                                            }
                                         } catch (error) {
                                             console.error(
                                                 `Failed to extract sprites for keyframe at time ${kfDesc.time}ms:`,
@@ -1458,6 +1952,9 @@ class GalleryManager {
                             }
                         }
 
+                        // Preserve original sprite indices for display purposes (spriteCanvases is indexed 0,1,2...)
+                        const preservedSpriteIndices = kfDesc.spriteIndices || null;
+
                         reconstructedKeyframes.push({
                             id: window.compositionEditor.generateId(),
                             time: kfDesc.time,
@@ -1470,7 +1967,7 @@ class GalleryManager {
                             image: kfImage,
                             imageLoaded: kfImageLoaded,
                             type: kfDesc.type || layerDesc.type,
-                            spriteIndices: kfDesc.spriteIndices || null,
+                            spriteIndices: preservedSpriteIndices,
                             isAnimated: kfDesc.isAnimated || null,
                             animationSpeed: kfDesc.animationSpeed || null,
                             spriteCanvases: kfSpriteCanvases,
@@ -1605,9 +2102,22 @@ class GalleryManager {
                                 layerDesc.spriteVariant,
                             );
                             assetData.isAnimated = layerDesc.isAnimated;
-                            assetData.spriteIndices = layerDesc.spriteIndices;
                             assetData.animationSpeed = layerDesc.animationSpeed;
-                            assetData.spriteCanvases = extractedSprites.map((s) => s.canvas);
+
+                            // Extract all sprites from the sheet
+                            const allCanvases = extractedSprites.map((s) => s.canvas);
+
+                            if (layerDesc.spriteIndices && Array.isArray(layerDesc.spriteIndices)) {
+                                // Map the selected sprite canvases (spriteCanvases array is indexed 0,1,2...)
+                                assetData.spriteCanvases = layerDesc.spriteIndices
+                                    .map((idx) => allCanvases[idx])
+                                    .filter((c) => c);
+                                // Preserve original sprite indices for display purposes
+                                assetData.spriteIndices = layerDesc.spriteIndices;
+                            } else {
+                                assetData.spriteCanvases = allCanvases;
+                                assetData.spriteIndices = allCanvases.map((_, i) => i);
+                            }
                             assetData.spriteVariant = layerDesc.spriteVariant;
                         } catch (error) {
                             console.error(`Failed to extract sprites for ${srcName}:`, error);

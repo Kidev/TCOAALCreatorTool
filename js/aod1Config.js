@@ -43,7 +43,7 @@ function getEpisode1Config() {
     const GAME_ASSETS = {
         player_sprite: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_10.png",
+            sheet: "spritessheet_12x8_characters_16.png",
             indices: [0, 1, 2],
             speed: 250,
         },
@@ -61,18 +61,18 @@ function getEpisode1Config() {
         },
         background: {
             category: "Backgrounds",
-            image: "backgrounds_178.png",
+            image: "backgrounds_164.png",
         },
         sound_effects: {
             PLAYER_MOVE: null,
-            EAT_SOUL: "se_23.ogg",
-            EAT_GRIME_SOUL: "se_3.ogg",
-            TAR_SOUL_SPAWN: "se_57.ogg",
-            ANDY_SPAWNED: "se_18.ogg",
-            GAME_OVER: "se_50.ogg",
-            WIN: "se_17.ogg",
-            SPAWN_ANIM: "se_15.ogg",
-            POCKET_DUST: "se_35.ogg",
+            EAT_SOUL: "se_1.ogg",
+            EAT_GRIME_SOUL: "se_8.ogg",
+            TAR_SOUL_SPAWN: "se_16.ogg",
+            ANDY_SPAWNED: "se_25.ogg",
+            GAME_OVER: "se_63.ogg",
+            WIN: "se_32.ogg",
+            SPAWN_ANIM: "se_18.ogg",
+            POCKET_DUST: "se_10.ogg",
         },
         music: {
             NORMAL: "hallucination_connect.ogg",
@@ -169,21 +169,21 @@ function getEpisode1Config() {
     const GAME_EVENTS_ASSETS = {
         NUMBERS: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_9.png",
+            sheet: "spritessheet_12x8_characters_5.png",
             index: [73, 36, 37, 38, 48, 49, 50, 60, 61, 62],
             speed: 0, // Will use NUMBER_DISPLAY_DURATION from config
             sound: null,
         },
         LIMIT_PLAYER: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_14.png",
+            sheet: "spritessheet_12x8_characters_7.png",
             index: [86],
             speed: 0,
             sound: null,
         },
         SPAWN_ANIM: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_7.png",
+            sheet: "spritessheet_12x8_characters_4.png",
             index: [57, 58, 59],
             speed: 250,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
@@ -207,7 +207,7 @@ function getEpisode1Config() {
         },
         FOLLOWER_ANIM: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_17.png",
+            sheet: "spritessheet_12x8_characters_3.png",
             index: [23, 21, 22, 11, 10, 9, 10, 11, 22, 21, 23],
             speed: 25,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
@@ -231,7 +231,7 @@ function getEpisode1Config() {
         },
         DEAD_HUSSY: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_7.png",
+            sheet: "spritessheet_12x8_characters_4.png",
             index: [49],
             speed: 0,
             spriteScale: 1, // Graves excluded from scaling
@@ -267,7 +267,7 @@ function getEpisode1Config() {
             // Andy
             type: 0,
             category: "Game sprites",
-            spritesheet: "spritessheet_12x8_characters_1.png",
+            spritesheet: "spritessheet_12x8_characters_9.png",
             speed: 200,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
             frames: {
@@ -281,7 +281,7 @@ function getEpisode1Config() {
             // Soul
             type: 1,
             category: "Game sprites",
-            spritesheet: "spritessheet_12x8_characters_11.png",
+            spritesheet: "spritessheet_12x8_characters_14.png",
             speed: 400,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
             frames: {
@@ -295,7 +295,7 @@ function getEpisode1Config() {
             // Grime Soul
             type: 2,
             category: "Game sprites",
-            spritesheet: "spritessheet_12x8_characters_11.png",
+            spritesheet: "spritessheet_12x8_characters_14.png",
             speed: 350,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
             frames: {
@@ -309,7 +309,7 @@ function getEpisode1Config() {
             // Tar Soul
             type: 3,
             category: "Game sprites",
-            spritesheet: "spritessheet_12x8_characters_17.png",
+            spritesheet: "spritessheet_12x8_characters_3.png",
             speed: 800,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
             frames: {
@@ -323,7 +323,7 @@ function getEpisode1Config() {
             // Nina
             type: 4,
             category: "Game sprites",
-            spritesheet: "spritessheet_12x8_characters_1.png",
+            spritesheet: "spritessheet_12x8_characters_9.png",
             speeds: [400, 800],
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
             frames: {

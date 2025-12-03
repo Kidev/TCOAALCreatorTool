@@ -353,7 +353,7 @@ async function importExternalAssetsFromScenes(scenes) {
             const id = await window.memoryManager.saveExternalAsset(url, title, type, false, null, blob);
 
             if (!window.gameImporterAssets) {
-                window.gameImporterAssets = { images: {}, audio: {} };
+                window.gameImporterAssets = { images: {}, audio: {}, data: {} };
             }
             if (!window.gameImporterAssets[type]["External"]) {
                 window.gameImporterAssets[type]["External"] = {};
@@ -720,8 +720,8 @@ const KEY_MAP = {
     "soundSpeed": "!",
     "censorSpeaker": "v",
     "demonSpeaker": "w",
-    "bustLeft": "x",
-    "bustRight": "y",
+    "bustLeft": "~",
+    "bustRight": "^",
     "loopBackgroundGif": "&",
     "centerDialog": "*",
     "hideDialogBox": "(",
@@ -913,7 +913,7 @@ function encodeCodeToURL(codeString) {
             .replaceAll("function setupScene()", "")
             .replaceAll("await ", "await_")
             .replaceAll("\\n", "")
-            .replaceAll("\\", "")
+            //.replaceAll("\\", "")
             .replaceAll("\n", "");
         compressed = removeSpacesOutsideQuotes(compressed);
 
@@ -1927,6 +1927,7 @@ function setupGalleryOnlyMode() {
                                 <div class="gallery-tabs">
                                     <button class="gallery-tab active" onclick="switchGalleryTab('images')">Images</button>
                                     <button class="gallery-tab" onclick="switchGalleryTab('audio')">Audio</button>
+                                    <button class="gallery-tab" onclick="switchGalleryTab('data')">Data</button>
                                 </div>
                                 <div class="gallery-categories" id="galleryCategories"></div>
                                 <div class="gallery-content gallery-content-embedded" id="galleryContent"></div>
@@ -2161,6 +2162,14 @@ function setupGalleryOnlyMode() {
 
     initGalleryScrollHandler();
     updateStickyPositions();
+
+    menuLoaded();
+}
+
+function menuLoaded() {
+    setTimeout(() => {
+        document.getElementById("editorOverlay").classList.remove("importing");
+    }, 100);
 }
 
 function updateLoadingBar(percent = -1, nameFile = undefined) {
@@ -2467,6 +2476,20 @@ async function checkAssetsAndShowForcedImport() {
 
             const overlay = document.getElementById("forcedImportOverlay");
             if (overlay) {
+                // Add version mismatch warning if applicable
+                if (window.memoryManager.versionMismatch) {
+                    const warningDiv = document.createElement("div");
+                    warningDiv.id = "versionMismatchWarning";
+                    warningDiv.style.cssText =
+                        "background: #ff6b6b; color: white; padding: 1.5vmax; border-radius: 8px; margin-bottom: 2vmax; text-align: center; font-size: 1.5vmax; max-width: 600px;";
+                    warningDiv.innerHTML =
+                        "<strong>⚠ Database Version Mismatch</strong><br><br>The stored database version is incompatible with this version of the tool.<br>Importing game assets will clear and recreate the database.";
+
+                    const content = overlay.querySelector(".forced-import-content");
+                    const button = content.querySelector("button");
+                    content.insertBefore(warningDiv, button);
+                }
+
                 overlay.style.display = "flex";
                 updateStickyPositions();
             }
@@ -2507,6 +2530,49 @@ function handleForcedImport() {
             if (text) text.textContent = "Processing game files...";
         }
 
+        // Clear database if there's a version mismatch
+        if (window.memoryManager.versionMismatch) {
+            if (text) text.textContent = "Clearing old database...";
+            try {
+                // Close existing connection if any
+                if (window.memoryManager.db) {
+                    window.memoryManager.db.close();
+                    window.memoryManager.db = null;
+                    window.memoryManager.isReady = false;
+                }
+
+                // Delete the database
+                await new Promise((resolve, reject) => {
+                    const request = indexedDB.deleteDatabase(window.memoryManager.dbName);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                    request.onblocked = () => {
+                        console.warn("Database deletion blocked - continuing anyway");
+                        resolve();
+                    };
+                });
+
+                // Reinitialize the database
+                window.memoryManager.versionMismatch = false;
+                window.memoryManager.initPromise = window.memoryManager.initDB();
+                await window.memoryManager.initPromise;
+
+                console.log("Database cleared and reinitialized successfully");
+            } catch (error) {
+                console.error("Error clearing database:", error);
+                if (progressModal) {
+                    progressModal.style.display = "none";
+                }
+                if (overlay) {
+                    overlay.style.display = "flex";
+                }
+                alert("Failed to clear old database. Please try again or clear your browser data.");
+                return;
+            }
+        }
+
+        if (text) text.textContent = "Processing game files...";
+
         if (!window.gameImporter) {
             window.gameImporter = new GameImporter();
         }
@@ -2543,6 +2609,14 @@ function handleForcedImport() {
 
 document.addEventListener("DOMContentLoaded", async function () {
     window.compositionRecontructedCount = 0;
+    const urlParams = new URLSearchParams(window.location.search);
+
+    // Remove reload parameter from URL if present
+    if (urlParams.has("reload")) {
+        const cleanUrl = new URL(window.location);
+        cleanUrl.searchParams.delete("reload");
+        history.replaceState(null, "", cleanUrl);
+    }
 
     createLoadingIndicator();
 
@@ -2561,7 +2635,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     await loadAndInjectUIAssets();
 
-    const urlParams = new URLSearchParams(window.location.search);
     let mode = urlParams.get("mode");
     const useParam = urlParams.get("use");
 
@@ -2614,7 +2687,32 @@ document.addEventListener("DOMContentLoaded", async function () {
                 }
 
                 dialogFramework.setConfig(decodedData.config);
-                dialogFramework.setCharacters(decodedData.characters);
+
+                // Create a fresh characters object, starting with defaults to ensure characters
+                // are available even when they're not explicitly defined in the preset code
+                const freshCharacters = {};
+
+                // First, copy all default characters
+                if (typeof DEFAULTS !== 'undefined' && DEFAULTS.characters) {
+                    Object.keys(DEFAULTS.characters).forEach((charName) => {
+                        freshCharacters[charName] = {
+                            color: DEFAULTS.characters[charName].color,
+                            aliases: DEFAULTS.characters[charName].aliases || [],
+                        };
+                    });
+                }
+
+                // Then, override with any characters from the decoded data
+                if (decodedData.characters) {
+                    Object.keys(decodedData.characters).forEach((charName) => {
+                        freshCharacters[charName] = {
+                            color: decodedData.characters[charName].color,
+                            aliases: decodedData.characters[charName].aliases || [],
+                        };
+                    });
+                }
+                dialogFramework.setCharacters(freshCharacters);
+
                 dialogFramework.setGlitchConfig(decodedData.glitchConfig);
 
                 decodedData.scenes.forEach((scene) => {
@@ -2911,11 +3009,16 @@ async function deleteGalleryAsset(category, name, asset, type) {
 
         if (window.memoryManager) {
             if (category === "External") {
-                const externalAssets = await window.memoryManager.getExternalAssets();
-                const assetToDelete = externalAssets.find((a) => a.title === name && a.type === type);
-                if (assetToDelete) {
-                    await window.memoryManager.deleteExternalAsset(assetToDelete.id);
+                if (asset.externalId) {
+                    await window.memoryManager.deleteExternalAsset(asset.externalId);
                     //console.log(`Deleted External asset from IndexedDB: ${name}`);
+                } else {
+                    const externalAssets = await window.memoryManager.getExternalAssets();
+                    const assetToDelete = externalAssets.find((a) => a.title === name && a.type === type);
+                    if (assetToDelete) {
+                        await window.memoryManager.deleteExternalAsset(assetToDelete.id);
+                        //console.log(`Deleted External asset from IndexedDB: ${name}`);
+                    }
                 }
             } else if (category === "Misc" && isComposition) {
                 const id = `compositions::${name}`;
@@ -3265,6 +3368,11 @@ function setupHelpMode() {
         });
     }
 
+    // Handle hash changes (browser back/forward or direct hash changes)
+    window.addEventListener("hashchange", () => {
+        handleHashNavigation();
+    });
+
     async function loadMarkdown() {
         if (!contentDiv) return;
 
@@ -3349,6 +3457,9 @@ function setupHelpMode() {
             generateHelpNavigation();
 
             setupHelpScrollTracking();
+
+            // Handle hash navigation after content is loaded
+            handleHashNavigation();
         } catch (error) {
             console.error("Error loading markdown:", error);
             contentDiv.innerHTML = `
@@ -3359,6 +3470,52 @@ function setupHelpMode() {
                 </div>
             `;
         }
+    }
+
+    function handleHashNavigation() {
+        const hash = window.location.hash;
+        if (!hash || hash === "#") return;
+
+        // Remove the # from the hash to get the ID
+        const targetId = hash.substring(1);
+
+        // Handle special case for "showcase" - scroll to top
+        if (targetId === "showcase" && helpOverlay) {
+            setTimeout(() => {
+                helpOverlay.scrollTo({
+                    top: 0,
+                    behavior: "smooth",
+                });
+            }, 100);
+            return;
+        }
+
+        const targetElement = document.getElementById(targetId);
+
+        if (targetElement && helpOverlay) {
+            // Wait a brief moment to ensure layout is complete
+            setTimeout(() => {
+                const headerHeight =
+                    parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--help-header-height")) ||
+                    60;
+
+                // Reduced offset to show title at the top with appropriate spacing
+                const offsetTop = targetElement.offsetTop - headerHeight - 20;
+                helpOverlay.scrollTo({
+                    top: offsetTop,
+                    behavior: "smooth",
+                });
+            }, 100);
+        }
+    }
+
+    function slugify(text) {
+        return text
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, "") // Remove special characters
+            .replace(/\s+/g, "-") // Replace spaces with hyphens
+            .replace(/-+/g, "-"); // Replace multiple hyphens with single hyphen
     }
 
     function generateHelpNavigation() {
@@ -3376,6 +3533,9 @@ function setupHelpMode() {
         introLink.dataset.targetId = "showcase";
         introLink.addEventListener("click", (e) => {
             e.preventDefault();
+            // Update URL without triggering browser's default scroll
+            history.replaceState(null, null, "#showcase");
+            // Manually handle the scroll
             if (helpOverlay) {
                 helpOverlay.scrollTo({
                     top: 0,
@@ -3388,7 +3548,8 @@ function setupHelpMode() {
         headers.forEach((header, index) => {
             const level = parseInt(header.tagName.substring(1));
             const text = header.textContent;
-            const id = header.id || `section-${index}`;
+            // Generate ID from header text if it doesn't have one
+            const id = header.id && header.id !== "" ? header.id : slugify(text);
 
             if (level === 1 && index === 0) {
                 if (!header.id) {
@@ -3422,6 +3583,9 @@ function setupHelpMode() {
 
             link.addEventListener("click", (e) => {
                 e.preventDefault();
+                // Update URL without triggering browser's default scroll
+                history.replaceState(null, null, `#${id}`);
+                // Manually handle the scroll
                 const targetElement = document.getElementById(id);
                 if (targetElement && helpOverlay) {
                     const headerHeight =
@@ -3429,7 +3593,8 @@ function setupHelpMode() {
                             getComputedStyle(document.documentElement).getPropertyValue("--help-header-height"),
                         ) || 60;
 
-                    const offsetTop = targetElement.offsetTop - headerHeight - 60;
+                    // Reduced offset to show title at the top with appropriate spacing
+                    const offsetTop = targetElement.offsetTop - headerHeight - 20;
                     helpOverlay.scrollTo({
                         top: offsetTop,
                         behavior: "smooth",
@@ -3459,7 +3624,7 @@ function setupHelpMode() {
             if (level === 1 && index === 0) return;
 
             if (!header.id) {
-                header.id = `section-${index}`;
+                header.id = slugify(header.textContent);
             }
 
             trackableHeaders.push(header);

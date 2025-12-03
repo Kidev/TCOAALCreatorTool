@@ -269,10 +269,10 @@ class CompositionEditor {
         const renderData = this.getLayerRenderData(layer);
 
         if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
-            const spriteIndex = renderData.isAnimated
-                ? renderData.spriteIndices[layer.currentSpriteIndex]
-                : renderData.spriteIndices[0];
-            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+            const canvasIndex = renderData.isAnimated
+                ? layer.currentSpriteIndex
+                : 0;
+            const spriteCanvas = renderData.spriteCanvases[canvasIndex];
             if (spriteCanvas) {
                 tempCtx.drawImage(spriteCanvas, renderData.x, renderData.y);
             }
@@ -1500,24 +1500,22 @@ class CompositionEditor {
                         const firstKeyframeTime = layer.keyframes[0].time;
                         const timeInAnimation = currentTime - firstKeyframeTime;
                         const animSpeed = layer.animationSpeed || 250;
-                        spriteFrameIndex = Math.floor(timeInAnimation / animSpeed) % renderData.spriteIndices.length;
+                        spriteFrameIndex = Math.floor(timeInAnimation / animSpeed) % renderData.spriteCanvases.length;
                     } else {
                         const now = Date.now();
                         if (now - layer.lastAnimationTime >= layer.animationSpeed) {
-                            layer.currentSpriteIndex = (layer.currentSpriteIndex + 1) % renderData.spriteIndices.length;
+                            layer.currentSpriteIndex = (layer.currentSpriteIndex + 1) % renderData.spriteCanvases.length;
                             layer.lastAnimationTime = now;
                         }
                         spriteFrameIndex = layer.currentSpriteIndex;
                     }
 
-                    const spriteIndex = renderData.spriteIndices[spriteFrameIndex];
-                    const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                    const spriteCanvas = renderData.spriteCanvases[spriteFrameIndex];
                     if (spriteCanvas) {
                         this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
                     }
                 } else {
-                    const spriteIndex = renderData.spriteIndices[0];
-                    const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                    const spriteCanvas = renderData.spriteCanvases[0];
                     if (spriteCanvas) {
                         this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
                     }
@@ -2148,17 +2146,15 @@ class CompositionEditor {
                 if (renderData.isAnimated) {
                     const now = Date.now();
                     if (now - layer.lastAnimationTime >= layer.animationSpeed) {
-                        layer.currentSpriteIndex = (layer.currentSpriteIndex + 1) % renderData.spriteIndices.length;
+                        layer.currentSpriteIndex = (layer.currentSpriteIndex + 1) % renderData.spriteCanvases.length;
                         layer.lastAnimationTime = now;
                     }
-                    const spriteIndex = renderData.spriteIndices[layer.currentSpriteIndex];
-                    const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                    const spriteCanvas = renderData.spriteCanvases[layer.currentSpriteIndex];
                     if (spriteCanvas) {
                         this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
                     }
                 } else {
-                    const spriteIndex = renderData.spriteIndices[0];
-                    const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                    const spriteCanvas = renderData.spriteCanvases[0];
                     if (spriteCanvas) {
                         this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
                     }
@@ -2763,8 +2759,7 @@ class CompositionEditor {
         thumbCtx.fillRect(0, 0, thumbSize, thumbSize);
 
         if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
-            const spriteIndex = renderData.spriteIndices[0];
-            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+            const spriteCanvas = renderData.spriteCanvases[0];
             if (spriteCanvas) {
                 const scale = Math.min(thumbSize / spriteCanvas.width, thumbSize / spriteCanvas.height);
                 const scaledWidth = spriteCanvas.width * scale;
@@ -3337,10 +3332,10 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             const renderData = this.getLayerRenderData(layer);
 
             if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
-                const spriteIndex = renderData.isAnimated
-                    ? renderData.spriteIndices[layer.currentSpriteIndex]
-                    : renderData.spriteIndices[0];
-                const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                const canvasIndex = renderData.isAnimated
+                    ? layer.currentSpriteIndex
+                    : 0;
+                const spriteCanvas = renderData.spriteCanvases[canvasIndex];
                 if (spriteCanvas) {
                     exportCtx.drawImage(spriteCanvas, renderData.x, renderData.y);
                 }
@@ -4211,10 +4206,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                 }
             }
 
-            if (typeof updateGalleryCategories === "function") {
-                updateGalleryCategories();
-            }
-
+            // Navigation will trigger gallery updates, no need to call updateGalleryCategories here
             this.navigateToCompositionInGallery(fileName);
 
             const audioMessage = this.audioKeyframes && this.audioKeyframes.length > 0 ? ` (with audio track)` : "";
@@ -4258,10 +4250,10 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                 const renderData = this.getLayerRenderData(layer);
 
                 if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
-                    const spriteIndex = renderData.isAnimated
-                        ? renderData.spriteIndices[layer.currentSpriteIndex]
-                        : renderData.spriteIndices[0];
-                    const spriteCanvas = renderData.spriteCanvases[spriteIndex];
+                    const canvasIndex = renderData.isAnimated
+                        ? layer.currentSpriteIndex
+                        : 0;
+                    const spriteCanvas = renderData.spriteCanvases[canvasIndex];
                     if (spriteCanvas) {
                         exportCtx.drawImage(spriteCanvas, renderData.x, renderData.y);
                     }

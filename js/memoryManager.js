@@ -33,8 +33,21 @@ class MemoryManager {
             const request = indexedDB.open(this.dbName, this.dbVersion);
 
             request.onerror = () => {
-                console.error("Error opening IndexedDB:", request.error);
-                reject(request.error);
+                const error = request.error;
+                console.error("Error opening IndexedDB:", error);
+
+                // Handle version mismatch (either higher or lower version exists)
+                if (error.name === "VersionError") {
+                    console.warn(
+                        `Database version mismatch detected (expected v${this.dbVersion}). Will require re-import.`,
+                    );
+                    this.versionMismatch = true;
+                    this.isReady = true; // Mark as ready but with version mismatch flag
+                    this.db = null; // No database available
+                    resolve(null); // Resolve with null to allow app to continue
+                } else {
+                    reject(error);
+                }
             };
 
             request.onsuccess = async () => {
@@ -81,11 +94,6 @@ class MemoryManager {
                     });
                     externalAssetsStore.createIndex("type", "type", { unique: false });
                     externalAssetsStore.createIndex("url", "url", { unique: false });
-                }
-
-                // Sprite cache store: stores extracted sprite data for fast loading
-                if (!db.objectStoreNames.contains("spriteCache")) {
-                    const spriteCacheStore = db.createObjectStore("spriteCache", { keyPath: "cacheKey" });
                 }
             };
         });
@@ -227,6 +235,11 @@ class MemoryManager {
             compositionDescriptor: assetData.compositionDescriptor || null,
         };
 
+        if (type === "data") {
+            assetRecord.jsonText = assetData.jsonText;
+            assetRecord.isValid = assetData.isValid;
+        }
+
         return new Promise((resolve, reject) => {
             const request = store.put(assetRecord);
             request.onsuccess = () => resolve(assetRecord);
@@ -283,6 +296,7 @@ class MemoryManager {
                 const organized = {
                     images: {},
                     audio: {},
+                    data: {},
                 };
 
                 assets.forEach((asset) => {
@@ -306,6 +320,12 @@ class MemoryManager {
                         compositionSource: asset.compositionSource || "user",
                     };
 
+                    
+                    if (asset.type === "data") {
+                        assetData.jsonText = asset.jsonText;
+                        assetData.isValid = asset.isValid;
+                    }
+
                     if (asset.croppedBlob) {
                         assetData.croppedUrl = URL.createObjectURL(asset.croppedBlob);
                         assetData.croppedBlob = asset.croppedBlob;
@@ -323,6 +343,11 @@ class MemoryManager {
 
     async getStorageState() {
         await this.ensureReady();
+
+        // If there's a version mismatch, treat as no data
+        if (this.versionMismatch || !this.db) {
+            return "none";
+        }
 
         const transaction = this.db.transaction(["assets"], "readonly");
         const store = transaction.objectStore("assets");
@@ -446,12 +471,18 @@ class MemoryManager {
             const request = indexedDB.deleteDatabase(this.dbName);
 
             request.onsuccess = () => {
+                this.versionMismatch = false;
                 location.replace(location.pathname + "?reload=" + Date.now());
                 resolve();
             };
 
             request.onerror = () => reject(request.error);
-            request.onblocked = () => reject(new Error("Database deletion blocked"));
+            request.onblocked = () => {
+                console.warn("Database deletion blocked - will retry on next page load");
+                this.versionMismatch = false;
+                location.replace(location.pathname + "?reload=" + Date.now());
+                resolve();
+            };
         });
     }
 
@@ -819,44 +850,6 @@ class MemoryManager {
         }
 
         return allExternal.length;
-    }
-
-    async cacheSprites(cacheKey, sprites) {
-        await this.ensureReady();
-
-        const transaction = this.db.transaction(["spriteCache"], "readwrite");
-        const store = transaction.objectStore("spriteCache");
-
-        const cacheRecord = {
-            cacheKey: cacheKey,
-            sprites: sprites,
-            timestamp: Date.now(),
-        };
-
-        return new Promise((resolve, reject) => {
-            const request = store.put(cacheRecord);
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    async getCachedSprites(cacheKey) {
-        await this.ensureReady();
-
-        const transaction = this.db.transaction(["spriteCache"], "readonly");
-        const store = transaction.objectStore("spriteCache");
-
-        return new Promise((resolve, reject) => {
-            const request = store.get(cacheKey);
-            request.onsuccess = () => {
-                if (request.result) {
-                    resolve(request.result.sprites);
-                } else {
-                    reject(new Error("Cache miss"));
-                }
-            };
-            request.onerror = () => reject(request.error);
-        });
     }
 }
 

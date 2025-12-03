@@ -202,13 +202,13 @@ class DialogFramework {
         this.gifCache = new Map();
 
         this.choicesSoundMove = {
-            path: "gallery:Sound effects/se_53.ogg",
+            path: "gallery:Sound effects/se_22.ogg",
             volume: 0.9,
             pitch: 0.9,
             speed: 1.0,
         };
         this.choicesSoundClick = {
-            path: "gallery:Sound effects/se_53.ogg",
+            path: "gallery:Sound effects/se_22.ogg",
             volume: 0.9,
             pitch: 1.0,
             speed: 1.0,
@@ -313,7 +313,8 @@ class DialogFramework {
 
         Object.keys(this.characters).forEach((characterName) => {
             const character = this.characters[characterName];
-            if (character.color && character.characterClassName) {
+            // Check that color is truthy and not an empty string
+            if (character.color && character.color.trim() !== "" && character.characterClassName) {
                 cssRules += `.${character.characterClassName} {\n    color: ${character.color} !important;\n}\n\n`;
             }
         });
@@ -2196,6 +2197,12 @@ class DialogFramework {
 
         const characterInfo = this.getCharacterFromSpeaker(speaker);
         if (speaker && characterInfo) {
+            // Ensure character CSS is generated if missing
+            const styleElement = document.getElementById("dynamic-character-styles");
+            if (!styleElement || !styleElement.textContent || styleElement.textContent.trim() === "") {
+                this.generateCharacterCSS();
+            }
+
             speakerLine.textContent = speaker;
             textLine1.classList.add(characterInfo.character.characterClassName);
             textLine2.classList.add(characterInfo.character.characterClassName);

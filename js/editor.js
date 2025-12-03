@@ -3315,32 +3315,32 @@ function generateCode() {
                 if (isDefault(value, defaultValue)) return;
 
                 if (value === null) {
-                    sceneEntries.push(`${key}: null`);
+                    sceneEntries.push(`        ${key}: null`);
                 } else if (typeof value === "string") {
-                    sceneEntries.push(`${key}: "${value.replace(/"/g, '\\"')}"`);
+                    sceneEntries.push(`        ${key}: "${value.replace(/"/g, '\\"')}"`);
                 } else if (typeof value === "boolean") {
-                    sceneEntries.push(`${key}: ${value}`);
+                    sceneEntries.push(`        ${key}: ${value}`);
                 } else if (typeof value === "number") {
-                    sceneEntries.push(`${key}: ${value}`);
+                    sceneEntries.push(`        ${key}: ${value}`);
                 } else if (Array.isArray(value)) {
                     if (key === "choicesList") {
                         const validChoices = value.filter((c) => c && c.trim() !== "");
                         if (validChoices.length > 0) {
                             sceneEntries.push(
-                                `${key}: [${validChoices.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(", ")}]`,
+                                `        ${key}: [${validChoices.map((c) => `"${c.replace(/"/g, '\\"')}"`).join(", ")}]`,
                             );
                         }
                     } else {
-                        sceneEntries.push(`${key}: ${JSON.stringify(value)}`);
+                        sceneEntries.push(`        ${key}: ${JSON.stringify(value)}`);
                     }
                 } else if (typeof value === "object") {
-                    sceneEntries.push(`${key}: ${JSON.stringify(value)}`);
+                    sceneEntries.push(`        ${key}: ${JSON.stringify(value)}`);
                 }
             });
 
             code += `
             .addScene({
-                ${sceneEntries.join(",\n            ")}
+            ${sceneEntries.join(",\n            ")}
             })`;
         });
 
@@ -3354,8 +3354,7 @@ function generateCode() {
 `;
     }
 
-    code += `;
-}`;
+    code += `}`;
 
     document.getElementById("outputCode").value = code;
 }
@@ -3715,7 +3714,8 @@ function switchGalleryTab(tab) {
         }
 
         if (galleryContext && galleryContext.mode === "select") {
-            const btnTab = btn.textContent.toLowerCase().includes("images") ? "images" : "audio";
+            const btnText = btn.textContent.toLowerCase();
+            const btnTab = btnText.includes("images") ? "images" : btnText.includes("audio") ? "audio" : "data";
             if (btnTab !== galleryContext.assetType) {
                 btn.classList.add("disabled");
                 btn.disabled = true;
@@ -3730,30 +3730,47 @@ function switchGalleryTab(tab) {
     });
 
     updateGalleryCategories();
-
-    if (window.galleryManager) {
-        if (tab === "images" && window.galleryManager.lastImageCategory) {
-            selectGalleryCategory(window.galleryManager.lastImageCategory);
-        } else if (tab === "audio" && window.galleryManager.lastAudioCategory) {
-            selectGalleryCategory(window.galleryManager.lastAudioCategory);
-        }
-    }
 }
 
 function updateGalleryCategories() {
     const categoriesContainer = document.getElementById("galleryCategories");
     if (!categoriesContainer || !window.gameImporterAssets) return;
 
+    if (!window.gameImporterAssets.images) window.gameImporterAssets.images = {};
+    if (!window.gameImporterAssets.audio) window.gameImporterAssets.audio = {};
+    if (!window.gameImporterAssets.data) window.gameImporterAssets.data = {};
+
     categoriesContainer.innerHTML = "";
 
     const isImageTab = currentGalleryTab === "images";
-    const assets = isImageTab ? window.gameImporterAssets.images : window.gameImporterAssets.audio;
+    const isDataTab = currentGalleryTab === "data";
+    const assets = isImageTab
+        ? window.gameImporterAssets.images
+        : isDataTab
+          ? window.gameImporterAssets.data
+          : window.gameImporterAssets.audio;
 
-    if (!assets["External"]) {
+    if (!isDataTab && !assets["External"]) {
         assets["External"] = {};
     }
 
-    const categories = Object.keys(assets);
+    let categories = Object.keys(assets);
+
+    if (isImageTab) {
+        const imageOrder = ["Portraits", "Sprites", "Backgrounds", "Pictures", "External", "Misc"];
+        categories.sort((a, b) => {
+            const indexA = imageOrder.indexOf(a);
+            const indexB = imageOrder.indexOf(b);
+
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+
+            if (indexA !== -1) return -1;
+
+            if (indexB !== -1) return 1;
+
+            return a.localeCompare(b);
+        });
+    }
 
     const lineDiv = document.createElement("div");
     const categoryDiv = document.createElement("div");
@@ -3778,10 +3795,22 @@ function updateGalleryCategories() {
     lineDiv.appendChild(editorDiv);
     categoriesContainer.appendChild(lineDiv);
 
+    const hasGameSprites = categories.includes("Game sprites");
+    const hasSystemSprites = categories.includes("System sprites");
+    const shouldShowSprites = isImageTab && (hasGameSprites || hasSystemSprites);
+
     categories.forEach((category) => {
+        if (category === "Game sprites" || category === "System sprites") {
+            return;
+        }
+
         const btn = document.createElement("button");
         btn.className = "gallery-category-btn";
-        btn.textContent = category;
+
+        const displayName = category === "Misc" ? "Compositions" : category;
+        btn.textContent = displayName;
+        btn.dataset.category = category;
+
         btn.style.marginRight = "0.15vmax";
         btn.onclick = () => {
             if (isImageTab) {
@@ -3793,6 +3822,27 @@ function updateGalleryCategories() {
         };
         categoryDiv.appendChild(btn);
     });
+
+    if (shouldShowSprites) {
+        const spritesBtn = document.createElement("button");
+        spritesBtn.className = "gallery-category-btn";
+        spritesBtn.textContent = "Sprites";
+        spritesBtn.dataset.category = "Sprites";
+        spritesBtn.style.marginRight = "0.15vmax";
+        spritesBtn.onclick = () => {
+            galleryManager.lastImageCategory = "Sprites";
+            selectGalleryCategory("Sprites");
+        };
+
+        const portraitsBtn = Array.from(categoryDiv.children).find((btn) => btn.dataset.category === "Portraits");
+        if (portraitsBtn && portraitsBtn.nextSibling) {
+            categoryDiv.insertBefore(spritesBtn, portraitsBtn.nextSibling);
+        } else if (portraitsBtn) {
+            categoryDiv.appendChild(spritesBtn);
+        } else {
+            categoryDiv.insertBefore(spritesBtn, categoryDiv.firstChild);
+        }
+    }
 
     const buttonEditor = document.createElement("button");
     buttonEditor.id = "composition-editor-btn";
@@ -3809,11 +3859,24 @@ function updateGalleryCategories() {
         let targetCategory;
 
         if (isImageTab) {
+            const lastCategoryValid =
+                galleryManager.lastImageCategory &&
+                ((galleryManager.lastImageCategory === "Sprites" && shouldShowSprites) ||
+                    assets[galleryManager.lastImageCategory]);
+
+            targetCategory = lastCategoryValid
+                ? galleryManager.lastImageCategory
+                : shouldShowSprites
+                  ? "Sprites"
+                  : categories.includes("Portraits")
+                    ? "Portraits"
+                    : categories[0];
+        } else if (isDataTab) {
             targetCategory =
-                galleryManager.lastImageCategory && assets[galleryManager.lastImageCategory]
-                    ? galleryManager.lastImageCategory
-                    : categories.includes("Portraits")
-                      ? "Portraits"
+                galleryManager.lastDataCategory && assets[galleryManager.lastDataCategory]
+                    ? galleryManager.lastDataCategory
+                    : categories.includes("Data")
+                      ? "Data"
                       : categories[0];
         } else {
             targetCategory =
@@ -3834,8 +3897,10 @@ function selectGalleryCategory(category) {
     if (window.galleryManager) {
         if (currentGalleryTab === "images") {
             window.galleryManager.lastImageCategory = category;
-        } else {
+        } else if (currentGalleryTab === "audio") {
             window.galleryManager.lastAudioCategory = category;
+        } else if (currentGalleryTab === "data") {
+            window.galleryManager.lastDataCategory = category;
         }
     }
 
@@ -3845,7 +3910,8 @@ function selectGalleryCategory(category) {
 
     document.querySelectorAll(".gallery-category-btn").forEach((btn) => {
         btn.classList.remove("active");
-        if (btn.textContent === category) {
+
+        if (btn.dataset.category === category) {
             btn.classList.add("active");
         }
     });
@@ -3864,12 +3930,85 @@ async function updateGalleryContent() {
         downloadAllButton.style.display = "block";
     }
 
+    const titleBar = document.querySelector(".preview-title-bar");
+    if (titleBar && !(currentGalleryTab === "data" && currentGalleryCategory === "Labels")) {
+        const cropBoxContainer = titleBar.querySelector("#previewCropBoxContainer");
+        titleBar.textContent = "Preview";
+        if (cropBoxContainer) {
+            titleBar.appendChild(cropBoxContainer);
+        }
+    }
+
     contentContainer.innerHTML = "";
 
-    const assets =
-        currentGalleryTab === "images"
-            ? window.gameImporterAssets.images[currentGalleryCategory]
-            : window.gameImporterAssets.audio[currentGalleryCategory];
+    if (!(currentGalleryTab === "data" && currentGalleryCategory === "Labels")) {
+        contentContainer.className = "gallery-content";
+    }
+
+    let assets;
+    let isSpritesCombined = false;
+
+    if (currentGalleryTab === "images" && currentGalleryCategory === "Sprites") {
+        assets = {};
+        isSpritesCombined = true;
+
+        if (window.gameImporterAssets.images["Game sprites"]) {
+            Object.entries(window.gameImporterAssets.images["Game sprites"]).forEach(([name, asset]) => {
+                assets[name] = { ...asset, _spriteSource: "Game" };
+            });
+        }
+        if (window.gameImporterAssets.images["System sprites"]) {
+            Object.entries(window.gameImporterAssets.images["System sprites"]).forEach(([name, asset]) => {
+                if (name.includes("tilesets") && asset.isSprite) {
+                    assets[name] = { ...asset, _spriteSource: "Tilesets" };
+                } else {
+                    assets[name] = { ...asset, _spriteSource: "System" };
+                }
+            });
+        }
+
+        if (window.gameImporterAssets.images["Misc"]) {
+            Object.entries(window.gameImporterAssets.images["Misc"]).forEach(([name, asset]) => {
+                if (name.includes("tilesets") && asset.isSprite) {
+                    assets[name] = { ...asset, _spriteSource: "Tilesets" };
+                }
+            });
+        }
+    } else {
+        assets =
+            currentGalleryTab === "images"
+                ? window.gameImporterAssets.images[currentGalleryCategory]
+                : currentGalleryTab === "data"
+                  ? window.gameImporterAssets.data[currentGalleryCategory]
+                  : window.gameImporterAssets.audio[currentGalleryCategory];
+
+        if (currentGalleryTab === "images" && currentGalleryCategory === "System sprites" && assets) {
+            const filtered = {};
+            Object.entries(assets).forEach(([name, asset]) => {
+                if (name.includes("tilesets") && asset.isSprite) {
+                    return;
+                }
+                filtered[name] = asset;
+            });
+            assets = filtered;
+        }
+
+        if (currentGalleryTab === "images" && currentGalleryCategory === "Misc" && assets) {
+            const filtered = {};
+            Object.entries(assets).forEach(([name, asset]) => {
+                if (name.includes("tilesets") && asset.isSprite) {
+                    return;
+                }
+
+                if (name.match(/Picture[_\s]?\d+/i)) {
+                    return;
+                }
+                filtered[name] = asset;
+            });
+            assets = filtered;
+        }
+    }
+
     if (!assets) return;
 
     const isSelectionMode = galleryContext && galleryContext.mode === "select";
@@ -3921,10 +4060,38 @@ async function updateGalleryContent() {
         });
     });
 
+    // Clear temp filter variables
+    window._tempBustsFilter = null;
+    window._tempSpritesFilter = null;
+
     let bustFilterValue = "All";
     if (currentGalleryTab === "images" && currentGalleryCategory === "Portraits") {
+        // Create container for filter and search
+        let filterContainer = document.getElementById("bustsFilterContainer");
+        if (!filterContainer) {
+            filterContainer = document.createElement("div");
+            filterContainer.id = "bustsFilterContainer";
+            filterContainer.style.cssText = `
+                display: flex;
+                gap: 0.5vmax;
+                width: 100%;
+            `;
+            document.getElementById("galleryCategories").appendChild(filterContainer);
+        }
+
         const filterSelect = document.createElement("select");
         filterSelect.id = "bustsFilterSelect";
+        filterSelect.style.cssText = `
+            width: 25%;
+            padding: 0.5vmax 0.8vmax;
+            font-family: Consolas, Monaco, "Courier New", monospace;
+            font-size: 0.85vmax;
+            background: rgb(45, 45, 45);
+            border: 1px solid rgb(62, 62, 62);
+            border-radius: 4px;
+            color: rgb(255, 255, 255);
+            box-sizing: border-box;
+        `;
         const bustCategories = [
             "All",
             "Andrew",
@@ -3974,24 +4141,265 @@ async function updateGalleryContent() {
             });
             galleryManager.selectFirstElement();
         });
-        if (document.getElementById("bustsFilterSelect") !== null) {
-            document.getElementById("bustsFilterSelect").remove();
+
+        filterContainer.innerHTML = "";
+        // Search will be added first, dropdown second (done later in search section)
+        // Store dropdown for now, will be appended after search
+        window._tempBustsFilter = filterSelect;
+    } else {
+        const filterContainer = document.getElementById("bustsFilterContainer");
+        if (filterContainer) {
+            filterContainer.remove();
         }
-        document.getElementById("galleryCategories").appendChild(filterSelect);
-    } else if (document.getElementById("bustsFilterSelect") !== null) {
-        document.getElementById("bustsFilterSelect").remove();
+    }
+
+    let spritesFilterValue = "All";
+    if (currentGalleryTab === "images" && currentGalleryCategory === "Sprites") {
+        // Create container for filter and search
+        let filterContainer = document.getElementById("spritesFilterContainer");
+        if (!filterContainer) {
+            filterContainer = document.createElement("div");
+            filterContainer.id = "spritesFilterContainer";
+            filterContainer.style.cssText = `
+                display: flex;
+                gap: 0.5vmax;
+                width: 100%;
+            `;
+            document.getElementById("galleryCategories").appendChild(filterContainer);
+        }
+
+        const filterSelect = document.createElement("select");
+        filterSelect.id = "spritesFilterSelect";
+        filterSelect.style.cssText = `
+            width: 25%;
+            padding: 0.5vmax 0.8vmax;
+            font-family: Consolas, Monaco, "Courier New", monospace;
+            font-size: 0.85vmax;
+            background: rgb(45, 45, 45);
+            border: 1px solid rgb(62, 62, 62);
+            border-radius: 4px;
+            color: rgb(255, 255, 255);
+            box-sizing: border-box;
+        `;
+
+        const spriteCategories = ["All", "Game", "System", "Tilesets"];
+        spriteCategories.forEach((cat) => {
+            const option = document.createElement("option");
+            option.value = cat;
+            option.textContent = cat;
+            filterSelect.appendChild(option);
+        });
+
+        filterSelect.value = "All";
+        filterSelect.addEventListener("change", function () {
+            spritesFilterValue = this.value;
+            const items = contentContainer.querySelectorAll(".gallery-item");
+            items.forEach((item) => {
+                const spriteSource = item.dataset.spriteSource;
+                if (!spriteSource) return;
+
+                if (spritesFilterValue === "All") {
+                    item.style.display = "";
+                } else {
+                    item.style.display = spriteSource === spritesFilterValue ? "" : "none";
+                }
+            });
+            galleryManager.selectFirstElement();
+        });
+
+        filterContainer.innerHTML = "";
+        // Search will be added first, dropdown second (done later in search section)
+        // Store dropdown for now, will be appended after search
+        window._tempSpritesFilter = filterSelect;
+    } else {
+        const filterContainer = document.getElementById("spritesFilterContainer");
+        if (filterContainer) {
+            filterContainer.remove();
+        }
+    }
+
+    // Add search input for all categories (except Labels which has its own search)
+    if (!(currentGalleryTab === "data" && currentGalleryCategory === "Labels")) {
+        // Determine which container to use
+        const bustsContainer = document.getElementById("bustsFilterContainer");
+        const spritesContainer = document.getElementById("spritesFilterContainer");
+        const targetContainer = bustsContainer || spritesContainer;
+
+        let searchInput = document.getElementById("gallerySearchInput");
+        if (!searchInput) {
+            searchInput = document.createElement("input");
+            searchInput.id = "gallerySearchInput";
+            searchInput.type = "text";
+            searchInput.placeholder = "Search...";
+
+            searchInput.addEventListener("input", function () {
+                const searchTerm = this.value.toLowerCase();
+                const items = contentContainer.querySelectorAll(".gallery-item");
+
+                // If search is active, set dropdowns to "All"
+                if (searchTerm) {
+                    const bustsFilter = document.getElementById("bustsFilterSelect");
+                    const spritesFilter = document.getElementById("spritesFilterSelect");
+
+                    if (bustsFilter && bustsFilter.value !== "All") {
+                        bustsFilter.value = "All";
+                        bustFilterValue = "All";
+                    }
+                    if (spritesFilter && spritesFilter.value !== "All") {
+                        spritesFilter.value = "All";
+                        spritesFilterValue = "All";
+                    }
+                }
+
+                items.forEach((item) => {
+                    if (!searchTerm) {
+                        item.style.display = "";
+                        return;
+                    }
+
+                    const filename = (item.dataset.filename || "").toLowerCase();
+                    const originalName = (item.dataset.originalName || "").toLowerCase();
+                    const formatName = (item.dataset.formatName || "").toLowerCase();
+
+                    const matches =
+                        filename.includes(searchTerm) ||
+                        originalName.includes(searchTerm) ||
+                        formatName.includes(searchTerm);
+
+                    item.style.display = matches ? "" : "none";
+                });
+
+                galleryManager.selectFirstElement();
+            });
+        }
+
+        // Clear search when changing categories
+        searchInput.value = "";
+
+        // Add search input to appropriate container
+        if (targetContainer) {
+            // With dropdown: search takes 75%, add it first
+            searchInput.style.cssText = `
+                width: 75%;
+                padding: 0.5vmax 0.8vmax;
+                font-family: Consolas, Monaco, "Courier New", monospace;
+                font-size: 0.85vmax;
+                background: rgb(45, 45, 45);
+                border: 1px solid rgb(62, 62, 62);
+                border-radius: 4px;
+                color: rgb(255, 255, 255);
+                box-sizing: border-box;
+            `;
+
+            // Add search first, then append dropdown after
+            targetContainer.appendChild(searchInput);
+
+            // Append the correct dropdown after search based on which container we're using
+            const isBustsContainer = targetContainer.id === "bustsFilterContainer";
+            const isSpritesContainer = targetContainer.id === "spritesFilterContainer";
+
+            if (isBustsContainer && window._tempBustsFilter) {
+                targetContainer.appendChild(window._tempBustsFilter);
+            } else if (isSpritesContainer && window._tempSpritesFilter) {
+                targetContainer.appendChild(window._tempSpritesFilter);
+            }
+
+            // Remove standalone container if it exists
+            const searchContainer = document.getElementById("gallerySearchContainer");
+            if (searchContainer) {
+                searchContainer.remove();
+            }
+        } else {
+            // Without dropdown: create standalone container
+            let searchContainer = document.getElementById("gallerySearchContainer");
+            if (!searchContainer) {
+                searchContainer = document.createElement("div");
+                searchContainer.id = "gallerySearchContainer";
+                searchContainer.style.cssText = `
+                    display: flex;
+                    gap: 0.5vmax;
+                    width: 100%;
+                `;
+                document.getElementById("galleryCategories").appendChild(searchContainer);
+            }
+
+            // Search takes 75%, spacer 25% (on right)
+            searchInput.style.cssText = `
+                width: 75%;
+                padding: 0.5vmax 0.8vmax;
+                font-family: Consolas, Monaco, "Courier New", monospace;
+                font-size: 0.85vmax;
+                background: rgb(45, 45, 45);
+                border: 1px solid rgb(62, 62, 62);
+                border-radius: 4px;
+                color: rgb(255, 255, 255);
+                box-sizing: border-box;
+            `;
+
+            // Add search input and spacer (spacer on right)
+            const spacer = document.createElement("div");
+            spacer.style.width = "25%";
+            searchContainer.innerHTML = "";
+            searchContainer.appendChild(searchInput);
+            searchContainer.appendChild(spacer);
+        }
+    } else {
+        const searchInput = document.getElementById("gallerySearchInput");
+        if (searchInput) {
+            searchInput.remove();
+        }
+        const searchContainer = document.getElementById("gallerySearchContainer");
+        if (searchContainer) {
+            searchContainer.remove();
+        }
+    }
+
+    if (currentGalleryTab === "data" && currentGalleryCategory === "Labels") {
+        let searchInput = document.getElementById("labelsSearchInput");
+
+        if (!searchInput) {
+            searchInput = document.createElement("input");
+            searchInput.id = "labelsSearchInput";
+            searchInput.type = "text";
+            searchInput.placeholder = "Search...";
+            searchInput.style.cssText = `
+                width: 100%;
+                padding: 0.5vmax 0.8vmax;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                font-size: 0.85vmax;
+                background: #2d2d2d;
+                border: 1px solid #3e3e3e;
+                border-radius: 4px;
+                color: #ffffff;
+                box-sizing: border-box;
+            `;
+
+            searchInput.addEventListener("input", function () {
+                filterLabelsLines(this.value);
+            });
+
+            document.getElementById("galleryCategories").appendChild(searchInput);
+        }
+
+        if (searchInput.value !== labelsTableState.searchTerm) {
+            searchInput.value = labelsTableState.searchTerm;
+        }
+    } else if (document.getElementById("labelsSearchInput") !== null) {
+        document.getElementById("labelsSearchInput").remove();
     }
 
     if (currentGalleryCategory === "External") {
         const addButton = document.createElement("div");
-        addButton.className = "gallery-item external-add-btn";
+
         if (currentGalleryTab === "audio") {
+            addButton.className = "gallery-item external-add-btn-audio";
             addButton.innerHTML = `
                 <div class="gallery-item-audio compact external-add-audio">
                     <div class="external-add-icon">+</div>
                     <div class="gallery-item-name">Add external sound</div>
                 </div>`;
         } else {
+            addButton.className = "gallery-item external-add-btn";
             addButton.innerHTML = `
                 <div class="external-add-icon">+</div>
                 <div class="gallery-item-name">Add external image</div>`;
@@ -4000,14 +4408,37 @@ async function updateGalleryContent() {
         contentContainer.appendChild(addButton);
     }
 
+    if (currentGalleryTab === "data" && currentGalleryCategory === "Labels") {
+        renderLabelsTreeView(contentContainer, assets);
+        return;
+    }
+
     assetEntries.forEach(([name, asset], index) => {
         if (currentGalleryTab === "images" && currentGalleryCategory === "Portraits" && bustFilterValue !== "All") {
             const baseName = name.toLowerCase().replace(/\.[^/.]+$/, "");
             if (!baseName.startsWith(bustFilterValue.toLowerCase() + "_")) return;
         }
-        const formatName = window.galleryManager.formatAssetTitle(name, currentGalleryCategory, currentGalleryTab);
+
+        if (isSpritesCombined && spritesFilterValue !== "All") {
+            if (!asset._spriteSource || asset._spriteSource !== spritesFilterValue) {
+                return;
+            }
+        }
+
+        let actualCategory = currentGalleryCategory;
+        if (isSpritesCombined && asset._spriteSource) {
+            if (asset._spriteSource === "Game") {
+                actualCategory = "Game sprites";
+            } else if (asset._spriteSource === "System") {
+                actualCategory = "System sprites";
+            } else if (asset._spriteSource === "Tilesets") {
+                actualCategory = "System sprites";
+            }
+        }
+
+        const formatName = window.galleryManager.formatAssetTitle(name, actualCategory, currentGalleryTab);
         const displayName = formatName;
-        const favKey = window.memoryManager?.generateFavouriteKey(currentGalleryTab, currentGalleryCategory, name);
+        const favKey = window.memoryManager?.generateFavouriteKey(currentGalleryTab, actualCategory, name);
         const isFav = favouritesSet.has(favKey);
 
         const item = document.createElement("div");
@@ -4017,8 +4448,13 @@ async function updateGalleryContent() {
         item.dataset.baseFileName = asset.baseFileName;
         item.dataset.originalName = asset.originalName;
         item.dataset.formatName = formatName;
-        item.dataset.category = currentGalleryCategory;
+        item.dataset.category = actualCategory;
         item.dataset.type = currentGalleryTab;
+
+        if (isSpritesCombined && asset._spriteSource) {
+            item.dataset.spriteSource = asset._spriteSource;
+        }
+
         if (asset.externalId) {
             item.dataset.externalId = asset.externalId;
         }
@@ -4031,7 +4467,7 @@ async function updateGalleryContent() {
             });
             ev.currentTarget.classList.add("selected");
             window.galleryManager.scrollIfRequired(ev.currentTarget);
-            window.galleryManager.previewAsset(name, currentGalleryCategory, currentGalleryTab);
+            window.galleryManager.previewAsset(name, actualCategory, currentGalleryTab);
         };
         item.oncontextmenu = async function (ev) {
             ev.preventDefault();
@@ -4427,3 +4863,272 @@ window.handleGameImportClick = function () {
         handleGameImport();
     }
 };
+
+let labelsTableState = {
+    jsonData: null,
+    selectedTable: null,
+    currentPage: 1,
+    itemsPerPage: 100,
+    searchTerm: "",
+};
+
+function renderLabelsTreeView(container, assets) {
+    const labelsAsset = Object.values(assets).find(
+        (asset) => asset.name.startsWith("labels") || asset.originalName.startsWith("labels"),
+    );
+
+    if (!labelsAsset || !labelsAsset.jsonText) {
+        container.innerHTML = '<div class="gallery-placeholder">No labels data found</div>';
+        return;
+    }
+
+    try {
+        if (!labelsTableState.jsonData) {
+            labelsTableState.jsonData = JSON.parse(labelsAsset.jsonText);
+        }
+
+        if (!labelsTableState.selectedTable) {
+            const tables = Object.keys(labelsTableState.jsonData);
+            if (tables.length > 0) {
+                labelsTableState.selectedTable = tables[tables.length - 1];
+            }
+        }
+
+        container.innerHTML = "";
+        container.className = "labels-data-container";
+
+        if (!labelsTableState.selectedTable) {
+            container.innerHTML = '<div class="gallery-placeholder">No table selected</div>';
+            return;
+        }
+
+        const tableData = labelsTableState.jsonData[labelsTableState.selectedTable];
+        const isObject = typeof tableData === "object" && !Array.isArray(tableData) && tableData !== null;
+        const isArray = Array.isArray(tableData);
+
+        let entries = [];
+        let totalItems = 0;
+
+        if (isObject) {
+            entries = Object.entries(tableData);
+            totalItems = entries.length;
+        } else if (isArray) {
+            entries = tableData.map((value, index) => [index, value]);
+            totalItems = entries.length;
+        } else {
+            const valueStr = typeof tableData === "string" ? tableData : JSON.stringify(tableData);
+            container.innerHTML = `<div class="gallery-placeholder">${escapeHtml(valueStr)}</div>`;
+            updateLabelsTablePreview();
+            return;
+        }
+
+        if (labelsTableState.searchTerm) {
+            const lowerSearch = labelsTableState.searchTerm.toLowerCase();
+            entries = entries.filter(([key, value]) => {
+                const keyStr = isArray ? `[${key}]` : String(key);
+                let valueStr;
+                if (Array.isArray(value)) {
+                    valueStr = value
+                        .map((item) => {
+                            let str = typeof item === "string" ? item : JSON.stringify(item);
+                            if (str.startsWith('"') && str.endsWith('"')) {
+                                str = str.slice(1, -1);
+                            }
+                            return str;
+                        })
+                        .join("\n");
+                } else {
+                    valueStr = typeof value === "string" ? value : JSON.stringify(value);
+                }
+                valueStr = valueStr.replace(/\\"/g, '"');
+
+                return keyStr.toLowerCase().includes(lowerSearch) || valueStr.toLowerCase().includes(lowerSearch);
+            });
+            totalItems = entries.length;
+        }
+
+        const totalPages = Math.ceil(totalItems / labelsTableState.itemsPerPage);
+        const startIndex = (labelsTableState.currentPage - 1) * labelsTableState.itemsPerPage;
+        const endIndex = Math.min(startIndex + labelsTableState.itemsPerPage, totalItems);
+        const pageEntries = entries.slice(startIndex, endIndex);
+
+        pageEntries.forEach(([key, value]) => {
+            const line = document.createElement("div");
+            line.className = "labels-line";
+
+            let valueStr;
+            if (Array.isArray(value)) {
+                valueStr = value
+                    .map((item) => {
+                        let str = typeof item === "string" ? item : JSON.stringify(item);
+
+                        if (str.startsWith('"') && str.endsWith('"')) {
+                            str = str.slice(1, -1);
+                        }
+                        return str;
+                    })
+                    .join("\n");
+            } else {
+                valueStr = typeof value === "string" ? value : JSON.stringify(value);
+            }
+
+            valueStr = valueStr.replace(/\\"/g, '"');
+            const keyStr = isArray ? `[${key}]` : String(key);
+
+            line.innerHTML = `<span class="labels-line-key">${escapeHtml(keyStr)}</span><span class="labels-line-value">${escapeHtml(valueStr)}</span>`;
+
+            container.appendChild(line);
+        });
+
+        updateLabelsTablePreview(totalItems, totalPages, startIndex, endIndex);
+    } catch (error) {
+        console.error("Failed to render labels table viewer:", error);
+        container.innerHTML = '<div class="gallery-placeholder">Error parsing labels: ' + error.message + "</div>";
+    }
+}
+
+function selectLabelsTable(tableName) {
+    labelsTableState.selectedTable = tableName;
+    labelsTableState.currentPage = 1;
+    labelsTableState.searchTerm = "";
+
+    const searchInput = document.getElementById("labelsSearchInput");
+    if (searchInput) {
+        searchInput.value = "";
+    }
+
+    updateGalleryContent();
+}
+
+function changeLabelsPage(pageNum) {
+    labelsTableState.currentPage = pageNum;
+    updateGalleryContent();
+}
+
+function filterLabelsLines(searchTerm) {
+    labelsTableState.searchTerm = searchTerm;
+    labelsTableState.currentPage = 1;
+    updateGalleryContent();
+}
+
+function updateLabelsTablePreview(totalItems = 0, totalPages = 0, startIndex = 0, endIndex = 0) {
+    const contentDiv = document.getElementById("previewPanelContent");
+    const controlsDiv = document.getElementById("previewControls");
+    const titleBar = document.querySelector(".preview-title-bar");
+
+    if (!contentDiv || !controlsDiv || !labelsTableState.jsonData) return;
+
+    if (titleBar) {
+        const cropBoxContainer = titleBar.querySelector("#previewCropBoxContainer");
+        titleBar.textContent = "Tables";
+        if (cropBoxContainer) {
+            titleBar.appendChild(cropBoxContainer);
+        }
+    }
+
+    let paginationHTML = '<div class="labels-pagination-controls">';
+
+    if (totalPages > 1) {
+        paginationHTML += '<div class="labels-pagination-buttons">';
+
+        paginationHTML += `
+            <button class="labels-page-btn" ${labelsTableState.currentPage === 1 ? "disabled" : ""}
+                onclick="changeLabelsPage(${labelsTableState.currentPage - 1})">
+                ‹ Previous
+            </button>
+        `;
+
+        const pagesToShow = [];
+        pagesToShow.push(1);
+
+        if (labelsTableState.currentPage > 3) pagesToShow.push("...");
+
+        for (
+            let i = Math.max(2, labelsTableState.currentPage - 1);
+            i <= Math.min(totalPages - 1, labelsTableState.currentPage + 1);
+            i++
+        ) {
+            pagesToShow.push(i);
+        }
+
+        if (labelsTableState.currentPage < totalPages - 2) pagesToShow.push("...");
+
+        if (totalPages > 1) pagesToShow.push(totalPages);
+
+        pagesToShow.forEach((page) => {
+            if (page === "...") {
+                paginationHTML += '<span class="labels-page-ellipsis">...</span>';
+            } else {
+                const isCurrent = page === labelsTableState.currentPage;
+                paginationHTML += `
+                    <button class="labels-page-btn ${isCurrent ? "current" : ""}"
+                        ${isCurrent ? "disabled" : ""}
+                        onclick="changeLabelsPage(${page})">
+                        ${page}
+                    </button>
+                `;
+            }
+        });
+
+        paginationHTML += `
+            <button class="labels-page-btn" ${labelsTableState.currentPage === totalPages ? "disabled" : ""}
+                onclick="changeLabelsPage(${labelsTableState.currentPage + 1})">
+                Next ›
+            </button>
+        `;
+
+        paginationHTML += "</div>";
+    }
+
+    if (totalItems > 0) {
+        paginationHTML += `
+            <div class="labels-page-info">
+                <span>Showing ${startIndex + 1}-${endIndex} of ${totalItems} entries</span>
+                <span>Page ${labelsTableState.currentPage} of ${totalPages}</span>
+            </div>
+        `;
+    }
+
+    paginationHTML += "</div>";
+    controlsDiv.innerHTML = paginationHTML;
+
+    const tables = Object.keys(labelsTableState.jsonData).reverse();
+
+    let html = '<div class="labels-table-selection">';
+
+    tables.forEach((tableName) => {
+        const tableData = labelsTableState.jsonData[tableName];
+        const isObject = typeof tableData === "object" && !Array.isArray(tableData) && tableData !== null;
+        const isArray = Array.isArray(tableData);
+        const isSelected = labelsTableState.selectedTable === tableName;
+        const isClickable = isObject || isArray;
+
+        let info = "";
+        if (isObject) {
+            info = `{${Object.keys(tableData).length} entries}`;
+        } else if (isArray) {
+            info = `[${tableData.length} items]`;
+        } else {
+            const valueStr = String(tableData);
+            info = valueStr.length > 30 ? valueStr.substring(0, 30) + "..." : valueStr;
+        }
+
+        const escapedTableName = escapeHtml(tableName).replace(/'/g, "\\'");
+
+        html += `
+            <div class="labels-table-selector ${isSelected ? "selected" : ""} ${!isClickable ? "disabled" : ""}" ${isClickable ? `onclick="selectLabelsTable('${escapedTableName}')"` : ""}>
+                <div class="labels-table-selector-name">${escapeHtml(tableName)}</div>
+                <div class="labels-table-selector-info">${info}</div>
+            </div>
+        `;
+    });
+
+    html += "</div>";
+    contentDiv.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}

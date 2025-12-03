@@ -72,17 +72,17 @@ function getEpisode2Config() {
         },
         background: {
             category: "Backgrounds",
-            image: "backgrounds_178.png",
+            image: "backgrounds_164.png",
         },
         sound_effects: {
             PLAYER_MOVE: null,
-            GAME_OVER: "se_50.ogg",
-            WIN: "se_17.ogg",
-            SPAWN_ANIM: "se_15.ogg",
-            POCKET_DUST: "se_35.ogg",
-            SPOTTED: "se_67.ogg",
-            GRAVE_FILLED: "se_5.ogg",
-            GRAVE_EMPTIED: "se_24.ogg",
+            GAME_OVER: "se_63.ogg",
+            WIN: "se_32.ogg",
+            SPAWN_ANIM: "se_18.ogg",
+            POCKET_DUST: "se_10.ogg",
+            SPOTTED: "se_35.ogg",
+            GRAVE_FILLED: "se_73.ogg",
+            GRAVE_EMPTIED: "se_66.ogg",
         },
         music: {
             NORMAL: "hallucination_connect.ogg",
@@ -92,7 +92,7 @@ function getEpisode2Config() {
         },
         graves: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_1.png",
+            sheet: "spritessheet_12x8_characters_9.png",
             indexFilled: [29],
             indexEmpty: [5],
             spriteScale: 1, // Graves excluded from scaling
@@ -177,21 +177,21 @@ function getEpisode2Config() {
     const GAME_EVENTS_ASSETS = {
         NUMBERS: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_9.png",
+            sheet: "spritessheet_12x8_characters_5.png",
             index: [73, 36, 37, 38, 48, 49, 50, 60, 61, 62],
             speed: 0, // Will use NUMBER_DISPLAY_DURATION from config
             sound: null,
         },
         LIMIT_PLAYER: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_14.png",
+            sheet: "spritessheet_12x8_characters_7.png",
             index: [86],
             speed: 0,
             sound: null,
         },
         SPAWN_ANIM: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_7.png",
+            sheet: "spritessheet_12x8_characters_4.png",
             index: [57, 58, 59],
             speed: 250,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
@@ -215,7 +215,7 @@ function getEpisode2Config() {
         },
         FOLLOWER_ANIM: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_17.png",
+            sheet: "spritessheet_12x8_characters_3.png",
             index: [23, 21, 22, 11, 10, 9, 10, 11, 22, 21, 23],
             speed: 25,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
@@ -239,7 +239,7 @@ function getEpisode2Config() {
         },
         DEAD_HUSSY: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_7.png",
+            sheet: "spritessheet_12x8_characters_4.png",
             index: [49],
             speed: 0,
             spriteScale: 1, // Graves excluded from scaling
@@ -270,7 +270,7 @@ function getEpisode2Config() {
         },
         POOF_ANIM: {
             category: "Game sprites",
-            sheet: "spritessheet_12x8_characters_1.png",
+            sheet: "spritessheet_12x8_characters_9.png",
             index: [9, 21, 33, 45],
             speed: 250,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
@@ -296,7 +296,7 @@ function getEpisode2Config() {
             // Julia
             type: 0,
             category: "Game sprites",
-            spritesheet: "spritessheet_12x8_characters_13.png",
+            spritesheet: "spritessheet_12x8_characters_1.png",
             speed: 10000,
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
             frames: {
@@ -310,7 +310,7 @@ function getEpisode2Config() {
             // Hussy
             type: 1,
             category: "Game sprites",
-            spritesheet: "spritessheet_12x8_characters_1.png",
+            spritesheet: "spritessheet_12x8_characters_9.png",
             speeds: [800, 1200], // Slower speed range for Episode 2
             spriteScale: 1.5, // Visual scale for 1x2/2x1 sprites
             frames: {

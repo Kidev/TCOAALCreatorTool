@@ -165,7 +165,7 @@ This is what the sequence file look like for the scene described:
 function setupScene() {
         dialogFramework
         .addScene({
-            image: "gallery:Pictures/pictures_769.png",
+            image: "gallery:Pictures/pictures_80.png",
             speaker: "Andy",
             line1: "Leyley, I don't--... want to.",
             dialogFadeInTime: 100,
@@ -193,7 +193,7 @@ function setupScene() {
                 "height": 720,
                 "layers": [{
                         "type": "background",
-                        "galleryRef": "gallery:Pictures/pictures_769.png",
+                        "galleryRef": "gallery:Pictures/pictures_80.png",
                         "x": 0,
                         "y": 0,
                         "width": 1296,
@@ -202,7 +202,7 @@ function setupScene() {
                         "zIndex": 0
                 },{
                         "type": "background",
-                        "galleryRef": "gallery:Pictures/pictures_109.png",
+                        "galleryRef": "gallery:Pictures/pictures_81.png",
                         "x": 0,
                         "y": 0,
                         "width": 1296,
@@ -301,7 +301,7 @@ When adding a composition to the compositor, you'll get access to all the origin
 ### Image layers
 The most straightforward layers. They are a single asset. They can be animated GIFs, but from only one file at a time. You can place them on the canvas using coordinates or drag and drop on the preview. You can change their ordering.  
 ![image-layers](docs/image-layers.png)
-Here, the `backgrounds_190.png` will be on top of `backgrounds_263.png`, giving the possibility to character to move behind clutter (like the trash bags in the introduction of the game).  
+Here, the `backgrounds_6.png` will be on top of `backgrounds_5.png`, giving the possibility to character to move behind clutter (like the trash bags in the introduction of the game).  
 ![image-layers-3d](docs/compositor-depth.mp4)
 
 

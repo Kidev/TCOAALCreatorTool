@@ -21,6 +21,7 @@ class GameImporter {
         this.importedAssets = {
             images: {},
             audio: {},
+            data: {},
         };
         this.signature = "TCOAAL";
         this.hash = atob(
@@ -29,8 +30,8 @@ class GameImporter {
         this.fileCounter = 0;
         this.totalFiles = 0;
         this.filenameMap = filenamesMapped;
-        this.customMenuRightPortraitFile = "ashley-teen_3.png";
-        this.customMenuLeftPortraitFile = "andrew-teen_12.png";
+        this.customMenuRightPortraitFile = "ashley-teen_19.png";
+        this.customMenuLeftPortraitFile = "andrew-teen_19.png";
     }
 
     async importGame(files) {
@@ -40,19 +41,19 @@ class GameImporter {
         const relevantFiles = [];
 
         const folders = [
-            { path: "www/data", type: "json", category: "Data" },
-            { path: "www/audio/bgm", type: "ogg", category: "Background songs" },
-            { path: "www/audio/bgs", type: "ogg", category: "Background sounds" },
-            { path: "www/audio/me", type: "ogg", category: "Event sounds" },
-            { path: "www/audio/se", type: "ogg", category: "Sound effects" },
-            { path: "www/img/faces", type: "png", category: "Portraits" },
-            { path: "www/img/characters", type: "png", category: "Game sprites" },
-            { path: "www/img/parallaxes", type: "png", category: "Backgrounds" },
-            { path: "www/img/pictures", type: "png", category: "Pictures" },
-            { path: "www/img/system", type: "png", category: "System sprites" },
-            { path: "www/img/tilesets", type: "png", category: "Misc" },
-            { path: "www/img/titles1", type: "png", category: "Misc" },
-            { path: "www/icon", type: "png", category: "Misc" },
+            { path: "www/data", type: "json", category: "Maps", assetType: "data" },
+            { path: "www/audio/bgm", type: "ogg", category: "Background songs", assetType: "audio" },
+            { path: "www/audio/bgs", type: "ogg", category: "Background sounds", assetType: "audio" },
+            { path: "www/audio/me", type: "ogg", category: "Event sounds", assetType: "audio" },
+            { path: "www/audio/se", type: "ogg", category: "Sound effects", assetType: "audio" },
+            { path: "www/img/faces", type: "png", category: "Portraits", assetType: "images" },
+            { path: "www/img/characters", type: "png", category: "Game sprites", assetType: "images" },
+            { path: "www/img/parallaxes", type: "png", category: "Backgrounds", assetType: "images" },
+            { path: "www/img/pictures", type: "png", category: "Pictures", assetType: "images" },
+            { path: "www/img/system", type: "png", category: "System sprites", assetType: "images" },
+            { path: "www/img/tilesets", type: "png", category: "System sprites", assetType: "images" },
+            { path: "www/img/titles1", type: "png", category: "Pictures", assetType: "images" },
+            { path: "www/icon", type: "png", category: "Pictures", assetType: "images" },
         ];
 
         let validFolders = [];
@@ -87,8 +88,6 @@ class GameImporter {
             await this.processFolder(filesByPath, folder);
         }
 
-        this.showProgress(false);
-
         await this.saveImportedAssets();
 
         await this.extractUIAssets();
@@ -100,7 +99,7 @@ class GameImporter {
         const urlParams = new URLSearchParams(window.location.search);
         const mode = urlParams.get("mode");
         const useParam = urlParams.get("use");
-
+        this.showProgress(false);
         if (mode === "gallery") {
             document.getElementById("gallerySection").style.display = "block";
             document.getElementById("download-all-button").style.display = "block";
@@ -222,6 +221,73 @@ class GameImporter {
                                 console.warn("Failed to save audio to memory:", assetName, error);
                             }
                         }
+                    } else if (folderInfo.type === "json") {
+                        if (fileName.includes("Credits") || baseFileName.includes("Credits")) {
+                            continue;
+                        }
+
+                        let targetCategory = folderInfo.category;
+                        if (fileName.startsWith("9c7050ae76645487") || baseFileName.includes("labels")) {
+                            targetCategory = "Labels";
+                        }
+
+                        if (!this.importedAssets.data[targetCategory]) {
+                            this.importedAssets.data[targetCategory] = {};
+                        }
+
+                        let jsonText = new TextDecoder("utf-8").decode(decrypted);
+                        let formattedJson = jsonText;
+                        let isValid = true;
+
+                        if (
+                            fileName.startsWith("9c7050ae76645487") ||
+                            mappedName.includes("labels") ||
+                            assetName.includes("labels")
+                        ) {
+                            const langdataPrefix = "LANGDATA";
+                            if (jsonText.startsWith(langdataPrefix)) {
+                                jsonText = jsonText.substring(langdataPrefix.length);
+                                console.log(`Stripped LANGDATA prefix from ${assetName}`);
+                            }
+                        }
+
+                        try {
+                            const parsed = JSON.parse(jsonText);
+                            formattedJson = JSON.stringify(parsed, null, 2);
+                        } catch (error) {
+                            console.warn(`Invalid JSON in ${fileName}:`, error);
+                            isValid = false;
+                        }
+
+                        const formattedBlob = new Blob([formattedJson], {
+                            type: "application/json",
+                        });
+                        const formattedUrl = URL.createObjectURL(formattedBlob);
+
+                        const assetData = {
+                            url: formattedUrl,
+                            blob: formattedBlob,
+                            name: assetName,
+                            originalName: fileName,
+                            baseFileName: originalPath,
+                            jsonText: formattedJson,
+                            isValid: isValid,
+                        };
+
+                        this.importedAssets.data[targetCategory][assetName] = assetData;
+
+                        if (window.memoryManager) {
+                            try {
+                                await window.memoryManager.savePartialAsset(
+                                    assetData,
+                                    originalPath,
+                                    targetCategory,
+                                    "data",
+                                );
+                            } catch (error) {
+                                console.warn("Failed to save data to memory:", assetName, error);
+                            }
+                        }
                     }
                 }
 
@@ -313,9 +379,9 @@ class GameImporter {
                 if (show) {
                     editorOverlay.classList.add("importing");
                 } else {
-                    setTimeout(() => {
-                        editorOverlay.classList.remove("importing");
-                    }, 100);
+                    // setTimeout(() => {
+                    //    editorOverlay.classList.remove("importing");
+                    //}, 100);
                 }
             }
         }
