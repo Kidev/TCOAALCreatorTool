@@ -2029,6 +2029,16 @@ function setupGalleryOnlyMode() {
                                 ✕
                             </button>
                         </div>
+                                                    <div class="composition-preview-canvas-onion-skinning">
+                                <button
+                                        id="previewCanvasOnionSkinning"
+                                        style="font-size: 0.8vmax; height: 75%; padding: 5px 5px !important"
+                                        title="Enable/disable onion skinning"
+                                        class="info"
+                                >
+                                    Onion Skinning
+                                </button>
+                            </div>
                         <div class="composition-preview-canvas-size-control">
                             <button
                                     id="previewCanvasAutoCustomToggle"
@@ -2557,7 +2567,7 @@ function handleForcedImport() {
                 window.memoryManager.initPromise = window.memoryManager.initDB();
                 await window.memoryManager.initPromise;
 
-                console.log("Database cleared and reinitialized successfully");
+                //console.log("Database cleared and reinitialized successfully");
             } catch (error) {
                 console.error("Error clearing database:", error);
                 if (progressModal) {
@@ -2693,7 +2703,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                 const freshCharacters = {};
 
                 // First, copy all default characters
-                if (typeof DEFAULTS !== 'undefined' && DEFAULTS.characters) {
+                if (typeof DEFAULTS !== "undefined" && DEFAULTS.characters) {
                     Object.keys(DEFAULTS.characters).forEach((charName) => {
                         freshCharacters[charName] = {
                             color: DEFAULTS.characters[charName].color,

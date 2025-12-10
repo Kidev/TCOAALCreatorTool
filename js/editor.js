@@ -4063,10 +4063,10 @@ async function updateGalleryContent() {
     // Clear temp filter variables
     window._tempBustsFilter = null;
     window._tempSpritesFilter = null;
+    window._tempBackgroundsFilter = null;
 
     let bustFilterValue = "All";
     if (currentGalleryTab === "images" && currentGalleryCategory === "Portraits") {
-        // Create container for filter and search
         let filterContainer = document.getElementById("bustsFilterContainer");
         if (!filterContainer) {
             filterContainer = document.createElement("div");
@@ -4218,12 +4218,78 @@ async function updateGalleryContent() {
         }
     }
 
+    let backgroundsFilterValue = "All";
+    if (currentGalleryTab === "images" && currentGalleryCategory === "Backgrounds") {
+        const existingSelect = document.getElementById("backgroundsFilterSelect");
+        if (existingSelect) {
+            backgroundsFilterValue = existingSelect.value;
+        }
+
+        // Create container for filter and search
+        let filterContainer = document.getElementById("backgroundsFilterContainer");
+        if (!filterContainer) {
+            filterContainer = document.createElement("div");
+            filterContainer.id = "backgroundsFilterContainer";
+            filterContainer.style.cssText = `
+                display: flex;
+                gap: 0.5vmax;
+                width: 100%;
+            `;
+            document.getElementById("galleryCategories").appendChild(filterContainer);
+        }
+
+        const filterSelect = document.createElement("select");
+        filterSelect.id = "backgroundsFilterSelect";
+        filterSelect.style.cssText = `
+            width: 25%;
+            padding: 0.5vmax 0.8vmax;
+            font-family: Consolas, Monaco, "Courier New", monospace;
+            font-size: 0.85vmax;
+            background: rgb(45, 45, 45);
+            border: 1px solid rgb(62, 62, 62);
+            border-radius: 4px;
+            color: rgb(255, 255, 255);
+            box-sizing: border-box;
+        `;
+
+        const backgroundCategories = [
+            { value: "All", label: "All" },
+            { value: "backgrounds", label: "Backgrounds" },
+            { value: "grounds", label: "Grounds" },
+            { value: "parallaxes", label: "Parallaxes" },
+            { value: "grounds+parallaxes", label: "Grounds & Parallaxes" },
+        ];
+        backgroundCategories.forEach((cat) => {
+            const option = document.createElement("option");
+            option.value = cat.value;
+            option.textContent = cat.label;
+            filterSelect.appendChild(option);
+        });
+
+        filterSelect.value = backgroundsFilterValue;
+        filterSelect.addEventListener("change", function () {
+            const previousValue = backgroundsFilterValue;
+            backgroundsFilterValue = this.value;
+
+            updateGalleryContent();
+        });
+
+        filterContainer.innerHTML = "";
+        window._tempBackgroundsFilter = filterSelect;
+    } else {
+        const filterContainer = document.getElementById("backgroundsFilterContainer");
+        if (filterContainer) {
+            filterContainer.remove();
+        }
+    }
+
     // Add search input for all categories (except Labels which has its own search)
     if (!(currentGalleryTab === "data" && currentGalleryCategory === "Labels")) {
         // Determine which container to use
         const bustsContainer = document.getElementById("bustsFilterContainer");
         const spritesContainer = document.getElementById("spritesFilterContainer");
-        const targetContainer = bustsContainer || spritesContainer;
+        const backgroundsContainer = document.getElementById("backgroundsFilterContainer");
+        const targetContainer = bustsContainer || spritesContainer || backgroundsContainer;
 
         let searchInput = document.getElementById("gallerySearchInput");
         if (!searchInput) {
@@ -4240,6 +4306,7 @@ async function updateGalleryContent() {
                 if (searchTerm) {
                     const bustsFilter = document.getElementById("bustsFilterSelect");
                     const spritesFilter = document.getElementById("spritesFilterSelect");
+                    const backgroundsFilter = document.getElementById("backgroundsFilterSelect");
 
                     if (bustsFilter && bustsFilter.value !== "All") {
                         bustsFilter.value = "All";
@@ -4248,6 +4315,10 @@ async function updateGalleryContent() {
                     if (spritesFilter && spritesFilter.value !== "All") {
                         spritesFilter.value = "All";
                         spritesFilterValue = "All";
+                    }
+                    if (backgroundsFilter && backgroundsFilter.value !== "All") {
+                        backgroundsFilter.value = "All";
+                        backgroundsFilterValue = "All";
                     }
                 }
 
@@ -4260,11 +4331,13 @@ async function updateGalleryContent() {
                     const filename = (item.dataset.filename || "").toLowerCase();
                     const originalName = (item.dataset.originalName || "").toLowerCase();
                     const formatName = (item.dataset.formatName || "").toLowerCase();
+                    const searchableTerms = (item.dataset.searchableTerms || "").toLowerCase();
 
                     const matches =
                         filename.includes(searchTerm) ||
                         originalName.includes(searchTerm) ||
-                        formatName.includes(searchTerm);
+                        formatName.includes(searchTerm) ||
+                        searchableTerms.includes(searchTerm);
 
                     item.style.display = matches ? "" : "none";
                 });
@@ -4297,11 +4370,14 @@ async function updateGalleryContent() {
             // Append the correct dropdown after search based on which container we're using
             const isBustsContainer = targetContainer.id === "bustsFilterContainer";
             const isSpritesContainer = targetContainer.id === "spritesFilterContainer";
+            const isBackgroundsContainer = targetContainer.id === "backgroundsFilterContainer";
 
             if (isBustsContainer && window._tempBustsFilter) {
                 targetContainer.appendChild(window._tempBustsFilter);
             } else if (isSpritesContainer && window._tempSpritesFilter) {
                 targetContainer.appendChild(window._tempSpritesFilter);
+            } else if (isBackgroundsContainer && window._tempBackgroundsFilter) {
+                targetContainer.appendChild(window._tempBackgroundsFilter);
             }
 
             // Remove standalone container if it exists
@@ -4414,6 +4490,11 @@ async function updateGalleryContent() {
     }
 
     assetEntries.forEach(([name, asset], index) => {
+        if (asset.baseFileName && typeof ignoreAssets !== "undefined") {
+            const shouldIgnore = ignoreAssets.some((hash) => asset.baseFileName.includes(hash));
+            if (shouldIgnore) return;
+        }
+
         if (currentGalleryTab === "images" && currentGalleryCategory === "Portraits" && bustFilterValue !== "All") {
             const baseName = name.toLowerCase().replace(/\.[^/.]+$/, "");
             if (!baseName.startsWith(bustFilterValue.toLowerCase() + "_")) return;
@@ -4421,6 +4502,22 @@ async function updateGalleryContent() {
 
         if (isSpritesCombined && spritesFilterValue !== "All") {
             if (!asset._spriteSource || asset._spriteSource !== spritesFilterValue) {
+                return;
+            }
+        }
+
+        if (
+            currentGalleryTab === "images" &&
+            currentGalleryCategory === "Backgrounds" &&
+            backgroundsFilterValue !== "All"
+        ) {
+            if (backgroundsFilterValue === "backgrounds") {
+                if (!window.galleryManager.isPureBackground(asset.baseFileName)) return;
+            } else if (backgroundsFilterValue === "grounds") {
+                if (!window.galleryManager.isGround(asset.baseFileName)) return;
+            } else if (backgroundsFilterValue === "parallaxes") {
+                if (!window.galleryManager.isParallaxe(asset.baseFileName)) return;
+            } else if (backgroundsFilterValue === "grounds+parallaxes") {
                 return;
             }
         }
@@ -4436,7 +4533,8 @@ async function updateGalleryContent() {
             }
         }
 
-        const formatName = window.galleryManager.formatAssetTitle(name, actualCategory, currentGalleryTab);
+        const friendlyName = window.galleryManager.getFriendlyName(name, asset.baseFileName);
+        const formatName = window.galleryManager.formatAssetTitle(friendlyName, actualCategory, currentGalleryTab);
         const displayName = formatName;
         const favKey = window.memoryManager?.generateFavouriteKey(currentGalleryTab, actualCategory, name);
         const isFav = favouritesSet.has(favKey);
@@ -4448,6 +4546,7 @@ async function updateGalleryContent() {
         item.dataset.baseFileName = asset.baseFileName;
         item.dataset.originalName = asset.originalName;
         item.dataset.formatName = formatName;
+        item.dataset.searchableTerms = window.galleryManager.getSearchableTerms(asset.baseFileName);
         item.dataset.category = actualCategory;
         item.dataset.type = currentGalleryTab;
 
@@ -4496,12 +4595,92 @@ async function updateGalleryContent() {
             item.innerHTML = `
                 ${starHtml}
                 <div class="gallery-item-audio compact">
-                <div class="audio-icon">🎵</div>
+                <div class="audio-icon">♫</div>
                 <div class="gallery-item-name">${displayName}</div>
                 </div>`;
         }
         contentContainer.appendChild(item);
     });
+
+    if (
+        currentGalleryTab === "images" &&
+        currentGalleryCategory === "Backgrounds" &&
+        backgroundsFilterValue === "grounds+parallaxes"
+    ) {
+        const grounds = [];
+        const parallaxes = new Map();
+
+        assetEntries.forEach(([name, asset]) => {
+            const hashName = window.galleryManager.getHashToNameValue(asset.baseFileName);
+            if (hashName && hashName.startsWith("ground_")) {
+                const number = hashName.replace("ground_", "");
+                grounds.push({ name, asset, number });
+            } else if (hashName && hashName.startsWith("parallax_")) {
+                const number = hashName.replace("parallax_", "");
+                parallaxes.set(number, { name, asset });
+            }
+        });
+
+        grounds.forEach((ground) => {
+            const parallaxe = parallaxes.get(ground.number);
+            if (!parallaxe) return;
+
+            const displayName = `Ground & Parallax #${ground.number}`;
+            const formatName = displayName;
+
+            const item = document.createElement("div");
+            item.className = "gallery-item gallery-item-paired";
+            item.dataset.filename = ground.name;
+            item.dataset.pairedFilename = parallaxe.name;
+            item.dataset.baseFileName = ground.asset.baseFileName;
+            item.dataset.pairedBaseFileName = parallaxe.asset.baseFileName;
+            item.dataset.isPaired = "true";
+            item.dataset.formatName = formatName;
+            item.dataset.category = currentGalleryCategory;
+            item.dataset.type = currentGalleryTab;
+            item.dataset.pairedNumber = ground.number;
+
+            item._groundAsset = ground.asset;
+            item._parallaxeAsset = parallaxe.asset;
+
+            item.onclick = function (ev) {
+                document.querySelectorAll(".gallery-item").forEach((it) => {
+                    it.classList.remove("selected");
+                });
+                ev.currentTarget.classList.add("selected");
+                window.galleryManager.scrollIfRequired(ev.currentTarget);
+
+                const groundAsset = ev.currentTarget._groundAsset;
+                const parallaxeAsset = ev.currentTarget._parallaxeAsset;
+                const groundName = ev.currentTarget.dataset.filename;
+                const parallaxeName = ev.currentTarget.dataset.pairedFilename;
+                const pairedNumber = ev.currentTarget.dataset.pairedNumber;
+
+                window.galleryManager.previewPairedBackgrounds(
+                    groundName,
+                    parallaxeName,
+                    currentGalleryCategory,
+                    groundAsset,
+                    parallaxeAsset,
+                    pairedNumber,
+                );
+            };
+
+            const starHtml = favouriteStarUrl
+                ? `<img class="gallery-item-fav-star" src="${favouriteStarUrl}" alt="Favourite" title="Favourite">`
+                : `<span class="gallery-item-fav-star" title="Favourite">★</span>`;
+
+            item.innerHTML = `
+                ${starHtml}
+                <div class="img-container">
+                <img src="${ground.asset.url}" alt="${ground.name}" loading="lazy" style="position: absolute; top: 0; left: 0; width: 100%; z-index: 1;">
+                <img src="${parallaxe.asset.url}" alt="${parallaxe.name}" loading="lazy" style="position: absolute; top: 0; left: 0; width: 100%; z-index: 2;">
+                </div>
+                <div class="gallery-item-name-paired">${displayName}</div>`;
+
+            contentContainer.appendChild(item);
+        });
+    }
 
     if (isSelectionMode && currentAssetName && currentAssetCategory === currentGalleryCategory) {
         setTimeout(() => {

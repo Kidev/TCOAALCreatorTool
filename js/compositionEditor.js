@@ -269,9 +269,7 @@ class CompositionEditor {
         const renderData = this.getLayerRenderData(layer);
 
         if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
-            const canvasIndex = renderData.isAnimated
-                ? layer.currentSpriteIndex
-                : 0;
+            const canvasIndex = renderData.isAnimated ? layer.currentSpriteIndex : 0;
             const spriteCanvas = renderData.spriteCanvases[canvasIndex];
             if (spriteCanvas) {
                 tempCtx.drawImage(spriteCanvas, renderData.x, renderData.y);
@@ -1504,7 +1502,8 @@ class CompositionEditor {
                     } else {
                         const now = Date.now();
                         if (now - layer.lastAnimationTime >= layer.animationSpeed) {
-                            layer.currentSpriteIndex = (layer.currentSpriteIndex + 1) % renderData.spriteCanvases.length;
+                            layer.currentSpriteIndex =
+                                (layer.currentSpriteIndex + 1) % renderData.spriteCanvases.length;
                             layer.lastAnimationTime = now;
                         }
                         spriteFrameIndex = layer.currentSpriteIndex;
@@ -3332,9 +3331,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
             const renderData = this.getLayerRenderData(layer);
 
             if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
-                const canvasIndex = renderData.isAnimated
-                    ? layer.currentSpriteIndex
-                    : 0;
+                const canvasIndex = renderData.isAnimated ? layer.currentSpriteIndex : 0;
                 const spriteCanvas = renderData.spriteCanvases[canvasIndex];
                 if (spriteCanvas) {
                     exportCtx.drawImage(spriteCanvas, renderData.x, renderData.y);
@@ -4250,9 +4247,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                 const renderData = this.getLayerRenderData(layer);
 
                 if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
-                    const canvasIndex = renderData.isAnimated
-                        ? layer.currentSpriteIndex
-                        : 0;
+                    const canvasIndex = renderData.isAnimated ? layer.currentSpriteIndex : 0;
                     const spriteCanvas = renderData.spriteCanvases[canvasIndex];
                     if (spriteCanvas) {
                         exportCtx.drawImage(spriteCanvas, renderData.x, renderData.y);

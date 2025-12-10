@@ -1325,3 +1325,36 @@ canvas.background-image {
         width: 95%;
     }
 }
+
+.forced-import-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle, rgba(128, 0, 255, 0.25) 0, rgba(128, 0, 255, 0.05) 40%, rgba(0, 0, 0, 0) 80%);
+    background-repeat: no-repeat;
+    background-size: 200% 200%; /* radius */
+    background-position: 50% 85%; /* x 50percent y 25percent */
+    animation: haloPulse 4s ease-in-out infinite;
+}
+
+@keyframes haloPulse {
+    0% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(1.1);
+    }
+    100% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+}
+
+#pitchSlider,
+#speedSlider,
+#volumeSlider {
+    accent-color: var(--default); /* change this to the color you want */
+}

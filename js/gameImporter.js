@@ -247,7 +247,7 @@ class GameImporter {
                             const langdataPrefix = "LANGDATA";
                             if (jsonText.startsWith(langdataPrefix)) {
                                 jsonText = jsonText.substring(langdataPrefix.length);
-                                console.log(`Stripped LANGDATA prefix from ${assetName}`);
+                                //console.log(`Stripped LANGDATA prefix from ${assetName}`);
                             }
                         }
 

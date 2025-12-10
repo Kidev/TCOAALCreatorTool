@@ -104,6 +104,125 @@ class GalleryManager {
 
     init() {}
 
+    /**
+     * Improves subtitle by replacing encrypted hashes with friendly names from hashToFilename
+     * @param {string} baseFileName - The original baseFileName (e.g., "img/faces/aab510d75d377c95[BUST].png")
+     * @returns {object} Object with { subtitle: improvedString, original: originalString }
+     */
+    improveSubtitle(baseFileName) {
+        if (!baseFileName) return { subtitle: baseFileName, original: baseFileName };
+
+        for (const [hash, friendlyName] of Object.entries(hashToFilename)) {
+            if (baseFileName.includes(hash)) {
+                const improved = baseFileName.replace(hash, friendlyName);
+                return {
+                    subtitle: improved,
+                    original: baseFileName,
+                };
+            }
+        }
+
+        return {
+            subtitle: baseFileName,
+            original: baseFileName,
+        };
+    }
+
+    /**
+     * Extracts all searchable terms from baseFileName using hashToFilename mapping
+     * @param {string} baseFileName - The original baseFileName (e.g., "img/faces/aab510d75d377c95[BUST].png")
+     * @returns {string} Space-separated searchable terms (e.g., "andrew_1 aab510d75d377c95 aab510d75d377c95[BUST]")
+     */
+    getSearchableTerms(baseFileName) {
+        if (!baseFileName) return "";
+
+        const terms = [];
+
+        for (const [hash, friendlyName] of Object.entries(hashToFilename)) {
+            if (baseFileName.includes(hash)) {
+                terms.push(friendlyName);
+
+                terms.push(hash);
+
+                const hashWithoutSuffix = hash.replace(/\[.*?\]$/, "");
+                if (hashWithoutSuffix !== hash) {
+                    terms.push(hashWithoutSuffix);
+                }
+
+                break;
+            }
+        }
+
+        return terms.join(" ");
+    }
+
+    /**
+     * Gets the display name from hashToName mapping if available
+     * @param {string} name - The current asset name (e.g., "andrew_1.png")
+     * @param {string} baseFileName - The original baseFileName (e.g., "img/faces/aab510d75d377c95[BUST].png")
+     * @returns {string} The display name with extension if found, otherwise the original name
+     */
+    getFriendlyName(name, baseFileName) {
+        if (!baseFileName) return name;
+
+        for (const [hash, displayName] of Object.entries(hashToName)) {
+            if (baseFileName.includes(hash)) {
+                const ext = name.includes(".") ? name.substring(name.lastIndexOf(".")) : "";
+
+                return displayName + ext;
+            }
+        }
+
+        return name;
+    }
+
+    /**
+     * Gets the hashToName value for an asset
+     * @param {string} baseFileName - The original baseFileName
+     * @returns {string|null} The hashToName value if found, otherwise null
+     */
+    getHashToNameValue(baseFileName) {
+        if (!baseFileName || typeof hashToName === "undefined") return null;
+
+        for (const [hash, displayName] of Object.entries(hashToName)) {
+            if (baseFileName.includes(hash)) {
+                return displayName;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Checks if an asset is a ground based on hashToName
+     * @param {string} baseFileName - The original baseFileName
+     * @returns {boolean} True if the asset is a ground
+     */
+    isGround(baseFileName) {
+        const hashName = this.getHashToNameValue(baseFileName);
+        return hashName && hashName.startsWith("ground_");
+    }
+
+    /**
+     * Checks if an asset is a parallaxe based on hashToName
+     * @param {string} baseFileName - The original baseFileName
+     * @returns {boolean} True if the asset is a parallax
+     */
+    isParallaxe(baseFileName) {
+        const hashName = this.getHashToNameValue(baseFileName);
+        return hashName && hashName.startsWith("parallax_");
+    }
+
+    /**
+     * Checks if an asset is a pure background (not ground or parallaxe)
+     * @param {string} baseFileName - The original baseFileName
+     * @returns {boolean} True if the asset is a pure background
+     */
+    isPureBackground(baseFileName) {
+        const hashName = this.getHashToNameValue(baseFileName);
+        if (!hashName) return true;
+        return !hashName.startsWith("ground_") && !hashName.startsWith("parallax_");
+    }
+
     detectSpriteSheetFromName(filename) {
         if (filename in spritesSheetsVariants) {
             const variant = spritesSheetsVariants[filename];
@@ -228,6 +347,130 @@ class GalleryManager {
             this.previewData(asset, name, contentDiv, controlsDiv);
         } else {
             this.previewAudio(asset, name, contentDiv, controlsDiv);
+        }
+    }
+
+    previewPairedBackgrounds(
+        groundName,
+        parallaxeName,
+        category,
+        groundAsset = null,
+        parallaxeAsset = null,
+        pairedNumber = null,
+    ) {
+        //console.log("previewPairedBackgrounds called:", { groundName, parallaxeName, category, groundAsset, parallaxeAsset, pairedNumber });
+
+        if (!groundAsset || !parallaxeAsset) {
+            const assets = window.gameImporterAssets?.images?.[category];
+            if (assets) {
+                groundAsset = assets[groundName];
+                parallaxeAsset = assets[parallaxeName];
+            }
+        }
+
+        if (!groundAsset || !parallaxeAsset) {
+            console.error("Could not find paired background assets", { groundAsset, parallaxeAsset });
+            alert(
+                "Could not find paired background assets. Ground: " + !!groundAsset + ", Parallax: " + !!parallaxeAsset,
+            );
+            return;
+        }
+
+        //console.log("Assets found, creating preview");
+
+        this.currentAsset = {
+            name: groundName,
+            category: category,
+            type: "images",
+            asset: groundAsset,
+            isPaired: true,
+            pairedName: parallaxeName,
+            pairedAsset: parallaxeAsset,
+        };
+
+        const downloadBtn = document.getElementById("previewDownloadBtn");
+        downloadBtn.classList.add("active");
+
+        const contentDiv = document.getElementById("previewPanelContent");
+        const controlsDiv = document.getElementById("previewControls");
+
+        const title = pairedNumber ? `Ground & Parallax #${pairedNumber}` : "Ground & Parallax";
+
+        const groundImproved = this.improveSubtitle(groundAsset.baseFileName);
+        const parallaxeImproved = this.improveSubtitle(parallaxeAsset.baseFileName);
+        const subtitle = `${groundImproved.subtitle}</br>${parallaxeImproved.subtitle}`;
+        const subtitleOriginal = `Ground: ${groundImproved.original}\nParallax: ${parallaxeImproved.original}`;
+
+        contentDiv.innerHTML = `
+        <div class="preview-image-container">
+            <img src="${groundAsset.url}" alt="${groundName}" class="preview-image" id="previewMainImage">
+            <img src="${parallaxeAsset.url}" alt="${parallaxeName}" class="preview-image" style="position: absolute;">
+        </div>`;
+
+        controlsDiv.innerHTML = `
+            <div class="asset-image-preview-title-line"><div class="asset-filename-title">${title}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
+            </div>
+                                        <div class="preview-control-group-add-editor">
+                <div class="split-button" id="imageOpenEditorChoiceButton">
+                    <button class="btn main"></button>
+                    <button class="btn arrow">▼</button>
+                    <div class="menu"></div>
+                </div>
+            </div>
+        `;
+
+        this.updateCropButtonInPreviewTitle(false);
+
+        if (window.compositionEditor.autoOpenButtonManager) {
+            window.compositionEditor.autoOpenButtonManager.attachTo(
+                document.getElementById("imageOpenEditorChoiceButton"),
+                this,
+                this.addPairedBackgroundsToCompositionEditor,
+            );
+        }
+    }
+
+    async addPairedBackgroundsToCompositionEditor() {
+        if (!this.currentAsset || !this.currentAsset.isPaired) {
+            alert("No paired backgrounds selected");
+            return;
+        }
+
+        if (!window.compositionEditor) {
+            console.error("Composition editor not initialized");
+            return;
+        }
+
+        const groundAsset = this.currentAsset.asset;
+        const parallaxeAsset = this.currentAsset.pairedAsset;
+        const groundName = this.currentAsset.name;
+        const parallaxeName = this.currentAsset.pairedName;
+        const category = this.currentAsset.category;
+
+        const groundData = {
+            name: groundName,
+            type: "background",
+            assetRef: `gallery:${category}/${groundName}`,
+            blobUrl: groundAsset.url,
+            x: 0,
+            y: 0,
+        };
+        window.compositionEditor.addLayer(groundData);
+
+        const parallaxeData = {
+            name: parallaxeName,
+            type: "background",
+            assetRef: `gallery:${category}/${parallaxeName}`,
+            blobUrl: parallaxeAsset.url,
+            x: 0,
+            y: 0,
+        };
+        window.compositionEditor.addLayer(parallaxeData);
+
+        this.flashSuccessOnButton();
+
+        if (window.compositionEditor.autoOpen === true && !window.compositionEditor.isOpen) {
+            window.compositionEditor.open();
         }
     }
 
@@ -524,7 +767,11 @@ class GalleryManager {
                         return; // User switched to another sprite sheet, abort
                     }
                     // Check if user navigated away
-                    if (!this.currentAsset || this.currentAsset.name !== name || this.currentAsset.category !== category) {
+                    if (
+                        !this.currentAsset ||
+                        this.currentAsset.name !== name ||
+                        this.currentAsset.category !== category
+                    ) {
                         return; // User navigated away, abort
                     }
                 }
@@ -609,21 +856,25 @@ class GalleryManager {
             }
         });
 
-        let titleWithoutSize, subtitle;
+        let titleWithoutSize, subtitle, subtitleOriginal;
         if (asset.externalUrl) {
             let titleName = this.formatAssetTitle(name, "images").split(" ");
             titleName.pop();
             titleWithoutSize = titleName.join(" ");
             subtitle = asset.externalUrl;
+            subtitleOriginal = asset.externalUrl;
         } else {
-            let titleName = this.formatAssetTitle(name, "images").split(" ");
+            const friendlyName = this.getFriendlyName(name, asset.baseFileName);
+            let titleName = this.formatAssetTitle(friendlyName, "images").split(" ");
             titleName.pop();
             titleWithoutSize = titleName.join(" ");
-            subtitle = asset.baseFileName;
+            const improved = this.improveSubtitle(asset.baseFileName);
+            subtitle = improved.subtitle;
+            subtitleOriginal = improved.original;
         }
 
         controlsDiv.innerHTML = `
-                <div class="asset-image-preview-title-line"><div class="asset-filename-title">${titleWithoutSize}<div class="asset-filename-subtitle">${subtitle}</div></div>
+                <div class="asset-image-preview-title-line"><div class="asset-filename-title">${titleWithoutSize}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
 </div>
                 <div id="previewControlsSheetSpecific">
                 <div class="preview-control-group preview-sprite-controls compact">
@@ -683,11 +934,20 @@ class GalleryManager {
             <img src="${src}" alt="${name}" class="preview-image" id="previewMainImage">
         </div>`;
 
-        const title = this.formatAssetTitle(name, "images");
-        const subtitle = asset.externalUrl ? asset.externalUrl : asset.baseFileName;
+        const friendlyName = this.getFriendlyName(name, asset.baseFileName);
+        const title = this.formatAssetTitle(friendlyName, "images");
+        let subtitle, subtitleOriginal;
+        if (asset.externalUrl) {
+            subtitle = asset.externalUrl;
+            subtitleOriginal = asset.externalUrl;
+        } else {
+            const improved = this.improveSubtitle(asset.baseFileName);
+            subtitle = improved.subtitle;
+            subtitleOriginal = improved.original;
+        }
 
         controlsDiv.innerHTML = `
-            <div class="asset-image-preview-title-line"><div class="asset-filename-title">${title}<div class="asset-filename-subtitle">${subtitle}</div></div>
+            <div class="asset-image-preview-title-line"><div class="asset-filename-title">${title}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
             </div>
                                         <div class="preview-control-group-add-editor">
                 <div class="split-button" id="imageOpenEditorChoiceButton">
@@ -816,11 +1076,20 @@ class GalleryManager {
             isDragging = false;
         });
 
-        const title = this.formatAssetTitle(name, "audio");
-        const subtitle = asset.externalUrl ? asset.externalUrl : asset.baseFileName;
+        const friendlyName = this.getFriendlyName(name, asset.baseFileName);
+        const title = this.formatAssetTitle(friendlyName, "audio");
+        let subtitle, subtitleOriginal;
+        if (asset.externalUrl) {
+            subtitle = asset.externalUrl;
+            subtitleOriginal = asset.externalUrl;
+        } else {
+            const improved = this.improveSubtitle(asset.baseFileName);
+            subtitle = improved.subtitle;
+            subtitleOriginal = improved.original;
+        }
 
         controlsDiv.innerHTML = `
-            <div class="asset-filename-title">${title}<div class="asset-filename-subtitle">${subtitle}</div></div>
+            <div class="asset-filename-title">${title}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
             <div class="preview-control-group-add-editor">
                 <div class="split-button" id="audioOpenEditorChoiceButton">
                     <button class="btn main"></button>
@@ -1017,15 +1286,19 @@ class GalleryManager {
         `;
 
         const category = this.currentAsset?.category || "Data";
-        const title = this.formatAssetTitle(name, category, "data");
-        const subtitle = asset.baseFileName;
+
+        const friendlyName = this.getFriendlyName(name, asset.baseFileName);
+        const title = this.formatAssetTitle(friendlyName, category, "data");
+        const improved = this.improveSubtitle(asset.baseFileName);
+        const subtitle = improved.subtitle;
+        const subtitleOriginal = improved.original;
         const isMaps = category === "Maps";
 
         if (isMaps) {
             controlsDiv.innerHTML = "";
         } else {
             controlsDiv.innerHTML = `
-                <div class="asset-filename-title">${title}<div class="asset-filename-subtitle">${subtitle}</div></div>
+                <div class="asset-filename-title">${title}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
                 <div class="preview-control-group-add-editor">
                     <div class="split-button disabled" id="dataOpenEditorChoiceButton">
                         <button class="btn main" disabled></button>
@@ -1041,7 +1314,7 @@ class GalleryManager {
             const jsonData = JSON.parse(asset.jsonText || "{}");
 
             const toolbarInfo = isMaps
-                ? `<span class="json-info"><strong>${title}</strong><br/><span style="font-size: 0.85em; opacity: 0.8;">${subtitle}</span></span>`
+                ? `<span class="json-info"><strong>${title}</strong><br/><span style="font-size: 0.85em; opacity: 0.8;" title="${subtitleOriginal}">${subtitle}</span></span>`
                 : `<span class="json-info">${asset.isValid ? "Valid JSON" : "Invalid JSON"}</span>`;
 
             contentDiv.innerHTML = `
@@ -1093,10 +1366,10 @@ class GalleryManager {
             navigator.clipboard
                 .writeText(jsonText)
                 .then(() => {
-                    console.log("JSON copied to clipboard");
+                    //console.log("JSON copied to clipboard");
                 })
                 .catch((err) => {
-                    console.error("Failed to copy JSON:", err);
+                    //console.error("Failed to copy JSON:", err);
                 });
         }
     }
@@ -1137,11 +1410,11 @@ class GalleryManager {
     }
 
     collapseAllJsonBlocks() {
-        console.log("Collapse all JSON blocks - not implemented yet");
+        //console.log("Collapse all JSON blocks - not implemented yet");
     }
 
     expandAllJsonBlocks() {
-        console.log("Expand all JSON blocks - not implemented yet");
+        //console.log("Expand all JSON blocks - not implemented yet");
     }
 
     searchInJson() {
@@ -1266,12 +1539,16 @@ class GalleryManager {
             }
         }
 
-        const words = base
-            .replace(/[_-]+/g, " ")
-            .split(" ")
-            .filter(Boolean)
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1));
-        return words.join(" ");
+        const words = base.replace(/[_-]+/g, " ").split(" ").filter(Boolean);
+
+        if (category === "Portraits") {
+            if (words.length === 0) return "";
+            const first = words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase();
+            const rest = words.slice(1).map((w) => w.toLowerCase());
+            return [first, ...rest].join(" ");
+        }
+
+        return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     }
 
     setAudioVolume(value) {
@@ -1545,7 +1822,7 @@ class GalleryManager {
         const step = width / data.length;
 
         if (progress > 0) {
-            ctx.fillStyle = "#ec83c3";
+            ctx.fillStyle = Color.PURPLE;
             ctx.beginPath();
             ctx.moveTo(0, middle);
 
@@ -1567,7 +1844,7 @@ class GalleryManager {
         }
 
         if (progress < 100) {
-            ctx.fillStyle = "#596891";
+            ctx.fillStyle = Color.GREEN;
             ctx.beginPath();
             const startIdx = Math.floor(progressX / step);
             ctx.moveTo(progressX, middle);
@@ -1663,6 +1940,32 @@ class GalleryManager {
 
     downloadAsset() {
         if (!this.currentAsset) return;
+
+        if (this.currentAsset.isPaired) {
+            const groundAsset = this.currentAsset.asset;
+            const parallaxeAsset = this.currentAsset.pairedAsset;
+            const groundName = this.currentAsset.name;
+            const parallaxeName = this.currentAsset.pairedName;
+
+            const a1 = document.createElement("a");
+            a1.href =
+                groundAsset.croppedUrl && this.globalImageViewMode === "cropped"
+                    ? groundAsset.croppedUrl
+                    : groundAsset.url;
+            a1.download = groundName;
+            a1.click();
+
+            setTimeout(() => {
+                const a2 = document.createElement("a");
+                a2.href =
+                    parallaxeAsset.croppedUrl && this.globalImageViewMode === "cropped"
+                        ? parallaxeAsset.croppedUrl
+                        : parallaxeAsset.url;
+                a2.download = parallaxeName;
+                a2.click();
+            }, 100);
+            return;
+        }
 
         const { name, asset } = this.currentAsset;
         const a = document.createElement("a");

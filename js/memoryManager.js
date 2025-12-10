@@ -320,7 +320,6 @@ class MemoryManager {
                         compositionSource: asset.compositionSource || "user",
                     };
 
-                    
                     if (asset.type === "data") {
                         assetData.jsonText = asset.jsonText;
                         assetData.isValid = asset.isValid;
