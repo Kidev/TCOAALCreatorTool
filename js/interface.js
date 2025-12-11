@@ -1954,11 +1954,11 @@ function setupGalleryOnlyMode() {
         <div id="importProgressModal" class="import-modal" style="display: none;">
             <div class="import-modal-content">
                 <img src="${window.uiAssets?.siteLoading?.url || ""}" style="margin: 0 auto 1.5vmax; display: block;">
-                <h2>Processing game assets</h2>
-                <div class="import-progress-bar">
-                    <div id="importProgressFill" class="import-progress-fill"></div>
+                <h2 style="display:none;visibility:hidden;">Processing game assets</h2>
+                <div class="import-progress-bar" style="display:none;visibility:hidden;">
+                    <div id="importProgressFill" class="import-progress-fill" style="display:none;visibility:hidden;"></div>
                 </div>
-                <div id="importProgressText" class="import-progress-text">Processing...</div>
+                <div id="importProgressText" class="import-progress-text" style="display:none;visibility:hidden;">Processing...</div>
             </div>
         </div>
         <!-- Composition Editor Modal -->

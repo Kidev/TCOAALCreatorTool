@@ -4039,8 +4039,31 @@ async function updateGalleryContent() {
 
     const assetEntries = Object.entries(assets);
     assetEntries.sort((a, b) => {
-        const keyA = window.memoryManager?.generateFavouriteKey(currentGalleryTab, currentGalleryCategory, a[0]);
-        const keyB = window.memoryManager?.generateFavouriteKey(currentGalleryTab, currentGalleryCategory, b[0]);
+        let categoryA = currentGalleryCategory;
+        let categoryB = currentGalleryCategory;
+
+        if (isSpritesCombined && a[1]._spriteSource) {
+            if (a[1]._spriteSource === "Game") {
+                categoryA = "Game sprites";
+            } else if (a[1]._spriteSource === "System") {
+                categoryA = "System sprites";
+            } else if (a[1]._spriteSource === "Tilesets") {
+                categoryA = "System sprites";
+            }
+        }
+
+        if (isSpritesCombined && b[1]._spriteSource) {
+            if (b[1]._spriteSource === "Game") {
+                categoryB = "Game sprites";
+            } else if (b[1]._spriteSource === "System") {
+                categoryB = "System sprites";
+            } else if (b[1]._spriteSource === "Tilesets") {
+                categoryB = "System sprites";
+            }
+        }
+
+        const keyA = window.memoryManager?.generateFavouriteKey(currentGalleryTab, categoryA, a[0]);
+        const keyB = window.memoryManager?.generateFavouriteKey(currentGalleryTab, categoryB, b[0]);
         const favA = favouritesSet.has(keyA);
         const favB = favouritesSet.has(keyB);
 
@@ -4628,6 +4651,10 @@ async function updateGalleryContent() {
             const displayName = `Ground & Parallax #${ground.number}`;
             const formatName = displayName;
 
+            const groundTerms = window.galleryManager.getSearchableTerms(ground.asset.baseFileName);
+            const parallaxeTerms = window.galleryManager.getSearchableTerms(parallaxe.asset.baseFileName);
+            const combinedSearchableTerms = `${groundTerms} ${parallaxeTerms} ${ground.number}`;
+
             const item = document.createElement("div");
             item.className = "gallery-item gallery-item-paired";
             item.dataset.filename = ground.name;
@@ -4636,6 +4663,7 @@ async function updateGalleryContent() {
             item.dataset.pairedBaseFileName = parallaxe.asset.baseFileName;
             item.dataset.isPaired = "true";
             item.dataset.formatName = formatName;
+            item.dataset.searchableTerms = combinedSearchableTerms;
             item.dataset.category = currentGalleryCategory;
             item.dataset.type = currentGalleryTab;
             item.dataset.pairedNumber = ground.number;

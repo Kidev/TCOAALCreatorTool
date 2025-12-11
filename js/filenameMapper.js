@@ -16,86 +16,121 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- *  TCOAAL Creator Tool
- *  Copyright (C) 2025, Alexandre 'kidev' Poumaroux
- *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU Affero General Public License as published
- *  by the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU Affero General Public License for more details.
- *
- *  You should have received a copy of the GNU Affero General Public License
- *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+const assetTypeOrder = {
+    "images": 0,
+    "sounds": 1,
+    "data": 2,
+};
+
+const assetCategoryOrder = {
+    "Portraits": 0,
+    "Game sprites": 1,
+    "Backgrounds": 2,
+    "Pictures": 3,
+    "System sprites": 4,
+    "Misc": 5,
+
+    "Background songs": 0,
+    "Background sounds": 1,
+    "Event sounds": 2,
+    "Sound effects": 3,
+};
+
+const numberOfPictures = 1012;
+const numberOfBackgrounds = 285;
+const numberOfData = 234;
+
+const spritesSheetsVariants = {
+    "spritessheet_16x16_system_12.png": {
+        sizes: [
+            { cols: 2, rows: 2 },
+            { cols: 4, rows: 4 },
+            { cols: 8, rows: 8 },
+            { cols: 16, rows: 16 },
+        ],
+        default: 2,
+    },
+};
 
 const filenamesMapped = {
     // === Map Files ===
-    "be4ea0427c554cd9": "map_1",
-    "701ca312447feeff": "map_2",
-    "eb08202b408f34a7": "map_3",
-    "3a0ad431671e9969": "map_4",
-    "a6508bd215624838": "map_5",
-    "7b62476c532a63b2": "map_6",
-    "59844f4ba628a616": "map_7",
-    "054cb6c0fb3a4287": "map_8",
-    "db27ad902d95af45": "map_9",
-    "bed6b049e84e7992": "map_10",
-    "c1d0913db015a7f9": "map_11",
-    "06a5c2c0040a37fe": "map_12",
-    "7061ce2052cc93e0": "map_13",
-    "ce75f846f12ff0cc": "map_14",
-    "26d47de73a40bdad": "map_15",
-    "1e29e5b2ac8b5ab1": "map_16",
-    "d94cd2768932c06a": "map_17",
-    "41d31c139a8afeb9": "map_18",
-    "4f072360c6b94567": "map_19",
-    "3d604cacb48ef965": "map_20",
-    "8af5d121f7003916": "map_21",
-    "06d1650812c92d1f": "map_22",
-    "ae760b41908472ae": "map_23",
-    "8b7dabc172728c30": "map_24",
-    "800344a950e65187": "map_25",
-    "2b18d7dc081dc62b": "map_26",
-    "f49c0ae25167ed55": "map_27",
-    "df8a857eec8680c5": "map_28",
-    "56c6157c0cef0d71": "map_29",
-    "43ff8d1358484703": "map_30",
-    "eb464b634bb21262": "map_31",
-    "2ffa3bb51859a242": "map_32",
-    "6655c6127544e5fd": "map_34",
-    "326ca006a81bb4b5": "map_35",
-    "1124eee982150e41": "map_36",
-    "8da10d2f34eaa36d": "map_37",
-    "2db29042af447095": "map_38",
-    "ee83399e9c8467e1": "map_40",
-    "d4b687332dfd6546": "map_41",
-    "154629d325c17b8d": "map_42",
-    "0fa2aa7bcdba1978": "map_43",
-    "dbaf035d6a7daa70": "map_44",
-    "f7abc2ea09dd1dc1": "map_45",
-    "5e3ee90558cf8b9c": "map_46",
-    "f4700abf0cc09876": "map_47",
-    "d88e5ac3a06a9e41": "map_48",
-    "95d5dc1e16e7599a": "map_49",
-    "8f7e0f347ee2d96c": "map_50",
-    "cf331dd3d89de0ce": "map_51",
-    "8ef62552742bfaeb": "map_52",
-    "fc234c9e5ea398a7": "map_53",
-    "880702f4bef60e2b": "map_54",
-    "13195526e1e78f1c": "map_55",
-    "2478e47ea38d116d": "map_56",
-    "93193f433c078e67": "map_57",
-    "2d63e9a6b22d5754": "map_59",
-    "d775a2847901ae30": "map_60",
+    "f548a33ef014a2a9": "map_Actors", // "Actors"
+    "6c2761ba70863900": "map_Animations", // "Animations"
+    "1578c9babaee50aa": "map_Armors", // "Armors"
+    "7aa4f7e2b748a9b1": "map_Classes", // "Classes"
+    "93165b65a9ecda9b": "map_CommonEvents", // "CommonEvents"
+    "b0cfe5f195d0d61b": "map_Enemies", // "Enemies"
+    "fca9ba82c2e9907e": "map_Items", // "Items"
+    "e2179bd0c2dc98da": "map_MapInfos", // "MapInfos"
+    "d4882f67829cb7a8": "map_Skills", // "Skills"
+    "8e0412b9817913ed": "map_States", // "States"
+    "be1a37535e921f91": "map_System", // "System"
+    "ac711434613b8c64": "map_Tilesets", // "Tilesets"
+    "08ef2224f07a731e": "map_Troops", // "Troops"
+    "5281c3e6b5a90e7f": "map_Weapons", // "Weapons"
+    "26d47de73a40bdad": "map_1", // "Map001"
+    "701ca312447feeff": "map_2", // "Map002"
+    "eb08202b408f34a7": "map_3", // "Map003"
+    "3a0ad431671e9969": "map_4", // "Map004"
+    "a6508bd215624838": "map_5", // "Map005"
+    "7b62476c532a63b2": "map_6", // "Map006"
+    "59844f4ba628a616": "map_7", // "Map007"
+    "054cb6c0fb3a4287": "map_8", // "Map008"
+    "db27ad902d95af45": "map_9", // "Map009"
+    "bed6b049e84e7992": "map_10", // "Map010"
+    "c1d0913db015a7f9": "map_11", // "Map011"
+    "06a5c2c0040a37fe": "map_12", // "Map012"
+    "7061ce2052cc93e0": "map_13", // "Map013"
+    "ce75f846f12ff0cc": "map_14", // "Map014"
+    "41994b52078001c6": "map_15", // "Map015"
+    "1e29e5b2ac8b5ab1": "map_16", // "Map016"
+    "d94cd2768932c06a": "map_17", // "Map017"
+    "41d31c139a8afeb9": "map_18", // "Map018"
+    "4f072360c6b94567": "map_19", // "Map019"
+    "3d604cacb48ef965": "map_20", // "Map020"
+    "8af5d121f7003916": "map_21", // "Map021"
+    "06d1650812c92d1f": "map_22", // "Map022"
+    "ae760b41908472ae": "map_23", // "Map023"
+    "8b7dabc172728c30": "map_24", // "Map024"
+    "800344a950e65187": "map_25", // "Map025"
+    "2b18d7dc081dc62b": "map_26", // "Map026"
+    "225f3ab08bef402d": "map_27", // "Map027"
+    "df8a857eec8680c5": "map_28", // "Map028"
+    "56c6157c0cef0d71": "map_29", // "Map029"
+    "43ff8d1358484703": "map_30", // "Map030"
+    "eb464b634bb21262": "map_31", // "Map031"
+    "2ffa3bb51859a242": "map_32", // "Map032"
+    "79590c22f5c0128d": "map_33", // "Map033"
+    "6655c6127544e5fd": "map_34", // "Map034"
+    "326ca006a81bb4b5": "map_35", // "Map035"
+    "1124eee982150e41": "map_36", // "Map036"
+    "8da10d2f34eaa36d": "map_37", // "Map037"
+    "2db29042af447095": "map_38", // "Map038"
+    "de33dea8dbf590d7": "map_39", // "Map039"
+    "ee83399e9c8467e1": "map_40", // "Map040"
+    "d4b687332dfd6546": "map_41", // "Map041"
+    "154629d325c17b8d": "map_42", // "Map042"
+    "0fa2aa7bcdba1978": "map_43", // "Map043"
+    "dbaf035d6a7daa70": "map_44", // "Map044"
+    "f7abc2ea09dd1dc1": "map_45", // "Map045"
+    "5e3ee90558cf8b9c": "map_46", // "Map046"
+    "f4700abf0cc09876": "map_47", // "Map047"
+    "d88e5ac3a06a9e41": "map_48", // "Map048"
+    "95d5dc1e16e7599a": "map_49", // "Map049"
+    "8f7e0f347ee2d96c": "map_50", // "Map050"
+    "30e8cd7cb027b77c": "map_51", // "Map051"
+    "8ef62552742bfaeb": "map_52", // "Map052"
+    "fc234c9e5ea398a7": "map_53", // "Map053"
+    "880702f4bef60e2b": "map_54", // "Map054"
+    "57f3411f6dfb1cc0": "map_55", // "Map055"
+    "2478e47ea38d116d": "map_56", // "Map056"
+    "93193f433c078e67": "map_57", // "Map057"
+    "a6df8a4fc070572c": "map_58", // "Map058"
+    "2d63e9a6b22d5754": "map_59", // "Map059"
+    "d775a2847901ae30": "map_60", // "Map060"
     "41157d8209e24b13": "map_61",
-    "03d23b256c30ee7f": "map_62",
-    "5e3c54603e0a02fe": "map_76",
+    "cb6b79b53dcf9cce": "map_62", // "Map062"
+    "5e3c54603e0a02fe": "map_76", // "Map076"
     "02edb9e9dbed9ed1": "map_78",
     "9c0da7f6ee1baba0": "map_79",
     "eeac9206c6ef8544": "map_80",
@@ -103,14 +138,13 @@ const filenamesMapped = {
     "98e0aaf1267b51b5": "map_82",
     "65ae51f77f180001": "map_83",
     "9230edb275fedc56": "map_86",
-    "552de4b3c2a6e722": "map_90",
-    "b1a34d2ccc9ccf36": "map_91",
-    "3d71012efc9032a3": "map_92",
-    "5cd593dc35c7271e": "map_93",
-    "b0ba735a85dd34b1": "map_94",
-    "3920efa60e948c36": "map_95",
-    "5b05a158b9e6b13e": "map_96",
-    "cb6b79b53dcf9cce": "map_97",
+    "552de4b3c2a6e722": "map_90", // "Map090"
+    "b1a34d2ccc9ccf36": "map_91", // "Map091"
+    "b7ab29068ab79381": "map_92", // "Map092"
+    "5cd593dc35c7271e": "map_93", // "Map093"
+    "b0ba735a85dd34b1": "map_94", // "Map094"
+    "3920efa60e948c36": "map_95", // "Map095"
+    "5b05a158b9e6b13e": "map_96", // "Map096"
     "ff41c61f0e584afb": "map_98",
     "536c41c6b1cbcb4b": "map_99",
     "2eea0cd657ee09db": "map_100",
@@ -149,7 +183,6 @@ const filenamesMapped = {
     "9e1dc561d06953fc": "map_147",
     "0b9acdb076dcd45d": "map_148",
     "d744a18452d3dfbd": "map_152",
-    "30e8cd7cb027b77c": "map_154",
     "a2b977b4d98205d1": "map_158",
     "283249c270778ae1": "map_159",
     "e3e707a94164a91e": "map_160",
@@ -167,7 +200,6 @@ const filenamesMapped = {
     "9462653e1b8ae4dc": "map_172",
     "d2c49021f405dedd": "map_173",
     "08928aa93a9e6f6d": "map_174",
-    "b7ab29068ab79381": "map_175",
     "00d652e9341d5d14": "map_176",
     "d4a47b2f99e704f3": "map_177",
     "4cf94c80f6323e7f": "map_179",
@@ -192,7 +224,6 @@ const filenamesMapped = {
     "2ed0077f6bb521af": "map_202",
     "48352a31db06b515": "map_203",
     "8950949860d6ac78": "map_204",
-    "225f3ab08bef402d": "map_205",
     "7b6e18c1910d7c36": "map_206",
     "0cd902c879bb1992": "map_207",
     "f462830b0e8ed3d1": "map_208",
@@ -223,53 +254,40 @@ const filenamesMapped = {
     "f16b0b8ac870030f": "map_237",
     "daefa4f82e8c29a8": "map_238",
     "ef67e4e229519e25": "map_239",
-    "6c2761ba70863900": "map_240",
     "93c43d4cbf4336ac": "map_241",
     "10f24ea2f4194e69": "map_242",
     "af6084c63a35ed62": "map_243",
-    "08ef2224f07a731e": "map_unknown_1",
+    "be4ea0427c554cd9": "map_unknown_1",
     "0f0ddf1441b3f3f9": "map_unknown_2",
-    "1578c9babaee50aa": "map_unknown_3",
+    "f49c0ae25167ed55": "map_unknown_3",
     "19f6ccb456f42e7f": "map_unknown_4",
     "380ac8da56af340d": "map_unknown_5",
     "39538e98b604697a": "map_unknown_6",
     "3d2050b7f6a05304": "map_unknown_7",
     "3e09b2d7ff4d577b": "map_unknown_8",
-    "41994b52078001c6": "map_unknown_9",
+    "cf331dd3d89de0ce": "map_unknown_9",
     "45475481eebe059c": "map_unknown_10",
-    "5281c3e6b5a90e7f": "map_unknown_11",
-    "57f3411f6dfb1cc0": "map_unknown_12",
+    "13195526e1e78f1c": "map_unknown_11",
+    "03d23b256c30ee7f": "map_unknown_12",
     "6faf1c02e530f786": "map_unknown_13",
     "76ef1d27e887074e": "map_unknown_14",
-    "79590c22f5c0128d": "map_unknown_15",
-    "7aa4f7e2b748a9b1": "map_unknown_16",
-    "8e0412b9817913ed": "map_unknown_17",
-    "9185501964bb45be": "map_unknown_18",
-    "93165b65a9ecda9b": "map_unknown_19",
-    "9581eaef313284c0": "map_unknown_20",
-    "9fce3adda53a3a0b": "map_unknown_21",
-    "a6df8a4fc070572c": "map_unknown_22",
-    "ab430e27123ff9c7": "map_unknown_23",
-    "ac711434613b8c64": "map_unknown_24",
-    "adb9d777182b38c4": "map_unknown_25",
-    "af6d71c8d47db1cf": "map_unknown_26",
-    "b0cfe5f195d0d61b": "map_unknown_27",
-    "b5ea7150036f2049": "map_unknown_28",
-    "be1a37535e921f91": "map_unknown_29",
-    "c30a6f45f3118b03": "map_unknown_30",
-    "cd64a52988a871c9": "map_unknown_31",
-    "d008bb79be0f5d70": "map_unknown_32",
-    "d4882f67829cb7a8": "map_unknown_33",
-    "de33dea8dbf590d7": "map_unknown_34",
-    "e2179bd0c2dc98da": "map_unknown_35",
-    "e3453d1d6d4231bd": "map_unknown_36",
-    "e4f88b8e366fd60d": "map_unknown_37",
-    "eab176917ac6057a": "map_unknown_38",
-    "f3a481a4b3309457": "map_unknown_39",
-    "f4fce3b5b60b3c5b": "map_unknown_40",
-    "f548a33ef014a2a9": "map_unknown_41",
-    "f7049de2b41b8c72": "map_unknown_42",
-    "fca9ba82c2e9907e": "map_unknown_43",
+    "3d71012efc9032a3": "map_unknown_15",
+    "9185501964bb45be": "map_unknown_16",
+    "9581eaef313284c0": "map_unknown_17",
+    "9fce3adda53a3a0b": "map_unknown_18",
+    "ab430e27123ff9c7": "map_unknown_19",
+    "adb9d777182b38c4": "map_unknown_20",
+    "af6d71c8d47db1cf": "map_unknown_21",
+    "b5ea7150036f2049": "map_unknown_22",
+    "c30a6f45f3118b03": "map_unknown_23",
+    "cd64a52988a871c9": "map_unknown_24",
+    "d008bb79be0f5d70": "map_unknown_25",
+    "e3453d1d6d4231bd": "map_unknown_26",
+    "e4f88b8e366fd60d": "map_unknown_27",
+    "eab176917ac6057a": "map_unknown_28",
+    "f3a481a4b3309457": "map_unknown_29",
+    "f4fce3b5b60b3c5b": "map_unknown_30",
+    "f7049de2b41b8c72": "map_unknown_31",
 
     // === Spritesheets ===
     "29de30eb871e6a80": "spritessheet_12x8_characters_1",
@@ -2130,42 +2148,6 @@ const filenamesMapped = {
     "663fd1980316d25b": "wandering_wizard", // "wandering_wizard"
 };
 
-const assetTypeOrder = {
-    "images": 0,
-    "sounds": 1,
-    "data": 2,
-};
-
-const assetCategoryOrder = {
-    "Portraits": 0,
-    "Game sprites": 1,
-    "Backgrounds": 2,
-    "Pictures": 3,
-    "System sprites": 4,
-    "Misc": 5,
-
-    "Background songs": 0,
-    "Background sounds": 1,
-    "Event sounds": 2,
-    "Sound effects": 3,
-};
-
-const numberOfPictures = 1012;
-const numberOfBackgrounds = 285;
-const numberOfData = 234;
-
-const spritesSheetsVariants = {
-    "spritessheet_16x16_system_12.png": {
-        sizes: [
-            { cols: 2, rows: 2 },
-            { cols: 4, rows: 4 },
-            { cols: 8, rows: 8 },
-            { cols: 16, rows: 16 },
-        ],
-        default: 2,
-    },
-};
-
 // Filenames in last unencrypted game version (before the Cry about it update)
 const hashToFilename = {
     // audio/bgm (.ogg)
@@ -2971,71 +2953,173 @@ const hashToFilename = {
     "91b682859f543183": "Book",
     "1bd7a4c33f40ff8d": "black",
     "f4b41d4b05a86dec": "black",
+
+    // data
+    "f548a33ef014a2a9": "Actors",
+    "6c2761ba70863900": "Animations",
+    "1578c9babaee50aa": "Armors",
+    "7aa4f7e2b748a9b1": "Classes",
+    "93165b65a9ecda9b": "CommonEvents",
+    "b0cfe5f195d0d61b": "Enemies",
+    "fca9ba82c2e9907e": "Items",
+    "e2179bd0c2dc98da": "MapInfos",
+    "d4882f67829cb7a8": "Skills",
+    "8e0412b9817913ed": "States",
+    "be1a37535e921f91": "System",
+    "ac711434613b8c64": "Tilesets",
+    "08ef2224f07a731e": "Troops",
+    "5281c3e6b5a90e7f": "Weapons",
+    "26d47de73a40bdad": "Map001",
+    "701ca312447feeff": "Map002",
+    "eb08202b408f34a7": "Map003",
+    "3a0ad431671e9969": "Map004",
+    "a6508bd215624838": "Map005",
+    "7b62476c532a63b2": "Map006",
+    "59844f4ba628a616": "Map007",
+    "054cb6c0fb3a4287": "Map008",
+    "db27ad902d95af45": "Map009",
+    "bed6b049e84e7992": "Map010",
+    "c1d0913db015a7f9": "Map011",
+    "06a5c2c0040a37fe": "Map012",
+    "7061ce2052cc93e0": "Map013",
+    "ce75f846f12ff0cc": "Map014",
+    "41994b52078001c6": "Map015",
+    "1e29e5b2ac8b5ab1": "Map016",
+    "d94cd2768932c06a": "Map017",
+    "41d31c139a8afeb9": "Map018",
+    "4f072360c6b94567": "Map019",
+    "3d604cacb48ef965": "Map020",
+    "8af5d121f7003916": "Map021",
+    "06d1650812c92d1f": "Map022",
+    "ae760b41908472ae": "Map023",
+    "8b7dabc172728c30": "Map024",
+    "800344a950e65187": "Map025",
+    "2b18d7dc081dc62b": "Map026",
+    "225f3ab08bef402d": "Map027",
+    "df8a857eec8680c5": "Map028",
+    "56c6157c0cef0d71": "Map029",
+    "43ff8d1358484703": "Map030",
+    "eb464b634bb21262": "Map031",
+    "2ffa3bb51859a242": "Map032",
+    "79590c22f5c0128d": "Map033",
+    "6655c6127544e5fd": "Map034",
+    "326ca006a81bb4b5": "Map035",
+    "1124eee982150e41": "Map036",
+    "8da10d2f34eaa36d": "Map037",
+    "2db29042af447095": "Map038",
+    "de33dea8dbf590d7": "Map039",
+    "ee83399e9c8467e1": "Map040",
+    "d4b687332dfd6546": "Map041",
+    "154629d325c17b8d": "Map042",
+    "0fa2aa7bcdba1978": "Map043",
+    "dbaf035d6a7daa70": "Map044",
+    "f7abc2ea09dd1dc1": "Map045",
+    "5e3ee90558cf8b9c": "Map046",
+    "f4700abf0cc09876": "Map047",
+    "d88e5ac3a06a9e41": "Map048",
+    "95d5dc1e16e7599a": "Map049",
+    "8f7e0f347ee2d96c": "Map050",
+    "30e8cd7cb027b77c": "Map051",
+    "8ef62552742bfaeb": "Map052",
+    "fc234c9e5ea398a7": "Map053",
+    "880702f4bef60e2b": "Map054",
+    "57f3411f6dfb1cc0": "Map055",
+    "2478e47ea38d116d": "Map056",
+    "93193f433c078e67": "Map057",
+    "a6df8a4fc070572c": "Map058",
+    "2d63e9a6b22d5754": "Map059",
+    "d775a2847901ae30": "Map060",
+    "cb6b79b53dcf9cce": "Map062",
+    "5e3c54603e0a02fe": "Map076",
+    "552de4b3c2a6e722": "Map090",
+    "b1a34d2ccc9ccf36": "Map091",
+    "b7ab29068ab79381": "Map092",
+    "5cd593dc35c7271e": "Map093",
+    "b0ba735a85dd34b1": "Map094",
+    "3920efa60e948c36": "Map095",
+    "5b05a158b9e6b13e": "Map096",
 };
 
 // Filenames in last unencrypted game version (before the Cry about it update)
 const hashToName = {
     // === Map Files ===
-    "be4ea0427c554cd9": "map_1",
-    "701ca312447feeff": "map_2",
-    "eb08202b408f34a7": "map_3",
-    "3a0ad431671e9969": "map_4",
-    "a6508bd215624838": "map_5",
-    "7b62476c532a63b2": "map_6",
-    "59844f4ba628a616": "map_7",
-    "054cb6c0fb3a4287": "map_8",
-    "db27ad902d95af45": "map_9",
-    "bed6b049e84e7992": "map_10",
-    "c1d0913db015a7f9": "map_11",
-    "06a5c2c0040a37fe": "map_12",
-    "7061ce2052cc93e0": "map_13",
-    "ce75f846f12ff0cc": "map_14",
-    "26d47de73a40bdad": "map_15",
-    "1e29e5b2ac8b5ab1": "map_16",
-    "d94cd2768932c06a": "map_17",
-    "41d31c139a8afeb9": "map_18",
-    "4f072360c6b94567": "map_19",
-    "3d604cacb48ef965": "map_20",
-    "8af5d121f7003916": "map_21",
-    "06d1650812c92d1f": "map_22",
-    "ae760b41908472ae": "map_23",
-    "8b7dabc172728c30": "map_24",
-    "800344a950e65187": "map_25",
-    "2b18d7dc081dc62b": "map_26",
-    "f49c0ae25167ed55": "map_27",
-    "df8a857eec8680c5": "map_28",
-    "56c6157c0cef0d71": "map_29",
-    "43ff8d1358484703": "map_30",
-    "eb464b634bb21262": "map_31",
-    "2ffa3bb51859a242": "map_32",
-    "6655c6127544e5fd": "map_34",
-    "326ca006a81bb4b5": "map_35",
-    "1124eee982150e41": "map_36",
-    "8da10d2f34eaa36d": "map_37",
-    "2db29042af447095": "map_38",
-    "ee83399e9c8467e1": "map_40",
-    "d4b687332dfd6546": "map_41",
-    "154629d325c17b8d": "map_42",
-    "0fa2aa7bcdba1978": "map_43",
-    "dbaf035d6a7daa70": "map_44",
-    "f7abc2ea09dd1dc1": "map_45",
-    "5e3ee90558cf8b9c": "map_46",
-    "f4700abf0cc09876": "map_47",
-    "d88e5ac3a06a9e41": "map_48",
-    "95d5dc1e16e7599a": "map_49",
-    "8f7e0f347ee2d96c": "map_50",
-    "cf331dd3d89de0ce": "map_51",
-    "8ef62552742bfaeb": "map_52",
-    "fc234c9e5ea398a7": "map_53",
-    "880702f4bef60e2b": "map_54",
-    "13195526e1e78f1c": "map_55",
-    "2478e47ea38d116d": "map_56",
-    "93193f433c078e67": "map_57",
-    "2d63e9a6b22d5754": "map_59",
-    "d775a2847901ae30": "map_60",
+    "f548a33ef014a2a9": "Actors",
+    "6c2761ba70863900": "Animations",
+    "1578c9babaee50aa": "Armors",
+    "7aa4f7e2b748a9b1": "Classes",
+    "93165b65a9ecda9b": "CommonEvents",
+    "b0cfe5f195d0d61b": "Enemies",
+    "fca9ba82c2e9907e": "Items",
+    "e2179bd0c2dc98da": "MapInfos",
+    "d4882f67829cb7a8": "Skills",
+    "8e0412b9817913ed": "States",
+    "be1a37535e921f91": "System",
+    "ac711434613b8c64": "Tilesets",
+    "08ef2224f07a731e": "Troops",
+    "5281c3e6b5a90e7f": "Weapons",
+    "26d47de73a40bdad": "Map001",
+    "701ca312447feeff": "Map002",
+    "eb08202b408f34a7": "Map003",
+    "3a0ad431671e9969": "Map004",
+    "a6508bd215624838": "Map005",
+    "7b62476c532a63b2": "Map006",
+    "59844f4ba628a616": "Map007",
+    "054cb6c0fb3a4287": "Map008",
+    "db27ad902d95af45": "Map009",
+    "bed6b049e84e7992": "Map010",
+    "c1d0913db015a7f9": "Map011",
+    "06a5c2c0040a37fe": "Map012",
+    "7061ce2052cc93e0": "Map013",
+    "ce75f846f12ff0cc": "Map014",
+    "41994b52078001c6": "Map015",
+    "1e29e5b2ac8b5ab1": "Map016",
+    "d94cd2768932c06a": "Map017",
+    "41d31c139a8afeb9": "Map018",
+    "4f072360c6b94567": "Map019",
+    "3d604cacb48ef965": "Map020",
+    "8af5d121f7003916": "Map021",
+    "06d1650812c92d1f": "Map022",
+    "ae760b41908472ae": "Map023",
+    "8b7dabc172728c30": "Map024",
+    "800344a950e65187": "Map025",
+    "2b18d7dc081dc62b": "Map026",
+    "225f3ab08bef402d": "Map027",
+    "df8a857eec8680c5": "Map028",
+    "56c6157c0cef0d71": "Map029",
+    "43ff8d1358484703": "Map030",
+    "eb464b634bb21262": "Map031",
+    "2ffa3bb51859a242": "Map032",
+    "79590c22f5c0128d": "Map033",
+    "6655c6127544e5fd": "Map034",
+    "326ca006a81bb4b5": "Map035",
+    "1124eee982150e41": "Map036",
+    "8da10d2f34eaa36d": "Map037",
+    "2db29042af447095": "Map038",
+    "de33dea8dbf590d7": "Map039",
+    "ee83399e9c8467e1": "Map040",
+    "d4b687332dfd6546": "Map041",
+    "154629d325c17b8d": "Map042",
+    "0fa2aa7bcdba1978": "Map043",
+    "dbaf035d6a7daa70": "Map044",
+    "f7abc2ea09dd1dc1": "Map045",
+    "5e3ee90558cf8b9c": "Map046",
+    "f4700abf0cc09876": "Map047",
+    "d88e5ac3a06a9e41": "Map048",
+    "95d5dc1e16e7599a": "Map049",
+    "8f7e0f347ee2d96c": "Map050",
+    "30e8cd7cb027b77c": "Map051",
+    "8ef62552742bfaeb": "Map052",
+    "fc234c9e5ea398a7": "Map053",
+    "880702f4bef60e2b": "Map054",
+    "57f3411f6dfb1cc0": "Map055",
+    "2478e47ea38d116d": "Map056",
+    "93193f433c078e67": "Map057",
+    "a6df8a4fc070572c": "Map058",
+    "2d63e9a6b22d5754": "Map059",
+    "d775a2847901ae30": "Map060",
     "41157d8209e24b13": "map_61",
-    "03d23b256c30ee7f": "map_62",
-    "5e3c54603e0a02fe": "map_76",
+    "cb6b79b53dcf9cce": "Map062",
+    "5e3c54603e0a02fe": "Map076",
     "02edb9e9dbed9ed1": "map_78",
     "9c0da7f6ee1baba0": "map_79",
     "eeac9206c6ef8544": "map_80",
@@ -3043,14 +3127,13 @@ const hashToName = {
     "98e0aaf1267b51b5": "map_82",
     "65ae51f77f180001": "map_83",
     "9230edb275fedc56": "map_86",
-    "552de4b3c2a6e722": "map_90",
-    "b1a34d2ccc9ccf36": "map_91",
-    "3d71012efc9032a3": "map_92",
-    "5cd593dc35c7271e": "map_93",
-    "b0ba735a85dd34b1": "map_94",
-    "3920efa60e948c36": "map_95",
-    "5b05a158b9e6b13e": "map_96",
-    "cb6b79b53dcf9cce": "map_97",
+    "552de4b3c2a6e722": "Map090",
+    "b1a34d2ccc9ccf36": "Map091",
+    "b7ab29068ab79381": "Map092",
+    "5cd593dc35c7271e": "Map093",
+    "b0ba735a85dd34b1": "Map094",
+    "3920efa60e948c36": "Map095",
+    "5b05a158b9e6b13e": "Map096",
     "ff41c61f0e584afb": "map_98",
     "536c41c6b1cbcb4b": "map_99",
     "2eea0cd657ee09db": "map_100",
@@ -3089,7 +3172,6 @@ const hashToName = {
     "9e1dc561d06953fc": "map_147",
     "0b9acdb076dcd45d": "map_148",
     "d744a18452d3dfbd": "map_152",
-    "30e8cd7cb027b77c": "map_154",
     "a2b977b4d98205d1": "map_158",
     "283249c270778ae1": "map_159",
     "e3e707a94164a91e": "map_160",
@@ -3107,7 +3189,6 @@ const hashToName = {
     "9462653e1b8ae4dc": "map_172",
     "d2c49021f405dedd": "map_173",
     "08928aa93a9e6f6d": "map_174",
-    "b7ab29068ab79381": "map_175",
     "00d652e9341d5d14": "map_176",
     "d4a47b2f99e704f3": "map_177",
     "4cf94c80f6323e7f": "map_179",
@@ -3132,7 +3213,6 @@ const hashToName = {
     "2ed0077f6bb521af": "map_202",
     "48352a31db06b515": "map_203",
     "8950949860d6ac78": "map_204",
-    "225f3ab08bef402d": "map_205",
     "7b6e18c1910d7c36": "map_206",
     "0cd902c879bb1992": "map_207",
     "f462830b0e8ed3d1": "map_208",
@@ -3163,53 +3243,40 @@ const hashToName = {
     "f16b0b8ac870030f": "map_237",
     "daefa4f82e8c29a8": "map_238",
     "ef67e4e229519e25": "map_239",
-    "6c2761ba70863900": "map_240",
     "93c43d4cbf4336ac": "map_241",
     "10f24ea2f4194e69": "map_242",
     "af6084c63a35ed62": "map_243",
-    "08ef2224f07a731e": "map_unknown_1",
+    "be4ea0427c554cd9": "map_unknown_1",
     "0f0ddf1441b3f3f9": "map_unknown_2",
-    "1578c9babaee50aa": "map_unknown_3",
+    "f49c0ae25167ed55": "map_unknown_3",
     "19f6ccb456f42e7f": "map_unknown_4",
     "380ac8da56af340d": "map_unknown_5",
     "39538e98b604697a": "map_unknown_6",
     "3d2050b7f6a05304": "map_unknown_7",
     "3e09b2d7ff4d577b": "map_unknown_8",
-    "41994b52078001c6": "map_unknown_9",
+    "cf331dd3d89de0ce": "map_unknown_9",
     "45475481eebe059c": "map_unknown_10",
-    "5281c3e6b5a90e7f": "map_unknown_11",
-    "57f3411f6dfb1cc0": "map_unknown_12",
+    "13195526e1e78f1c": "map_unknown_11",
+    "03d23b256c30ee7f": "map_unknown_12",
     "6faf1c02e530f786": "map_unknown_13",
     "76ef1d27e887074e": "map_unknown_14",
-    "79590c22f5c0128d": "map_unknown_15",
-    "7aa4f7e2b748a9b1": "map_unknown_16",
-    "8e0412b9817913ed": "map_unknown_17",
-    "9185501964bb45be": "map_unknown_18",
-    "93165b65a9ecda9b": "map_unknown_19",
-    "9581eaef313284c0": "map_unknown_20",
-    "9fce3adda53a3a0b": "map_unknown_21",
-    "a6df8a4fc070572c": "map_unknown_22",
-    "ab430e27123ff9c7": "map_unknown_23",
-    "ac711434613b8c64": "map_unknown_24",
-    "adb9d777182b38c4": "map_unknown_25",
-    "af6d71c8d47db1cf": "map_unknown_26",
-    "b0cfe5f195d0d61b": "map_unknown_27",
-    "b5ea7150036f2049": "map_unknown_28",
-    "be1a37535e921f91": "map_unknown_29",
-    "c30a6f45f3118b03": "map_unknown_30",
-    "cd64a52988a871c9": "map_unknown_31",
-    "d008bb79be0f5d70": "map_unknown_32",
-    "d4882f67829cb7a8": "map_unknown_33",
-    "de33dea8dbf590d7": "map_unknown_34",
-    "e2179bd0c2dc98da": "map_unknown_35",
-    "e3453d1d6d4231bd": "map_unknown_36",
-    "e4f88b8e366fd60d": "map_unknown_37",
-    "eab176917ac6057a": "map_unknown_38",
-    "f3a481a4b3309457": "map_unknown_39",
-    "f4fce3b5b60b3c5b": "map_unknown_40",
-    "f548a33ef014a2a9": "map_unknown_41",
-    "f7049de2b41b8c72": "map_unknown_42",
-    "fca9ba82c2e9907e": "map_unknown_43",
+    "3d71012efc9032a3": "map_unknown_15",
+    "9185501964bb45be": "map_unknown_16",
+    "9581eaef313284c0": "map_unknown_17",
+    "9fce3adda53a3a0b": "map_unknown_18",
+    "ab430e27123ff9c7": "map_unknown_19",
+    "adb9d777182b38c4": "map_unknown_20",
+    "af6d71c8d47db1cf": "map_unknown_21",
+    "b5ea7150036f2049": "map_unknown_22",
+    "c30a6f45f3118b03": "map_unknown_23",
+    "cd64a52988a871c9": "map_unknown_24",
+    "d008bb79be0f5d70": "map_unknown_25",
+    "e3453d1d6d4231bd": "map_unknown_26",
+    "e4f88b8e366fd60d": "map_unknown_27",
+    "eab176917ac6057a": "map_unknown_28",
+    "f3a481a4b3309457": "map_unknown_29",
+    "f4fce3b5b60b3c5b": "map_unknown_30",
+    "f7049de2b41b8c72": "map_unknown_31",
 
     // === Spritesheets ===
     "29de30eb871e6a80": "spritessheet_12x8_characters_1",
@@ -4384,7 +4451,7 @@ const hashToName = {
     "icon": "pictures_icon",
 
     // === Music (ME) ===
-    "4fe5a3e14978bba6": "me_1",
+    "4fe5a3e14978bba6": "balcony",
     "d405da43ec0669c0": "kill_switch", // "kill_switch"
 
     // === Sound Effects (SE) ===
@@ -4398,7 +4465,7 @@ const hashToName = {
     "3f55df3996a099e3": "statue", // "statue"
     "20cb27ef60c8b250": "open_1", // "Open1"
     "1d869cca761d1f5b": "sand", // "Sand"
-    "dbe371e3fdd67bf4": "se_11",
+    "dbe371e3fdd67bf4": "Water1",
     "7f6266a05d031a94": "se_12",
     "ec37304323499aab": "water_1", // "Water1"
     "c9d55115b9d0b6f9": "flush", // "flush"
@@ -4413,7 +4480,7 @@ const hashToName = {
     "b12d6f9f4b9e1ca3": "knock", // "knock"
     "90b3e9ebf8f919e5": "walk_away", // "walkaway"
     "dc247e4f1a7a8f98": "darkness_3", // "Darkness3"
-    "5982909527ac5860": "se_26",
+    "5982909527ac5860": "Key",
     "03bcac3737f12e6b": "phone_ring", // "phone_ring"
     "74ea5e851fc15d23": "washing_machine", // "washingmachine"
     "c3a2ef1f7d840426": "blood_stab", // "blood_stab"
@@ -4429,7 +4496,7 @@ const hashToName = {
     "97bd49ca4170d542": "car_door", // "cardoor"
     "e3cd5a4b1a1e0890": "elevator_door", // "elevatordoor"
     "c44c4edbf7c90767": "bellding", // "bellding"
-    "a5da3da2ae6ed664": "se_42",
+    "a5da3da2ae6ed664": "coin", // coin
     "e7ba7d67c89feb44": "carpull", // "carpull"
     "b1d996591fd54afe": "rustle_foliage", // "rustle_foliage"
     "5b3d77888976143e": "run", // "Run"
@@ -4440,7 +4507,7 @@ const hashToName = {
     "58e443f31a974fd0": "blade", // "blade"
     "232221889c283071": "blender", // "blender"
     "65c1e576d21efce7": "dig", // "dig"
-    "e9e21bdbb6892e29": "se_53",
+    "e9e21bdbb6892e29": "confirm",
     "1bf231bddc4a2083": "se_54",
     "34c4159bda097c78": "draw", // "draw"
     "d6ed1157a201bd9e": "56",
@@ -4449,7 +4516,7 @@ const hashToName = {
     "4eaf69352441868c": "se_59",
     "b5136fcb0987fd4d": "se_60",
     "7dd808ff989006e3": "se_61",
-    "1b12df87d700b9de": "se_62",
+    "1b12df87d700b9de": "blood_stab",
     "2cc88d940d6f65df": "se_63",
     "65b8897cb0e998b2": "blingy", // "blingy"
     "201755faa2d12641": "se_65",
@@ -4460,10 +4527,28 @@ const hashToName = {
     "73a2bdfa3b0feb0d": "spam", // "spam"
     "6f74ae580cef73f5": "se_71",
     "74380a0d0e3c7c48": "curtain_alt", // "curtain"
-    "4cee1acde9c80ff6": "se_73",
-    "c5c1bd2fb7a56bd5": "se_74",
+    "4cee1acde9c80ff6": "se_73", // Darkness3
+    "c5c1bd2fb7a56bd5": "se_74", // bellding
     "e99b9a3350a587d3": "se_75",
     "45e50cc8a9de3bc3": "fall", // "Fall"
+
+    // "b5136fcb0987fd4d": "Water1", // .ogg
+    // "5adf3c7054e7a170": "balcony", // .ogg
+    // "dbe371e3fdd67bf4": "blingy", // .ogg
+    // "1b12df87d700b9de": "blood_stab", // .ogg
+    // "e9e21bdbb6892e29": "confirm", // .ogg
+    // "6f74ae580cef73f5": "draw", // .ogg
+    // "7c1ae5440068d7f5": "forest", // .ogg
+    // "7dd808ff989006e3": "match", // .ogg
+    // "4fe5a3e14978bba6": "musicbox_blingy", // .ogg
+    // "b26e0849339bdaf0": "phone_ring", // .ogg
+    // "bfe1f2ddce1fa1a8": "sheep_sway", // .ogg
+    // "c30bc7904f060edd": "snailseyes", // .ogg
+    // "d6ed1157a201bd9e": "spam", // .ogg
+    // "c257c15680b1ddee": "teddybear", // .ogg
+    // "a0c2b4248fd4b6cd": "ticktock", // .ogg
+    // "4eaf69352441868c": "title_sting", // .ogg
+    // "5ce6fc5a596ddc3f": "washingmachine", // .ogg
 
     // === Character Faces ===
     // Andrew

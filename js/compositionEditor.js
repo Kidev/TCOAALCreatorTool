@@ -258,6 +258,7 @@ class CompositionEditor {
 
         this.setupCanvasEventHandlers();
         this.setupCanvasSizeControls();
+        this.setupOnionSkinningControl();
     }
 
     getPixelAtPosition(layer, x, y) {
@@ -462,6 +463,17 @@ class CompositionEditor {
         this.updateCanvasSizeMode();
 
         this.canvasSizeControlsInitialized = true;
+    }
+
+    setupOnionSkinningControl() {
+        const onionSkinningBtn = document.getElementById("previewCanvasOnionSkinning");
+
+        if (!onionSkinningBtn) return;
+
+        onionSkinningBtn.addEventListener("click", () => {
+            onionSkinningBtn.classList.toggle("active");
+            this.render();
+        });
     }
 
     updateCanvasSizeMode() {
@@ -2121,6 +2133,27 @@ class CompositionEditor {
         return layer;
     }
 
+    renderLayerAtKeyframe(layer, keyframeIndex, opacity = 1.0) {
+        const originalIndex = layer.selectedKeyframeIndex;
+        layer.selectedKeyframeIndex = keyframeIndex;
+        const renderData = this.getLayerRenderData(layer);
+        layer.selectedKeyframeIndex = originalIndex;
+
+        const previousAlpha = this.ctx.globalAlpha;
+        this.ctx.globalAlpha = opacity;
+
+        if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
+            const spriteCanvas = renderData.spriteCanvases[0];
+            if (spriteCanvas) {
+                this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
+            }
+        } else if (renderData.image && renderData.imageLoaded) {
+            this.ctx.drawImage(renderData.image, renderData.x, renderData.y, renderData.width, renderData.height);
+        }
+
+        this.ctx.globalAlpha = previousAlpha;
+    }
+
     render() {
         if (!this.ctx || !this.canvas) return;
 
@@ -2135,9 +2168,30 @@ class CompositionEditor {
         }
 
         const sortedLayers = [...this.layers].sort((a, b) => a.zIndex - b.zIndex);
+        const onionSkinningEnabled = document
+            .getElementById("previewCanvasOnionSkinning")
+            ?.classList.contains("active");
 
         sortedLayers.forEach((layer) => {
             if (!layer.visible) return;
+
+            if (
+                onionSkinningEnabled &&
+                layer.id === this.selectedLayerId &&
+                layer.hasKeyframes &&
+                layer.keyframes.length > 1
+            ) {
+                const currentIndex = layer.selectedKeyframeIndex;
+                const maxPreviousFrames = 3;
+
+                for (let i = 1; i <= maxPreviousFrames; i++) {
+                    const prevIndex = currentIndex - i;
+                    if (prevIndex >= 0) {
+                        const opacity = ((maxPreviousFrames - i + 1) / (maxPreviousFrames + 1)) * 0.4;
+                        this.renderLayerAtKeyframe(layer, prevIndex, opacity);
+                    }
+                }
+            }
 
             const renderData = this.getLayerRenderData(layer);
 

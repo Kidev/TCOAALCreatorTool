@@ -153,6 +153,13 @@ class GalleryManager {
             }
         }
 
+        for (const [hash, displayName] of Object.entries(hashToName)) {
+            if (baseFileName.includes(hash)) {
+                terms.push(displayName);
+                break;
+            }
+        }
+
         return terms.join(" ");
     }
 
@@ -2545,7 +2552,7 @@ class GalleryManager {
             isAnimated: isAnimated,
             spriteIndices: [...this.selectedSprites],
             animationSpeed: animationSpeed,
-            spriteCanvases: this.extractedSprites.map((s) => s.canvas),
+            spriteCanvases: this.selectedSprites.map((i) => this.extractedSprites[i].canvas),
             spriteVariant: this.spriteSheetData
                 ? {
                       cols: this.spriteSheetData.cols,
