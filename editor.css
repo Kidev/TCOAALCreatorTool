@@ -1647,6 +1647,14 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     justify-content: center;
 }
 
+.gallery-item-data {
+    height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
 .gallery-item-name {
     margin-top: 0.5vmax;
     text-align: center;
@@ -2379,7 +2387,21 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     justify-content: center;
 }
 
+.gallery-item-data.compact {
+    height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
 .audio-icon {
+    font-size: 1.2vmax;
+    color: var(--default);
+    font-weight: 900;
+}
+
+.data-icon {
     font-size: 1.2vmax;
     color: var(--default);
     font-weight: 900;
@@ -2652,13 +2674,13 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 
 .composition-editor-content {
     background: var(--bg-color-darker);
-    width: 95%;
-    height: 95%;
-    border-radius: 8px;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    box-shadow: none;
 }
 
 .composition-editor-header {

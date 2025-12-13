@@ -461,6 +461,7 @@ class GalleryManager {
             blobUrl: groundAsset.url,
             x: 0,
             y: 0,
+            isGroundLayer: true,
         };
         window.compositionEditor.addLayer(groundData);
 
@@ -471,6 +472,7 @@ class GalleryManager {
             blobUrl: parallaxeAsset.url,
             x: 0,
             y: 0,
+            isParallaxLayer: true,
         };
         window.compositionEditor.addLayer(parallaxeData);
 
@@ -819,7 +821,7 @@ class GalleryManager {
                                     <div class="sprite-cell-preview"
                                         data-index="${i}"
                                         title="${asset.name} #${i}"
-                                        onclick="galleryManager.toggleSpriteSelection(${i})">
+                                        onclick="galleryManager.toggleSpriteSelection(${i}, event)">
                                         <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
                                     </div>`,
                             )
@@ -846,7 +848,7 @@ class GalleryManager {
                                     <div class="sprite-cell-preview"
                                         data-index="${i}"
                                         title="${asset.name} #${i}"
-                                        onclick="galleryManager.toggleSpriteSelection(${i})">
+                                        onclick="galleryManager.toggleSpriteSelection(${i}, event)">
                                         <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
                                     </div>`,
                             )
@@ -1627,7 +1629,22 @@ class GalleryManager {
         }
     }
 
-    toggleSpriteSelection(index) {
+    toggleSpriteSelection(index, event = null) {
+        if (event && event.shiftKey) {
+            this.selectedSprites = [index];
+
+            document.querySelectorAll(".sprite-cell-preview").forEach((cell) => {
+                cell.classList.remove("selected");
+            });
+            const cell = document.querySelector(`.sprite-cell-preview[data-index="${index}"]`);
+            if (cell) {
+                cell.classList.add("selected");
+            }
+
+            this.addSpriteToCompositionEditor(0, event);
+            return;
+        }
+
         const cell = document.querySelector(`.sprite-cell-preview[data-index="${index}"]`);
 
         const selectedIndex = this.selectedSprites.indexOf(index);
@@ -2508,7 +2525,7 @@ class GalleryManager {
         }
     }
 
-    addSpriteToCompositionEditor() {
+    addSpriteToCompositionEditor(mode, event) {
         if (!this.currentAsset || this.currentAsset.type !== "images") {
             alert("No sprite selected");
             return;
@@ -2568,7 +2585,9 @@ class GalleryManager {
 
         window.compositionEditor.addLayer(assetData);
 
-        this.clearSpriteSelection();
+        if (!event || !event.shiftKey) {
+            this.clearSpriteSelection();
+        }
         this.flashSuccessOnButton();
 
         if (window.compositionEditor.autoOpen === true && !window.compositionEditor.isOpen) {

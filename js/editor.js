@@ -4614,12 +4614,19 @@ async function updateGalleryContent() {
                 ${starHtml}
                 <img src="${asset.croppedUrl || asset.url}" alt="${name}" loading="lazy">
                 <div class="gallery-item-name">${displayName}</div>`;
-        } else {
+        } else if (currentGalleryTab !== "data") {
             item.innerHTML = `
                 ${starHtml}
                 <div class="gallery-item-audio compact">
                 <div class="audio-icon">♫</div>
                 <div class="gallery-item-name">${displayName}</div>
+                </div>`;
+        } else {
+            item.innerHTML = `
+                ${starHtml}
+                <div class="gallery-item-data compact">
+                    <div class="data-icon">🗂</div>
+                    <div class="gallery-item-name">${displayName}</div>
                 </div>`;
         }
         contentContainer.appendChild(item);

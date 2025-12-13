@@ -79,6 +79,9 @@ class CompositionEditor {
         this.currentNotificationIndex = 0;
         this.notificationTimeout = null;
 
+        this.thumbnailAnimations = [];
+        this.onionSkinRegions = [];
+
         /*this.getAutoOpenTitle = () => {
             return this.autoOpen === true
                 ? "Will also open the editor, click to change"
@@ -313,21 +316,112 @@ class CompositionEditor {
                 e.preventDefault();
             }
 
+            if (e.ctrlKey && this.selectedLayerId) {
+                const selectedLayer = this.layers.find((l) => l.id === this.selectedLayerId);
+                if (selectedLayer && selectedLayer.visible) {
+                    const renderData = this.getLayerRenderData(selectedLayer);
+
+                    this.isDragging = true;
+                    this.dragStartX = mouseX;
+                    this.dragStartY = mouseY;
+                    this.dragLayerStartX = renderData.x;
+                    this.dragLayerStartY = renderData.y;
+
+                    this.canvas.style.cursor = "grabbing";
+                    this.render();
+                    return;
+                }
+            }
+
+            const onionSkinningEnabled = document
+                .getElementById("previewCanvasOnionSkinning")
+                ?.classList.contains("active");
+            if (onionSkinningEnabled && this.onionSkinRegions.length > 0) {
+                const nonEmptyRegions = [];
+                const emptyRegions = [];
+
+                for (const region of this.onionSkinRegions) {
+                    const layer = this.layers.find((l) => l.id === region.layerId);
+                    if (!layer) continue;
+
+                    const keyframe = layer.keyframes[region.keyframeIndex];
+                    if (keyframe?.isIntentionallyEmpty) {
+                        emptyRegions.push(region);
+                    } else {
+                        nonEmptyRegions.push(region);
+                    }
+                }
+
+                const regionsToCheck = [...nonEmptyRegions.reverse(), ...emptyRegions.reverse()];
+
+                for (const region of regionsToCheck) {
+                    if (
+                        mouseX >= region.x &&
+                        mouseX <= region.x + region.width &&
+                        mouseY >= region.y &&
+                        mouseY <= region.y + region.height
+                    ) {
+                        const layer = this.layers.find((l) => l.id === region.layerId);
+                        if (layer) {
+                            this.selectKeyframe(layer.id, region.keyframeIndex);
+
+                            this.isDragging = true;
+                            this.dragStartX = mouseX;
+                            this.dragStartY = mouseY;
+                            this.dragLayerStartX = region.x;
+                            this.dragLayerStartY = region.y;
+
+                            this.canvas.style.cursor = "grabbing";
+                            this.render();
+                            return;
+                        }
+                    }
+                }
+            }
+
             const reversedLayers = [...this.layers].reverse();
+            const nonEmptyLayers = [];
+            const emptyKeyframeLayers = [];
+
             for (const layer of reversedLayers) {
                 if (!layer.visible) continue;
 
+                const isEmptyKeyframe =
+                    layer.hasKeyframes &&
+                    layer.keyframes.length > 0 &&
+                    layer.keyframes[layer.selectedKeyframeIndex]?.isIntentionallyEmpty;
+
+                if (isEmptyKeyframe) {
+                    emptyKeyframeLayers.push(layer);
+                } else {
+                    nonEmptyLayers.push(layer);
+                }
+            }
+
+            const layersToCheck = [...reversedLayers];
+
+            for (const layer of layersToCheck) {
                 const renderData = this.getLayerRenderData(layer);
+
+                const hasEmptyKeyframe =
+                    layer.hasKeyframes &&
+                    layer.keyframes.length > 0 &&
+                    layer.keyframes[layer.selectedKeyframeIndex]?.isIntentionallyEmpty;
+
+                const width = hasEmptyKeyframe && renderData.width === 0 ? 48 : renderData.width;
+                const height = hasEmptyKeyframe && renderData.height === 0 ? 48 : renderData.height;
 
                 if (
                     mouseX >= renderData.x &&
-                    mouseX <= renderData.x + renderData.width &&
+                    mouseX <= renderData.x + width &&
                     mouseY >= renderData.y &&
-                    mouseY <= renderData.y + renderData.height
+                    mouseY <= renderData.y + height
                 ) {
                     let shouldSelect = false;
 
                     if (isRightClick) {
+                        shouldSelect = true;
+                    } else if (hasEmptyKeyframe) {
                         shouldSelect = true;
                     } else {
                         const pixel = this.getPixelAtPosition(layer, mouseX, mouseY);
@@ -470,8 +564,18 @@ class CompositionEditor {
 
         if (!onionSkinningBtn) return;
 
+        const updateButtonState = () => {
+            const isActive = onionSkinningBtn.classList.contains("active");
+            onionSkinningBtn.textContent = isActive ? "☑ Onion skinning" : "☐ Onion skinning";
+            onionSkinningBtn.classList.toggle("success", isActive);
+            onionSkinningBtn.classList.toggle("info", !isActive);
+        };
+
+        updateButtonState();
+
         onionSkinningBtn.addEventListener("click", () => {
             onionSkinningBtn.classList.toggle("active");
+            updateButtonState();
             this.render();
         });
     }
@@ -484,9 +588,9 @@ class CompositionEditor {
         if (!toggleBtn || !inputX || !inputY) return;
 
         if (this.canvasSizeMode === "auto") {
-            toggleBtn.textContent = "Auto";
-            toggleBtn.classList.remove("warning");
-            toggleBtn.classList.add("info");
+            toggleBtn.textContent = "☑ Auto";
+            toggleBtn.classList.remove("info");
+            toggleBtn.classList.add("success");
             inputX.readOnly = true;
             inputY.readOnly = true;
             inputX.style.opacity = "0.6";
@@ -494,9 +598,9 @@ class CompositionEditor {
             inputX.style.cursor = "default";
             inputY.style.cursor = "default";
         } else {
-            toggleBtn.textContent = "Custom";
-            toggleBtn.classList.remove("info");
-            toggleBtn.classList.add("warning");
+            toggleBtn.textContent = "☐ Auto";
+            toggleBtn.classList.remove("success");
+            toggleBtn.classList.add("info");
             inputX.readOnly = false;
             inputY.readOnly = false;
             inputX.style.opacity = "1";
@@ -642,7 +746,7 @@ class CompositionEditor {
         if (this.previewBackgroundImage) {
             if (toggleBtn) {
                 toggleBtn.style.display = "inline-block";
-                toggleBtn.textContent = this.previewBackgroundVisible ? "☑" : "☐";
+                toggleBtn.textContent = this.previewBackgroundVisible ? "☑ Template" : "☐ Template";
                 toggleBtn.classList.toggle("success", this.previewBackgroundVisible);
             }
             if (removeBtn) {
@@ -703,7 +807,7 @@ class CompositionEditor {
             notification.className = `composition-notification composition-notification-${type} ${customClass}`;
             notification.innerHTML = `
                 <span class="notification-message">${message}</span>
-                <button class="notification-close notification-btn" onclick="compositionEditor.cancelMoveAsKeyframeMode()">Cancel</button>
+                <button class="notification-close notification-btn" onclick="compositionEditor.cancelMoveAsKeyframeMode()">Done</button>
             `;
             area.appendChild(notification);
             return;
@@ -903,6 +1007,11 @@ class CompositionEditor {
         const hasExplicitWidth = assetData.width !== undefined && assetData.width !== null && assetData.width !== 0;
         const hasExplicitHeight = assetData.height !== undefined && assetData.height !== null && assetData.height !== 0;
 
+        const isBackgroundAsset = assetData.assetRef && assetData.assetRef.includes("gallery:Backgrounds/");
+        const isGround = assetData.isGroundLayer || (assetData.name && assetData.name.toLowerCase().includes("ground"));
+        const isParallax =
+            assetData.isParallaxLayer || (assetData.name && assetData.name.toLowerCase().includes("parallax"));
+
         const layer = {
             id: this.generateId(),
             name: assetData.name || "Layer " + (this.layers.length + 1),
@@ -914,7 +1023,7 @@ class CompositionEditor {
             width: assetData.width || 0,
             height: assetData.height || 0,
             visible: true,
-            zIndex: this.layers.length,
+            zIndex: isBackgroundAsset ? 0 : this.layers.length,
 
             isAnimated: assetData.isAnimated || false,
             spriteIndices: assetData.spriteIndices || [],
@@ -931,18 +1040,49 @@ class CompositionEditor {
             keyframes: assetData.keyframes || [],
             selectedKeyframeIndex: 0,
 
+            isGroundLayer: assetData.isGroundLayer || false,
+            isParallaxLayer: assetData.isParallaxLayer || false,
+
             _hasExplicitWidth: hasExplicitWidth,
             _hasExplicitHeight: hasExplicitHeight,
         };
 
+        const insertLayer = () => {
+            if (isParallax) {
+                const firstNonGroundIndex = this.layers.findIndex((l) => {
+                    const layerIsGround = l.isGroundLayer || (l.name && l.name.toLowerCase().includes("ground"));
+                    const layerIsParallax = l.isParallaxLayer || (l.name && l.name.toLowerCase().includes("parallax"));
+                    return !layerIsGround || layerIsParallax;
+                });
+                const insertIndex = firstNonGroundIndex === -1 ? this.layers.length : firstNonGroundIndex;
+                this.layers.splice(insertIndex, 0, layer);
+                for (let i = 0; i < this.layers.length; i++) {
+                    this.layers[i].zIndex = i;
+                }
+            } else if (isGround) {
+                this.layers.unshift(layer);
+                layer.zIndex = 0;
+                for (let i = 1; i < this.layers.length; i++) {
+                    this.layers[i].zIndex = i;
+                }
+            } else if (isBackgroundAsset) {
+                this.layers.unshift(layer);
+                for (let i = 0; i < this.layers.length; i++) {
+                    this.layers[i].zIndex = i;
+                }
+            } else {
+                this.layers.push(layer);
+            }
+        };
+
         if (layer.type === "sprite" && layer.spriteCanvases.length > 0) {
             layer.imageLoaded = true;
-            this.layers.push(layer);
+            insertLayer();
             this.updateCanvasSize();
             this.updateLayersList();
             this.render();
         } else if (layer.blobUrl) {
-            this.layers.push(layer);
+            insertLayer();
             const img = new Image();
             img.onload = async () => {
                 layer.image = img;
@@ -970,7 +1110,7 @@ class CompositionEditor {
             };
             img.src = layer.blobUrl;
         } else {
-            this.layers.push(layer);
+            insertLayer();
             this.updateCanvasSize();
             this.updateLayersList();
             this.render();
@@ -1284,31 +1424,65 @@ class CompositionEditor {
         this.updateLayersList();
     }
 
-    moveLayerUp(layerId) {
+    moveLayerUp(layerId, event = null) {
         const index = this.layers.findIndex((l) => l.id === layerId);
-        if (index !== -1 && index < this.layers.length - 1) {
-            const temp = this.layers[index];
-            this.layers[index] = this.layers[index + 1];
-            this.layers[index + 1] = temp;
+        if (index === -1) return;
 
-            this.layers[index].zIndex = index;
-            this.layers[index + 1].zIndex = index + 1;
-            this.updateLayersList();
-            this.render();
+        if (event && event.shiftKey) {
+            if (index < this.layers.length - 1) {
+                const layer = this.layers.splice(index, 1)[0];
+                this.layers.push(layer);
+
+                this.layers.forEach((l, i) => {
+                    l.zIndex = i;
+                });
+                this.updateLayersList();
+                this.render();
+                this.scrollToSelectedLayer();
+            }
+        } else {
+            if (index < this.layers.length - 1) {
+                const temp = this.layers[index];
+                this.layers[index] = this.layers[index + 1];
+                this.layers[index + 1] = temp;
+
+                this.layers[index].zIndex = index;
+                this.layers[index + 1].zIndex = index + 1;
+                this.updateLayersList();
+                this.render();
+                this.scrollToSelectedLayer();
+            }
         }
     }
 
-    moveLayerDown(layerId) {
+    moveLayerDown(layerId, event = null) {
         const index = this.layers.findIndex((l) => l.id === layerId);
-        if (index > 0) {
-            const temp = this.layers[index];
-            this.layers[index] = this.layers[index - 1];
-            this.layers[index - 1] = temp;
+        if (index === -1) return;
 
-            this.layers[index].zIndex = index;
-            this.layers[index - 1].zIndex = index - 1;
-            this.updateLayersList();
-            this.render();
+        if (event && event.shiftKey) {
+            if (index > 0) {
+                const layer = this.layers.splice(index, 1)[0];
+                this.layers.unshift(layer);
+
+                this.layers.forEach((l, i) => {
+                    l.zIndex = i;
+                });
+                this.updateLayersList();
+                this.render();
+                this.scrollToSelectedLayer();
+            }
+        } else {
+            if (index > 0) {
+                const temp = this.layers[index];
+                this.layers[index] = this.layers[index - 1];
+                this.layers[index - 1] = temp;
+
+                this.layers[index].zIndex = index;
+                this.layers[index - 1].zIndex = index - 1;
+                this.updateLayersList();
+                this.render();
+                this.scrollToSelectedLayer();
+            }
         }
     }
 
@@ -1360,10 +1534,27 @@ class CompositionEditor {
         this.render();
     }
 
+    scrollToSelectedLayer() {
+        setTimeout(() => {
+            const container = document.getElementById("compositionLayersList");
+            if (!container) return;
+
+            const selectedLayerDiv = container.querySelector(".composition-layer-item.selected");
+            if (selectedLayerDiv) {
+                selectedLayerDiv.scrollIntoView({
+                    behavior: "smooth",
+                    block: "nearest",
+                    inline: "nearest",
+                });
+            }
+        }, 0);
+    }
+
     selectLayer(layerId) {
         this.selectedLayerId = layerId;
         this.updateLayersList();
         this.render();
+        this.scrollToSelectedLayer();
     }
 
     togglePreview() {
@@ -1672,6 +1863,66 @@ class CompositionEditor {
 
         this.updateLayerTypeFromKeyframes(layer);
 
+        this.updateCanvasSize();
+        this.updateLayersList();
+        this.render();
+        return newKeyframe.id;
+    }
+
+    addEmptyKeyframe(layerId, time = null) {
+        const layer = this.layers.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        if (!layer.hasKeyframes) {
+            this.showNotification("Cannot add empty keyframe to a layer without keyframes", "warning");
+            return;
+        }
+
+        const selectedKeyframe = layer.keyframes[layer.selectedKeyframeIndex];
+
+        const selectedRenderData = this.getKeyframeRenderData(layer, layer.selectedKeyframeIndex);
+
+        let newTime;
+        if (time !== null) {
+            newTime = time;
+        } else {
+            const nextIndex = layer.selectedKeyframeIndex + 1;
+            if (nextIndex < layer.keyframes.length) {
+                const nextTime = layer.keyframes[nextIndex].time;
+                newTime = selectedKeyframe.time + Math.max(100, Math.floor((nextTime - selectedKeyframe.time) / 2));
+            } else {
+                newTime = selectedKeyframe.time + 1000;
+            }
+        }
+
+        const defaultName = `KF ${layer.keyframes.length + 1}`;
+
+        const newKeyframe = {
+            id: this.generateId(),
+            name: defaultName,
+            time: newTime,
+            x: selectedKeyframe.x,
+            y: selectedKeyframe.y,
+            assetRef: null,
+            blobUrl: null,
+            image: null,
+            imageLoaded: false,
+            type: "background",
+            spriteIndices: [],
+            isAnimated: false,
+            animationSpeed: 250,
+            spriteCanvases: [],
+            spriteVariant: null,
+            width: selectedRenderData.width || 0,
+            height: selectedRenderData.height || 0,
+            gifDuration: null,
+            isIntentionallyEmpty: true,
+        };
+
+        layer.keyframes.splice(layer.selectedKeyframeIndex + 1, 0, newKeyframe);
+        layer.selectedKeyframeIndex = layer.selectedKeyframeIndex + 1;
+
+        this.updateLayerTypeFromKeyframes(layer);
         this.updateCanvasSize();
         this.updateLayersList();
         this.render();
@@ -2009,12 +2260,52 @@ class CompositionEditor {
         this.importAsKeyframeMode = true;
         this.moveAsKeyframeSourceId = targetLayerId;
 
-        this.showNotification(
-            `<strong>Import as Keyframe Mode</strong><br>Click a layer to import it as a keyframe into "${targetLayer.name}"`,
-            "info",
-            0,
-            "move-as-keyframe-notification",
-        );
+        const layersHeaderTitle = document.querySelector(".composition-layers-header > div:first-child");
+        const layersHeaderButtons = document.querySelector(".composition-layers-header > div:last-child");
+
+        if (layersHeaderTitle) {
+            const h3 = layersHeaderTitle.querySelector("h3");
+            if (h3) {
+                h3.style.display = "none";
+            }
+
+            let modeIndicator = document.getElementById("keyframe-mode-indicator");
+            if (!modeIndicator) {
+                modeIndicator = document.createElement("div");
+                modeIndicator.id = "keyframe-mode-indicator";
+                modeIndicator.style.fontSize = "0.85em";
+                modeIndicator.style.marginTop = "4px";
+                modeIndicator.style.color = "var(--green)";
+                modeIndicator.style.fontWeight = "600";
+                layersHeaderTitle.appendChild(modeIndicator);
+            }
+            modeIndicator.innerHTML = `<span style="font-size: 1.1em; font-weight: bold;">Import as Keyframe Mode</span><br><span style="font-size: 0.9em; font-weight: normal; opacity: 0.8;">Click a layer to import into "${targetLayer.name}, Shift+Click for multiple"</span>`;
+        }
+
+        if (layersHeaderButtons) {
+            const exportGifBtn = document.getElementById("exportGifBtn");
+            const exportPngBtn = document.getElementById("exportPngBtn");
+            const exportOggBtn = document.getElementById("exportOggBtn");
+            const playBtn = document.getElementById("previewPlayBtn");
+
+            if (exportGifBtn) exportGifBtn.style.display = "none";
+            if (exportPngBtn) exportPngBtn.style.display = "none";
+            if (exportOggBtn) exportOggBtn.style.display = "none";
+            if (playBtn) playBtn.style.display = "none";
+
+            let doneButton = document.getElementById("keyframe-mode-done-btn");
+            if (!doneButton) {
+                doneButton = document.createElement("button");
+                doneButton.id = "keyframe-mode-done-btn";
+                doneButton.className = "preview-control-btn success";
+                doneButton.textContent = "Done";
+                doneButton.onclick = () => this.cancelMoveAsKeyframeMode();
+                doneButton.style.backgroundColor = "var(--green)";
+                doneButton.style.color = "black";
+                doneButton.style.fontWeight = "600";
+                layersHeaderButtons.insertBefore(doneButton, layersHeaderButtons.firstChild);
+            }
+        }
 
         this.updateLayersList();
         this.render();
@@ -2034,12 +2325,52 @@ class CompositionEditor {
         this.importAsKeyframeMode = false;
         this.moveAsKeyframeSourceId = sourceLayerId;
 
-        this.showNotification(
-            `<strong>Move as Keyframe Mode</strong><br>Click a layer to add "${sourceLayer.name}" as its keyframe`,
-            "info",
-            0,
-            "move-as-keyframe-notification",
-        );
+        const layersHeaderTitle = document.querySelector(".composition-layers-header > div:first-child");
+        const layersHeaderButtons = document.querySelector(".composition-layers-header > div:last-child");
+
+        if (layersHeaderTitle) {
+            const h3 = layersHeaderTitle.querySelector("h3");
+            if (h3) {
+                h3.style.display = "none";
+            }
+
+            let modeIndicator = document.getElementById("keyframe-mode-indicator");
+            if (!modeIndicator) {
+                modeIndicator = document.createElement("div");
+                modeIndicator.id = "keyframe-mode-indicator";
+                modeIndicator.style.fontSize = "0.85em";
+                modeIndicator.style.marginTop = "4px";
+                modeIndicator.style.color = "var(--green)";
+                modeIndicator.style.fontWeight = "600";
+                layersHeaderTitle.appendChild(modeIndicator);
+            }
+            modeIndicator.innerHTML = `Move as Keyframe Mode<br><span style="font-size: 0.9em; font-weight: normal; opacity: 0.8;">Click a layer to add "${sourceLayer.name}" as its keyframe</span>`;
+        }
+
+        if (layersHeaderButtons) {
+            const exportGifBtn = document.getElementById("exportGifBtn");
+            const exportPngBtn = document.getElementById("exportPngBtn");
+            const exportOggBtn = document.getElementById("exportOggBtn");
+            const playBtn = document.getElementById("previewPlayBtn");
+
+            if (exportGifBtn) exportGifBtn.style.display = "none";
+            if (exportPngBtn) exportPngBtn.style.display = "none";
+            if (exportOggBtn) exportOggBtn.style.display = "none";
+            if (playBtn) playBtn.style.display = "none";
+
+            let doneButton = document.getElementById("keyframe-mode-done-btn");
+            if (!doneButton) {
+                doneButton = document.createElement("button");
+                doneButton.id = "keyframe-mode-done-btn";
+                doneButton.className = "preview-control-btn success";
+                doneButton.textContent = "Done";
+                doneButton.onclick = () => this.cancelMoveAsKeyframeMode();
+                doneButton.style.backgroundColor = "var(--green)";
+                doneButton.style.color = "black";
+                doneButton.style.fontWeight = "600";
+                layersHeaderButtons.insertBefore(doneButton, layersHeaderButtons.firstChild);
+            }
+        }
 
         this.updateLayersList();
         this.render();
@@ -2050,16 +2381,29 @@ class CompositionEditor {
         this.importAsKeyframeMode = false;
         this.moveAsKeyframeSourceId = null;
 
-        const notification = document.querySelector(".composition-notification.move-as-keyframe-notification");
-        if (notification) {
-            notification.remove();
+        const modeIndicator = document.getElementById("keyframe-mode-indicator");
+        if (modeIndicator) {
+            modeIndicator.remove();
+        }
+
+        const doneButton = document.getElementById("keyframe-mode-done-btn");
+        if (doneButton) {
+            doneButton.remove();
+        }
+
+        const layersHeaderTitle = document.querySelector(".composition-layers-header > div:first-child");
+        if (layersHeaderTitle) {
+            const h3 = layersHeaderTitle.querySelector("h3");
+            if (h3) {
+                h3.style.display = "";
+            }
         }
 
         this.updateLayersList();
         this.render();
     }
 
-    convertLayerToKeyframe(sourceLayerId, targetLayerId) {
+    convertLayerToKeyframe(sourceLayerId, targetLayerId, event = null) {
         const sourceLayer = this.layers.find((l) => l.id === sourceLayerId);
         const targetLayer = this.layers.find((l) => l.id === targetLayerId);
 
@@ -2099,9 +2443,19 @@ class CompositionEditor {
 
         this.removeLayer(sourceLayerId);
 
-        this.cancelMoveAsKeyframeMode();
+        const shiftHeld = event && event.shiftKey;
 
-        this.showNotification(`Layer moved as keyframe at ${newKeyframe.time}ms`, "success");
+        if (!this.importAsKeyframeMode) {
+            this.cancelMoveAsKeyframeMode();
+        } else if (!shiftHeld) {
+            this.cancelMoveAsKeyframeMode();
+        } else {
+            this.updateLayersList();
+            this.render();
+        }
+
+        const actionVerb = this.importAsKeyframeMode ? "imported" : "moved";
+        this.showNotification(`Layer ${actionVerb} as keyframe at ${newKeyframe.time}ms`, "success");
     }
 
     getLayerRenderData(layer) {
@@ -2109,7 +2463,8 @@ class CompositionEditor {
             const keyframe = layer.keyframes[layer.selectedKeyframeIndex];
 
             let assetKeyframe = keyframe;
-            if (!keyframe.assetRef && !keyframe.blobUrl) {
+
+            if (!keyframe.isIntentionallyEmpty && !keyframe.assetRef && !keyframe.blobUrl) {
                 for (let i = layer.selectedKeyframeIndex - 1; i >= 0; i--) {
                     if (layer.keyframes[i].assetRef || layer.keyframes[i].blobUrl) {
                         assetKeyframe = layer.keyframes[i];
@@ -2120,35 +2475,79 @@ class CompositionEditor {
             return {
                 x: keyframe.x,
                 y: keyframe.y,
-                width: keyframe.width || assetKeyframe.width,
-                height: keyframe.height || assetKeyframe.height,
-                type: assetKeyframe.type,
-                image: assetKeyframe.image,
-                imageLoaded: assetKeyframe.imageLoaded,
-                spriteCanvases: assetKeyframe.spriteCanvases,
-                spriteIndices: assetKeyframe.spriteIndices,
-                isAnimated: assetKeyframe.isAnimated,
+                width: keyframe.width || assetKeyframe.width || 0,
+                height: keyframe.height || assetKeyframe.height || 0,
+                type: assetKeyframe.type || "background",
+                image: assetKeyframe.image || null,
+                imageLoaded: assetKeyframe.imageLoaded || false,
+                spriteCanvases: assetKeyframe.spriteCanvases || [],
+                spriteIndices: assetKeyframe.spriteIndices || [],
+                isAnimated: assetKeyframe.isAnimated || false,
             };
         }
         return layer;
     }
 
-    renderLayerAtKeyframe(layer, keyframeIndex, opacity = 1.0) {
+    renderLayerAtKeyframe(layer, keyframeIndex, opacity = 1.0, timeDiff = null) {
         const originalIndex = layer.selectedKeyframeIndex;
         layer.selectedKeyframeIndex = keyframeIndex;
         const renderData = this.getLayerRenderData(layer);
         layer.selectedKeyframeIndex = originalIndex;
 
+        const keyframe = layer.keyframes[keyframeIndex];
+        const isEmptyKeyframe = keyframe && keyframe.isIntentionallyEmpty;
+
         const previousAlpha = this.ctx.globalAlpha;
         this.ctx.globalAlpha = opacity;
 
         if (renderData.type === "sprite" && renderData.spriteCanvases && renderData.spriteCanvases.length > 0) {
-            const spriteCanvas = renderData.spriteCanvases[0];
+            let spriteIndex = 0;
+
+            if (renderData.isAnimated && renderData.spriteCanvases.length > 1) {
+                const animSpeed = (layer.animationSpeed || 250) * 0.7;
+                const now = Date.now();
+                spriteIndex = Math.floor(now / animSpeed) % renderData.spriteCanvases.length;
+            }
+
+            const spriteCanvas = renderData.spriteCanvases[spriteIndex];
             if (spriteCanvas) {
                 this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
             }
         } else if (renderData.image && renderData.imageLoaded) {
             this.ctx.drawImage(renderData.image, renderData.x, renderData.y, renderData.width, renderData.height);
+        }
+
+        if (isEmptyKeyframe) {
+            const emptyWidth = renderData.width || 48;
+            const emptyHeight = renderData.height || 48;
+
+            this.ctx.fillStyle = `rgba(128, 128, 128, 0.01)`;
+            this.ctx.fillRect(renderData.x, renderData.y, emptyWidth, emptyHeight);
+
+            this.ctx.strokeStyle = `rgba(128, 128, 128, ${opacity})`;
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(renderData.x, renderData.y, emptyWidth, emptyHeight);
+        }
+
+        if (timeDiff !== null) {
+            const sign = timeDiff >= 0 ? "+" : "";
+            const timeText = `${sign}${(timeDiff / 1000).toFixed(1)}`;
+
+            this.ctx.globalAlpha = 1.0;
+            this.ctx.font = "bold 12px monospace";
+            this.ctx.textAlign = "center";
+            this.ctx.textBaseline = "middle";
+
+            const textX = renderData.x + renderData.width / 2;
+            const textY = renderData.y + renderData.height / 2;
+
+            this.ctx.strokeStyle = "black";
+            this.ctx.lineWidth = 3;
+            this.ctx.strokeText(timeText, textX, textY);
+
+            const baseColor = timeDiff < 0 ? "255, 107, 107" : "81, 207, 102";
+            this.ctx.fillStyle = `rgb(${baseColor})`;
+            this.ctx.fillText(timeText, textX, textY);
         }
 
         this.ctx.globalAlpha = previousAlpha;
@@ -2158,6 +2557,7 @@ class CompositionEditor {
         if (!this.ctx || !this.canvas) return;
 
         this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        this.onionSkinRegions = [];
 
         if (this.previewBackgroundImage && this.previewBackgroundVisible) {
             this.ctx.drawImage(this.previewBackgroundImage, 0, 0, this.canvasWidth, this.canvasHeight);
@@ -2182,13 +2582,127 @@ class CompositionEditor {
                 layer.keyframes.length > 1
             ) {
                 const currentIndex = layer.selectedKeyframeIndex;
-                const maxPreviousFrames = 3;
+                const maxPreviousFrames = 5;
+                const currentTime = layer.keyframes[currentIndex].time;
 
                 for (let i = 1; i <= maxPreviousFrames; i++) {
                     const prevIndex = currentIndex - i;
                     if (prevIndex >= 0) {
-                        const opacity = ((maxPreviousFrames - i + 1) / (maxPreviousFrames + 1)) * 0.4;
-                        this.renderLayerAtKeyframe(layer, prevIndex, opacity);
+                        const opacity = (maxPreviousFrames - i + 1) / (maxPreviousFrames + 1);
+                        const prevTime = layer.keyframes[prevIndex].time;
+                        const timeDiff = prevTime - currentTime;
+
+                        const originalIndex = layer.selectedKeyframeIndex;
+                        layer.selectedKeyframeIndex = prevIndex;
+                        const renderData = this.getLayerRenderData(layer);
+                        layer.selectedKeyframeIndex = originalIndex;
+
+                        const prevKeyframe = layer.keyframes[prevIndex];
+                        const isEmptyKf = prevKeyframe && prevKeyframe.isIntentionallyEmpty;
+                        const regionWidth = isEmptyKf && renderData.width === 0 ? 48 : renderData.width;
+                        const regionHeight = isEmptyKf && renderData.height === 0 ? 48 : renderData.height;
+
+                        this.onionSkinRegions.push({
+                            layerId: layer.id,
+                            keyframeIndex: prevIndex,
+                            x: renderData.x,
+                            y: renderData.y,
+                            width: regionWidth,
+                            height: regionHeight,
+                        });
+
+                        this.renderLayerAtKeyframe(layer, prevIndex, opacity, timeDiff);
+                    }
+                }
+
+                const maxFutureFrames = 5;
+                for (let i = 1; i <= maxFutureFrames; i++) {
+                    const nextIndex = currentIndex + i;
+                    if (nextIndex < layer.keyframes.length) {
+                        const opacity = (maxFutureFrames - i + 1) / (maxFutureFrames + 1);
+                        const nextTime = layer.keyframes[nextIndex].time;
+                        const timeDiff = nextTime - currentTime;
+
+                        const originalIndex = layer.selectedKeyframeIndex;
+                        layer.selectedKeyframeIndex = nextIndex;
+                        const renderData = this.getLayerRenderData(layer);
+                        layer.selectedKeyframeIndex = originalIndex;
+
+                        const nextKeyframe = layer.keyframes[nextIndex];
+                        const isEmptyKf = nextKeyframe && nextKeyframe.isIntentionallyEmpty;
+                        const regionWidth = isEmptyKf && renderData.width === 0 ? 48 : renderData.width;
+                        const regionHeight = isEmptyKf && renderData.height === 0 ? 48 : renderData.height;
+
+                        this.onionSkinRegions.push({
+                            layerId: layer.id,
+                            keyframeIndex: nextIndex,
+                            x: renderData.x,
+                            y: renderData.y,
+                            width: regionWidth,
+                            height: regionHeight,
+                        });
+
+                        this.renderLayerAtKeyframe(layer, nextIndex, opacity, timeDiff);
+                    }
+                }
+
+                if (this.onionSkinRegions.length > 0) {
+                    const currentRenderData = this.getLayerRenderData(layer);
+                    const currentKeyframe = layer.keyframes[currentIndex];
+                    const isCurrentEmpty = currentKeyframe && currentKeyframe.isIntentionallyEmpty;
+                    const currentWidth = isCurrentEmpty && currentRenderData.width === 0 ? 48 : currentRenderData.width;
+                    const currentHeight =
+                        isCurrentEmpty && currentRenderData.height === 0 ? 48 : currentRenderData.height;
+
+                    const allRegions = [
+                        ...this.onionSkinRegions,
+                        {
+                            layerId: layer.id,
+                            keyframeIndex: currentIndex,
+                            x: currentRenderData.x,
+                            y: currentRenderData.y,
+                            width: currentWidth,
+                            height: currentHeight,
+                        },
+                    ];
+
+                    const sortedRegions = allRegions.sort((a, b) => a.keyframeIndex - b.keyframeIndex);
+
+                    for (let i = 0; i < sortedRegions.length - 1; i++) {
+                        const fromRegion = sortedRegions[i];
+                        const toRegion = sortedRegions[i + 1];
+
+                        const isBeforeCurrent = toRegion.keyframeIndex <= currentIndex;
+                        const arrowColor = isBeforeCurrent ? "rgba(255, 50, 50, 0.7)" : "rgba(50, 255, 50, 0.7)";
+
+                        const fromX = fromRegion.x + fromRegion.width / 2;
+                        const fromY = fromRegion.y + fromRegion.height / 2;
+                        const toX = toRegion.x + toRegion.width / 2;
+                        const toY = toRegion.y + toRegion.height / 2;
+
+                        this.ctx.strokeStyle = arrowColor;
+                        this.ctx.lineWidth = 3;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(fromX, fromY);
+                        this.ctx.lineTo(toX, toY);
+                        this.ctx.stroke();
+
+                        const angle = Math.atan2(toY - fromY, toX - fromX);
+                        const arrowSize = 15;
+
+                        this.ctx.fillStyle = arrowColor;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(toX, toY);
+                        this.ctx.lineTo(
+                            toX - arrowSize * Math.cos(angle - Math.PI / 6),
+                            toY - arrowSize * Math.sin(angle - Math.PI / 6),
+                        );
+                        this.ctx.lineTo(
+                            toX - arrowSize * Math.cos(angle + Math.PI / 6),
+                            toY - arrowSize * Math.sin(angle + Math.PI / 6),
+                        );
+                        this.ctx.closePath();
+                        this.ctx.fill();
                     }
                 }
             }
@@ -2214,6 +2728,21 @@ class CompositionEditor {
                 }
             } else if (renderData.image && renderData.imageLoaded) {
                 this.ctx.drawImage(renderData.image, renderData.x, renderData.y, renderData.width, renderData.height);
+            }
+
+            if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                const currentKeyframe = layer.keyframes[layer.selectedKeyframeIndex];
+                if (currentKeyframe && currentKeyframe.isIntentionallyEmpty) {
+                    const emptyWidth = renderData.width || 48;
+                    const emptyHeight = renderData.height || 48;
+
+                    this.ctx.fillStyle = "rgba(128, 128, 128, 0.01)";
+                    this.ctx.fillRect(renderData.x, renderData.y, emptyWidth, emptyHeight);
+
+                    this.ctx.strokeStyle = "rgba(128, 128, 128, 1.0)";
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(renderData.x, renderData.y, emptyWidth, emptyHeight);
+                }
             }
         });
 
@@ -2267,17 +2796,19 @@ class CompositionEditor {
 
         const hasAudioKeyframes = this.audioKeyframes && this.audioKeyframes.length > 0;
 
+        const inKeyframeMode = this.moveAsKeyframeMode || this.importAsKeyframeMode;
+
         const gifBtn = document.getElementById("exportGifBtn");
         if (gifBtn) {
-            gifBtn.style.display = hasAnimatedLayers ? "inline-block" : "none";
+            gifBtn.style.display = !inKeyframeMode && hasAnimatedLayers ? "inline-block" : "none";
         }
         const pngBtn = document.getElementById("exportPngBtn");
         if (pngBtn) {
-            pngBtn.style.display = this.layers.length > 0 ? "inline-block" : "none";
+            pngBtn.style.display = !inKeyframeMode && this.layers.length > 0 ? "inline-block" : "none";
         }
         const oggBtn = document.getElementById("exportOggBtn");
         if (oggBtn) {
-            oggBtn.style.display = hasAudioKeyframes ? "inline-block" : "none";
+            oggBtn.style.display = !inKeyframeMode && hasAudioKeyframes ? "inline-block" : "none";
         }
 
         let playBtn = document.getElementById("previewPlayBtn");
@@ -2295,7 +2826,7 @@ class CompositionEditor {
         }
 
         if (playBtn) {
-            if (hasKeyframeAnimations || hasAudioKeyframes) {
+            if (!inKeyframeMode && (hasKeyframeAnimations || hasAudioKeyframes)) {
                 playBtn.style.display = "inline-block";
                 playBtn.textContent = this.isPlayingPreview ? "⏸ Pause" : "▶ Play";
                 playBtn.className = this.isPlayingPreview
@@ -2487,30 +3018,39 @@ class CompositionEditor {
             }
 
             layerDiv.addEventListener("click", (e) => {
+                const isButton = e.target.tagName === "BUTTON" || e.target.closest("button");
+                const isInput = e.target.tagName === "INPUT" || e.target.closest("input");
+
+                if (!isInput && this.selectedLayerId !== layer.id) {
+                    if (this.moveAsKeyframeMode && this.moveAsKeyframeSourceId) {
+                        if (layer.id !== this.moveAsKeyframeSourceId) {
+                            if (this.importAsKeyframeMode) {
+                                this.convertLayerToKeyframe(layer.id, this.moveAsKeyframeSourceId, e);
+                            } else {
+                                this.convertLayerToKeyframe(this.moveAsKeyframeSourceId, layer.id, e);
+                            }
+                            return;
+                        } else {
+                            this.cancelMoveAsKeyframeMode();
+                            return;
+                        }
+                    }
+
+                    this.selectLayer(layer.id);
+                }
+
+                if (isButton || isInput) {
+                    return;
+                }
+
                 if (
-                    e.target.tagName === "BUTTON" ||
-                    e.target.tagName === "INPUT" ||
-                    e.target.closest("button") ||
-                    e.target.closest("input")
+                    this.moveAsKeyframeMode &&
+                    this.moveAsKeyframeSourceId &&
+                    layer.id === this.moveAsKeyframeSourceId
                 ) {
+                    this.cancelMoveAsKeyframeMode();
                     return;
                 }
-
-                if (this.moveAsKeyframeMode && this.moveAsKeyframeSourceId) {
-                    if (layer.id === this.moveAsKeyframeSourceId) {
-                        this.cancelMoveAsKeyframeMode();
-                        return;
-                    }
-
-                    if (this.importAsKeyframeMode) {
-                        this.convertLayerToKeyframe(layer.id, this.moveAsKeyframeSourceId);
-                    } else {
-                        this.convertLayerToKeyframe(this.moveAsKeyframeSourceId, layer.id);
-                    }
-                    return;
-                }
-
-                this.selectLayer(layer.id);
             });
 
             const renderData = this.getLayerRenderData(layer);
@@ -2535,12 +3075,15 @@ class CompositionEditor {
             let keyframeTimelineHTML = "";
             let positionHTML = "";
 
+            const isLayerSelected = layer.id === this.selectedLayerId;
+
             if (layer.hasKeyframes && layer.keyframes.length > 0) {
                 const selectedKf = layer.keyframes[layer.selectedKeyframeIndex];
                 const selectedIdx = layer.selectedKeyframeIndex;
                 const kfName = selectedKf.name || `KF ${selectedIdx + 1}`;
 
-                keyframeTimelineHTML = '<div class="keyframe-timeline-section" style="overflow-x: hidden;">';
+                const timelineDisplay = isLayerSelected ? "block" : "none";
+                keyframeTimelineHTML = `<div class="keyframe-timeline-section" style="overflow-x: hidden; display: ${timelineDisplay};">`;
 
                 keyframeTimelineHTML +=
                     '<div class="keyframe-header" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">';
@@ -2565,6 +3108,12 @@ class CompositionEditor {
                             ⥅
                         </button>
                         <button class="layer-control-btn"
+                                onclick="compositionEditor.addEmptyKeyframe('${layer.id}')"
+                                title="Add empty keyframe (no asset)"
+                                style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
+                            ⦿
+                        </button>
+                        <button class="layer-control-btn"
                                 onclick="compositionEditor.showImportAsKeyframeMenu('${layer.id}')"
                                 title="Import another layer as a new keyframe in this timeline"
                                 style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
@@ -2573,14 +3122,16 @@ class CompositionEditor {
                     </div>
                 `;
 
-                keyframeTimelineHTML += `
-                    <button class="layer-control-btn"
-                           onclick="compositionEditor.ejectKeyframe('${layer.id}', '${selectedKf.id}')"
-                           title="Eject keyframe as a new simple image layer"
-                           style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
-                        ⏏
-                    </button>
-                `;
+                if (!selectedKf.isIntentionallyEmpty) {
+                    keyframeTimelineHTML += `
+                        <button class="layer-control-btn"
+                               onclick="compositionEditor.ejectKeyframe('${layer.id}', '${selectedKf.id}')"
+                               title="Eject keyframe as a new simple image layer"
+                               style="font-size: 1vmax; padding: 0.25vmax; font-weight: normal;">
+                            ⏏
+                        </button>
+                    `;
+                }
 
                 if (layer.keyframes.length > 1) {
                     keyframeTimelineHTML += `
@@ -2625,8 +3176,9 @@ class CompositionEditor {
                 keyframeTimelineHTML += positionHTML;
                 keyframeTimelineHTML += "</div>";
             } else {
+                const positionDisplay = isLayerSelected ? "grid" : "none";
                 positionHTML = `
-                    <div class="layer-position" style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
+                    <div class="layer-position" style="flex: 1; display: ${positionDisplay}; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
                         <div style="display: flex; flex-direction: column; gap: 2px;">
                             <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">X</label>
                             <input type="number" value="${renderData.x}" min="0" max="${this.canvasWidth}" step="1"
@@ -2651,7 +3203,7 @@ class CompositionEditor {
                 layer.keyframes.forEach((kf, idx) => {
                     const isSelected = idx === layer.selectedKeyframeIndex;
                     const kfRenderData = this.getKeyframeRenderData(layer, idx);
-                    const thumb = this.getLayerThumbnailFromRenderData(kfRenderData);
+                    const thumb = this.getLayerThumbnailFromRenderData(kfRenderData, `${layer.id}-kf${idx}`);
 
                     let tooltipText = "";
                     if (kf.assetRef) {
@@ -2712,14 +3264,14 @@ class CompositionEditor {
                     <div class="layer-top-actions" style="display: flex; gap: 6px; align-items: center;">
                         <div style="display: flex; gap: 3px; border-right: 1px solid var(--txt-color); padding-right: 6px; ${!layer.hasKeyframes ? `border-left: 1px solid var(--txt-color);padding-left: 6px;` : ""}">
                             <button class="layer-control-btn"
-                                    onclick="compositionEditor.moveLayerUp('${layer.id}')"
-                                    title="Move layer forward (higher z-index)"
+                                    onclick="compositionEditor.moveLayerUp('${layer.id}', event)"
+                                    title="Move layer forward (Shift+click: move to top)"
                                     ${actualIndex === this.layers.length - 1 ? "disabled" : ""}>
                                 ⬆
                             </button>
                             <button class="layer-control-btn"
-                                    onclick="compositionEditor.moveLayerDown('${layer.id}')"
-                                    title="Move layer backward (lower z-index)"
+                                    onclick="compositionEditor.moveLayerDown('${layer.id}', event)"
+                                    title="Move layer backward (Shift+click: move to bottom)"
                                     ${actualIndex === 0 ? "disabled" : ""}>
                                 ⬇
                             </button>
@@ -2763,11 +3315,13 @@ class CompositionEditor {
         });
 
         this.attachKeyframeDragListeners();
+
+        setTimeout(() => this.animateThumbnails(), 0);
     }
 
     getLayerThumbnail(layer) {
         const renderData = this.getLayerRenderData(layer);
-        return this.getLayerThumbnailFromRenderData(renderData);
+        return this.getLayerThumbnailFromRenderData(renderData, layer.id);
     }
 
     getKeyframeRenderData(layer, keyframeIndex) {
@@ -2778,7 +3332,8 @@ class CompositionEditor {
         const keyframe = layer.keyframes[keyframeIndex];
 
         let assetKeyframe = keyframe;
-        if (!keyframe.assetRef && !keyframe.blobUrl) {
+
+        if (!keyframe.isIntentionallyEmpty && !keyframe.assetRef && !keyframe.blobUrl) {
             for (let i = keyframeIndex - 1; i >= 0; i--) {
                 if (layer.keyframes[i].assetRef || layer.keyframes[i].blobUrl) {
                     assetKeyframe = layer.keyframes[i];
@@ -2790,20 +3345,31 @@ class CompositionEditor {
         return {
             x: keyframe.x,
             y: keyframe.y,
-            width: keyframe.width || assetKeyframe.width,
-            height: keyframe.height || assetKeyframe.height,
-            type: assetKeyframe.type,
-            image: assetKeyframe.image,
-            imageLoaded: assetKeyframe.imageLoaded,
-            spriteCanvases: assetKeyframe.spriteCanvases,
-            spriteIndices: assetKeyframe.spriteIndices,
-            isAnimated: assetKeyframe.isAnimated,
+            width: keyframe.width || assetKeyframe.width || 0,
+            height: keyframe.height || assetKeyframe.height || 0,
+            type: assetKeyframe.type || "background",
+            image: assetKeyframe.image || null,
+            imageLoaded: assetKeyframe.imageLoaded || false,
+            spriteCanvases: assetKeyframe.spriteCanvases || [],
+            spriteIndices: assetKeyframe.spriteIndices || [],
+            isAnimated: assetKeyframe.isAnimated || false,
         };
     }
 
-    getLayerThumbnailFromRenderData(renderData) {
-        const thumbnailCanvas = document.createElement("canvas");
+    getLayerThumbnailFromRenderData(renderData, layerId = null) {
         const thumbSize = 40;
+
+        if (
+            renderData.type === "sprite" &&
+            renderData.isAnimated &&
+            renderData.spriteCanvases &&
+            renderData.spriteCanvases.length > 1
+        ) {
+            const canvasId = layerId ? `thumb-canvas-${layerId}` : `thumb-canvas-${Date.now()}-${Math.random()}`;
+            return `<canvas id="${canvasId}" width="${thumbSize}" height="${thumbSize}" style="width:40px;height:40px;border-radius:4px;"></canvas>`;
+        }
+
+        const thumbnailCanvas = document.createElement("canvas");
         thumbnailCanvas.width = thumbSize;
         thumbnailCanvas.height = thumbSize;
         const thumbCtx = thumbnailCanvas.getContext("2d");
@@ -2832,6 +3398,75 @@ class CompositionEditor {
 
         const thumbnailUrl = thumbnailCanvas.toDataURL();
         return `<img src="${thumbnailUrl}" style="width:40px;height:40px;border-radius:4px;object-fit:contain;">`;
+    }
+
+    animateThumbnails() {
+        if (this.thumbnailAnimations) {
+            this.thumbnailAnimations.forEach((anim) => {
+                if (anim.interval) clearInterval(anim.interval);
+            });
+        }
+        this.thumbnailAnimations = [];
+
+        this.layers.forEach((layer) => {
+            const renderData = this.getLayerRenderData(layer);
+            if (
+                renderData.type === "sprite" &&
+                renderData.isAnimated &&
+                renderData.spriteCanvases &&
+                renderData.spriteCanvases.length > 1
+            ) {
+                const canvasId = `thumb-canvas-${layer.id}`;
+                this.startThumbnailAnimation(canvasId, renderData, layer.animationSpeed || 250);
+            }
+
+            if (layer.hasKeyframes && layer.keyframes.length > 0) {
+                layer.keyframes.forEach((kf, idx) => {
+                    const kfRenderData = this.getKeyframeRenderData(layer, idx);
+                    if (
+                        kfRenderData.type === "sprite" &&
+                        kfRenderData.isAnimated &&
+                        kfRenderData.spriteCanvases &&
+                        kfRenderData.spriteCanvases.length > 1
+                    ) {
+                        const canvasId = `thumb-canvas-${layer.id}-kf${idx}`;
+                        this.startThumbnailAnimation(canvasId, kfRenderData, layer.animationSpeed || 250);
+                    }
+                });
+            }
+        });
+    }
+
+    startThumbnailAnimation(canvasId, renderData, animSpeed) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const ctx = canvas.getContext("2d");
+        const thumbSize = 40;
+        let currentFrame = 0;
+
+        const animate = () => {
+            ctx.clearRect(0, 0, thumbSize, thumbSize);
+            ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+            ctx.fillRect(0, 0, thumbSize, thumbSize);
+
+            const spriteCanvas = renderData.spriteCanvases[currentFrame];
+            if (spriteCanvas) {
+                const scale = Math.min(thumbSize / spriteCanvas.width, thumbSize / spriteCanvas.height);
+                const scaledWidth = spriteCanvas.width * scale;
+                const scaledHeight = spriteCanvas.height * scale;
+                const x = (thumbSize - scaledWidth) / 2;
+                const y = (thumbSize - scaledHeight) / 2;
+                ctx.drawImage(spriteCanvas, x, y, scaledWidth, scaledHeight);
+            }
+
+            currentFrame = (currentFrame + 1) % renderData.spriteCanvases.length;
+        };
+
+        animate();
+
+        const interval = setInterval(animate, animSpeed);
+        this.thumbnailAnimations.push({ interval, canvasId });
     }
 
     truncate(str, maxLen) {

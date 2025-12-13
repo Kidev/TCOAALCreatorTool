@@ -2008,7 +2008,7 @@ function setupGalleryOnlyMode() {
                                 style="font-size: 0.8vmax;height:75%;padding: 5px 5px !important;"
                                 title="Select background image for preview only"
                             >
-                                Template
+                                ☐ Template
                             </button>
                             <button
                                 id="previewBackgroundToggleBtn"
@@ -2017,7 +2017,7 @@ function setupGalleryOnlyMode() {
                                 title="Hide/Show background"
                                 class="success"
                             >
-                                ☑
+                                ☑ Template
                             </button>
                             <button
                                 id="previewBackgroundRemoveBtn"
@@ -2029,14 +2029,14 @@ function setupGalleryOnlyMode() {
                                 ✕
                             </button>
                         </div>
-                                                    <div class="composition-preview-canvas-onion-skinning">
+                                                    <div class="composition-preview-bg-controls">
                                 <button
                                         id="previewCanvasOnionSkinning"
                                         style="font-size: 0.8vmax; height: 75%; padding: 5px 5px !important"
                                         title="Enable/disable onion skinning"
                                         class="info"
                                 >
-                                    Onion Skinning
+                                    ☐ Onion skinning
                                 </button>
                             </div>
                         <div class="composition-preview-canvas-size-control">
@@ -2959,6 +2959,65 @@ function handleGalleryKeydown(e) {
     }
 }
 
+document.addEventListener(
+    "keydown",
+    (e) => {
+        const target = e.target;
+        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+            const inputType = target.getAttribute("type");
+
+            if (!inputType || inputType === "text" || inputType === "search" || target.tagName === "TEXTAREA") {
+                if (e.key === " " || e.code === "Space" || e.key === "Enter") {
+                    e.stopPropagation();
+
+                    if (e.key === "Enter") {
+                        target.blur();
+                    }
+                }
+            }
+        }
+    },
+    true,
+);
+
+document.addEventListener("input", (e) => {
+    const target = e.target;
+    if (
+        target &&
+        target.tagName === "INPUT" &&
+        (target.getAttribute("type") === "text" ||
+            target.getAttribute("type") === "search" ||
+            !target.getAttribute("type"))
+    ) {
+        setTimeout(() => {
+            if (!galleryManager) return;
+
+            const selectedItem = document.querySelector(".gallery-item.selected");
+            if (selectedItem) {
+                const isVisible =
+                    selectedItem.offsetParent !== null &&
+                    window.getComputedStyle(selectedItem).display !== "none" &&
+                    window.getComputedStyle(selectedItem).visibility !== "hidden";
+
+                if (!isVisible && galleryManager.currentAsset) {
+                    galleryManager.currentAsset = null;
+                    selectedItem.classList.remove("selected");
+
+                    const previewContent = document.getElementById("previewPanelContent");
+                    if (previewContent) {
+                        previewContent.innerHTML = '<div class="preview-placeholder">Select an item to preview</div>';
+                    }
+
+                    const previewControls = document.getElementById("previewControls");
+                    if (previewControls) {
+                        previewControls.innerHTML = "";
+                    }
+                }
+            }
+        }, 50);
+    }
+});
+
 document.addEventListener("keydown", handleGalleryKeydown);
 
 function checkAssetUsage(category, name, type) {
@@ -3263,7 +3322,7 @@ class DropDownButton {
     attachTo(new_root, target, method) {
         this._unlink();
         this.root = new_root;
-        this.execute = (...args) => method.call(target, args);
+        this.execute = (...args) => method.call(target, ...args);
         this._link();
     }
 
@@ -3274,8 +3333,8 @@ class DropDownButton {
 
         this._updateLabel();
 
-        this.mainBtn.onclick = () => {
-            this.execute(this.getMode());
+        this.mainBtn.onclick = (e) => {
+            this.execute(this.getMode(), e);
         };
 
         this.arrowBtn.onclick = (e) => {
