@@ -756,6 +756,8 @@ const KEY_MAP = {
     "keyframes": "U",
     "time": "V",
     "spriteVariant": "W",
+
+    "rotation": "=",
 };
 
 // Reverse mapping for decompression (short key -> long key)

@@ -111,6 +111,38 @@ class CompositionEditor {
         return "layer-" + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
     }
 
+    drawImageWithTransform(ctx, image, x, y, width, height, rotation = 0) {
+        const rot = rotation !== undefined ? rotation : 0;
+
+        if (rot === 0) {
+            if (width && height) {
+                ctx.drawImage(image, x, y, width, height);
+            } else {
+                ctx.drawImage(image, x, y);
+            }
+            return;
+        }
+
+        ctx.save();
+
+        const drawWidth = width || image.width;
+        const drawHeight = height || image.height;
+        const centerX = x + drawWidth / 2;
+        const centerY = y + drawHeight / 2;
+
+        ctx.translate(centerX, centerY);
+        ctx.rotate((rot * Math.PI) / 180);
+        ctx.translate(-centerX, -centerY);
+
+        if (width && height) {
+            ctx.drawImage(image, x, y, width, height);
+        } else {
+            ctx.drawImage(image, x, y);
+        }
+
+        ctx.restore();
+    }
+
     async parseGifDuration(blobUrl) {
         try {
             const response = await fetch(blobUrl);
@@ -1022,6 +1054,8 @@ class CompositionEditor {
             y: assetData.y || 0,
             width: assetData.width || 0,
             height: assetData.height || 0,
+            rotation: assetData.rotation !== undefined ? assetData.rotation : 0,
+            aspectRatioLocked: assetData.aspectRatioLocked !== undefined ? assetData.aspectRatioLocked : true,
             visible: true,
             zIndex: isBackgroundAsset ? 0 : this.layers.length,
 
@@ -1534,6 +1568,150 @@ class CompositionEditor {
         this.render();
     }
 
+    updateLayerRotation(layerId, rotation) {
+        const layer = this.layers.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        rotation = ((rotation % 360) + 360) % 360;
+
+        if (layer.hasKeyframes && layer.keyframes.length > 0) {
+            const keyframe = layer.keyframes[layer.selectedKeyframeIndex];
+            if (keyframe) {
+                keyframe.rotation = rotation;
+            }
+        } else {
+            layer.rotation = rotation;
+        }
+
+        this.updateLayersList();
+        this.render();
+    }
+
+    updateLayerSize(layerId, newWidth, newHeight) {
+        const layer = this.layers.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        const target =
+            layer.hasKeyframes && layer.keyframes.length > 0 ? layer.keyframes[layer.selectedKeyframeIndex] : layer;
+
+        if (!target) return;
+
+        const aspectRatioLocked = target.aspectRatioLocked !== undefined ? target.aspectRatioLocked : true;
+        const oldWidth = target.width || 1;
+        const oldHeight = target.height || 1;
+
+        if (aspectRatioLocked) {
+            const aspectRatio = oldWidth / oldHeight;
+
+            if (newWidth !== null && newHeight === null) {
+                target.width = Math.max(1, newWidth);
+                target.height = Math.round(target.width / aspectRatio);
+            } else if (newHeight !== null && newWidth === null) {
+                target.height = Math.max(1, newHeight);
+                target.width = Math.round(target.height * aspectRatio);
+            } else {
+                target.width = Math.max(1, newWidth);
+                target.height = Math.max(1, newHeight);
+            }
+        } else {
+            if (newWidth !== null) target.width = Math.max(1, newWidth);
+            if (newHeight !== null) target.height = Math.max(1, newHeight);
+        }
+
+        this.updateLayersList();
+        this.render();
+    }
+
+    toggleAspectRatioLock(layerId) {
+        const layer = this.layers.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        const target =
+            layer.hasKeyframes && layer.keyframes.length > 0 ? layer.keyframes[layer.selectedKeyframeIndex] : layer;
+
+        if (!target) return;
+
+        target.aspectRatioLocked = !target.aspectRatioLocked;
+        this.updateLayersList();
+    }
+
+    updateRotationKnob(knobId, rotation) {
+        const knob = document.getElementById(knobId);
+        if (!knob) return;
+
+        rotation = ((rotation % 360) + 360) % 360;
+
+        const line = knob.querySelector("line");
+        const text = knob.querySelector("text");
+
+        if (line) {
+            line.setAttribute("transform", `rotate(${rotation} 25 25)`);
+        }
+        if (text) {
+            text.textContent = `${Math.round(rotation)}°`;
+        }
+    }
+
+    initRotationKnob(knobId, layerId) {
+        const knob = document.getElementById(knobId);
+        if (!knob) return;
+
+        let isDragging = false;
+
+        const getAngleFromEvent = (e) => {
+            const rect = knob.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const mouseX = e.clientX || (e.touches && e.touches[0].clientX);
+            const mouseY = e.clientY || (e.touches && e.touches[0].clientY);
+
+            const deltaX = mouseX - centerX;
+            const deltaY = mouseY - centerY;
+
+            let angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI) + 90;
+            angle = ((angle % 360) + 360) % 360;
+
+            return Math.round(angle);
+        };
+
+        const handleInteraction = (e) => {
+            e.preventDefault();
+            const angle = getAngleFromEvent(e);
+            this.updateLayerRotation(layerId, angle);
+
+            const input = knob.parentElement.parentElement.querySelector('input[type="number"]');
+            if (input) {
+                input.value = angle;
+            }
+        };
+
+        const startDrag = (e) => {
+            isDragging = true;
+            knob.style.cursor = "grabbing";
+            handleInteraction(e);
+        };
+
+        const onDrag = (e) => {
+            if (isDragging) {
+                handleInteraction(e);
+            }
+        };
+
+        const stopDrag = () => {
+            isDragging = false;
+            knob.style.cursor = "grab";
+        };
+
+        knob.addEventListener("mousedown", startDrag);
+        document.addEventListener("mousemove", onDrag);
+        document.addEventListener("mouseup", stopDrag);
+
+        knob.addEventListener("touchstart", startDrag);
+        document.addEventListener("touchmove", onDrag);
+        document.addEventListener("touchend", stopDrag);
+    }
+
     scrollToSelectedLayer() {
         setTimeout(() => {
             const container = document.getElementById("compositionLayersList");
@@ -1714,16 +1892,40 @@ class CompositionEditor {
 
                     const spriteCanvas = renderData.spriteCanvases[spriteFrameIndex];
                     if (spriteCanvas) {
-                        this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
+                        this.drawImageWithTransform(
+                            this.ctx,
+                            spriteCanvas,
+                            renderData.x,
+                            renderData.y,
+                            renderData.width || spriteCanvas.width,
+                            renderData.height || spriteCanvas.height,
+                            renderData.rotation,
+                        );
                     }
                 } else {
                     const spriteCanvas = renderData.spriteCanvases[0];
                     if (spriteCanvas) {
-                        this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
+                        this.drawImageWithTransform(
+                            this.ctx,
+                            spriteCanvas,
+                            renderData.x,
+                            renderData.y,
+                            renderData.width || spriteCanvas.width,
+                            renderData.height || spriteCanvas.height,
+                            renderData.rotation,
+                        );
                     }
                 }
             } else if (renderData.image && renderData.imageLoaded) {
-                this.ctx.drawImage(renderData.image, renderData.x, renderData.y, renderData.width, renderData.height);
+                this.drawImageWithTransform(
+                    this.ctx,
+                    renderData.image,
+                    renderData.x,
+                    renderData.y,
+                    renderData.width,
+                    renderData.height,
+                    renderData.rotation,
+                );
             }
         }
 
@@ -1773,6 +1975,8 @@ class CompositionEditor {
                 time: 0,
                 x: layer.x,
                 y: layer.y,
+                rotation: layer.rotation,
+                aspectRatioLocked: layer.aspectRatioLocked,
                 assetRef: layer.assetRef,
                 blobUrl: layer.blobUrl,
                 image: layer.image,
@@ -1842,6 +2046,9 @@ class CompositionEditor {
             time: newTime,
             x: selectedKeyframe.x,
             y: selectedKeyframe.y,
+            rotation: selectedKeyframe.rotation !== undefined ? selectedKeyframe.rotation : 0,
+            aspectRatioLocked:
+                selectedKeyframe.aspectRatioLocked !== undefined ? selectedKeyframe.aspectRatioLocked : true,
             assetRef: sourceKeyframe.assetRef,
             blobUrl: sourceKeyframe.blobUrl,
             image: sourceKeyframe.image,
@@ -1903,6 +2110,9 @@ class CompositionEditor {
             time: newTime,
             x: selectedKeyframe.x,
             y: selectedKeyframe.y,
+            rotation: selectedKeyframe.rotation !== undefined ? selectedKeyframe.rotation : 0,
+            aspectRatioLocked:
+                selectedKeyframe.aspectRatioLocked !== undefined ? selectedKeyframe.aspectRatioLocked : true,
             assetRef: null,
             blobUrl: null,
             image: null,
@@ -1972,6 +2182,8 @@ class CompositionEditor {
             name: `${filename}`,
             x: keyframe.x,
             y: keyframe.y,
+            rotation: keyframe.rotation !== undefined ? keyframe.rotation : 0,
+            aspectRatioLocked: keyframe.aspectRatioLocked !== undefined ? keyframe.aspectRatioLocked : true,
             width: keyframe.width,
             height: keyframe.height,
             zIndex: this.layers.length,
@@ -2279,7 +2491,7 @@ class CompositionEditor {
                 modeIndicator.style.fontWeight = "600";
                 layersHeaderTitle.appendChild(modeIndicator);
             }
-            modeIndicator.innerHTML = `<span style="font-size: 1.1em; font-weight: bold;">Import as Keyframe Mode</span><br><span style="font-size: 0.9em; font-weight: normal; opacity: 0.8;">Click a layer to import into "${targetLayer.name}, Shift+Click for multiple"</span>`;
+            modeIndicator.innerHTML = `<span style="font-size: 1.1em; font-weight: bold;">Import as Keyframe Mode</span><br><span style="font-size: 0.9em; font-weight: normal; opacity: 0.8;">Click a layer to import into "${targetLayer.name}", click with shift to add multiple in one go</span>`;
         }
 
         if (layersHeaderButtons) {
@@ -2421,6 +2633,8 @@ class CompositionEditor {
             time: maxTime + 1000,
             x: sourceLayer.x,
             y: sourceLayer.y,
+            rotation: sourceLayer.rotation !== undefined ? sourceLayer.rotation : 0,
+            aspectRatioLocked: sourceLayer.aspectRatioLocked !== undefined ? sourceLayer.aspectRatioLocked : true,
             assetRef: sourceLayer.assetRef,
             blobUrl: sourceLayer.blobUrl,
             image: sourceLayer.image,
@@ -2475,6 +2689,8 @@ class CompositionEditor {
             return {
                 x: keyframe.x,
                 y: keyframe.y,
+                rotation: keyframe.rotation !== undefined ? keyframe.rotation : 0,
+                aspectRatioLocked: keyframe.aspectRatioLocked !== undefined ? keyframe.aspectRatioLocked : true,
                 width: keyframe.width || assetKeyframe.width || 0,
                 height: keyframe.height || assetKeyframe.height || 0,
                 type: assetKeyframe.type || "background",
@@ -2511,10 +2727,26 @@ class CompositionEditor {
 
             const spriteCanvas = renderData.spriteCanvases[spriteIndex];
             if (spriteCanvas) {
-                this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
+                this.drawImageWithTransform(
+                    this.ctx,
+                    spriteCanvas,
+                    renderData.x,
+                    renderData.y,
+                    renderData.width || spriteCanvas.width,
+                    renderData.height || spriteCanvas.height,
+                    renderData.rotation,
+                );
             }
         } else if (renderData.image && renderData.imageLoaded) {
-            this.ctx.drawImage(renderData.image, renderData.x, renderData.y, renderData.width, renderData.height);
+            this.drawImageWithTransform(
+                this.ctx,
+                renderData.image,
+                renderData.x,
+                renderData.y,
+                renderData.width,
+                renderData.height,
+                renderData.rotation,
+            );
         }
 
         if (isEmptyKeyframe) {
@@ -2718,16 +2950,40 @@ class CompositionEditor {
                     }
                     const spriteCanvas = renderData.spriteCanvases[layer.currentSpriteIndex];
                     if (spriteCanvas) {
-                        this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
+                        this.drawImageWithTransform(
+                            this.ctx,
+                            spriteCanvas,
+                            renderData.x,
+                            renderData.y,
+                            renderData.width || spriteCanvas.width,
+                            renderData.height || spriteCanvas.height,
+                            renderData.rotation,
+                        );
                     }
                 } else {
                     const spriteCanvas = renderData.spriteCanvases[0];
                     if (spriteCanvas) {
-                        this.ctx.drawImage(spriteCanvas, renderData.x, renderData.y);
+                        this.drawImageWithTransform(
+                            this.ctx,
+                            spriteCanvas,
+                            renderData.x,
+                            renderData.y,
+                            renderData.width || spriteCanvas.width,
+                            renderData.height || spriteCanvas.height,
+                            renderData.rotation,
+                        );
                     }
                 }
             } else if (renderData.image && renderData.imageLoaded) {
-                this.ctx.drawImage(renderData.image, renderData.x, renderData.y, renderData.width, renderData.height);
+                this.drawImageWithTransform(
+                    this.ctx,
+                    renderData.image,
+                    renderData.x,
+                    renderData.y,
+                    renderData.width,
+                    renderData.height,
+                    renderData.rotation,
+                );
             }
 
             if (layer.hasKeyframes && layer.keyframes.length > 0) {
@@ -3146,27 +3402,67 @@ class CompositionEditor {
 
                 keyframeTimelineHTML += this.generateVisualTimeline(layer);
 
+                const currentRotation = renderData.rotation !== undefined ? renderData.rotation : 0;
+                const aspectRatioLocked =
+                    renderData.aspectRatioLocked !== undefined ? renderData.aspectRatioLocked : true;
+                const lockIcon = aspectRatioLocked ? "🔒" : "🔓";
+                const knobId = `rot-knob-${layer.id}`;
+
                 positionHTML = `
-                    <div style="display: flex; gap: 8px; margin-top: 8px;">
-                        <div class="layer-position" style="flex: 0 0 20%; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
-                            <div style="display: flex; flex-direction: column; gap: 2px;">
-                                <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Time (ms)</label>
-                                <input type="number" value="${selectedKf.time}" min="0" step="100"
-                                       onchange="compositionEditor.updateKeyframeTime('${layer.id}', '${selectedKf.id}', parseInt(this.value))"
-                                       class="position-input">
-                            </div>
+                    <div class="layer-position" style="display: grid; grid-template-columns: 1fr 3fr; gap: 8px; margin-top: 8px; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Time (ms)</label>
+                            <input type="number" value="${selectedKf.time}" min="0" step="100"
+                                   onchange="compositionEditor.updateKeyframeTime('${layer.id}', '${selectedKf.id}', parseInt(this.value))"
+                                   class="position-input">
                         </div>
-                        <div class="layer-position" style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
-                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <div style="display: flex; gap: 8px;">
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
                                 <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">X</label>
                                 <input type="number" value="${renderData.x}" min="0" max="${this.canvasWidth}" step="1"
                                        onchange="compositionEditor.updateLayerPosition('${layer.id}', parseInt(this.value), ${renderData.y}, false)"
                                        class="position-input" style="width: 100%;">
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
                                 <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Y</label>
                                 <input type="number" value="${renderData.y}" min="0" max="${this.canvasHeight}" step="1"
                                        onchange="compositionEditor.updateLayerPosition('${layer.id}', ${renderData.x}, parseInt(this.value), false)"
+                                       class="position-input" style="width: 100%;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: end;">
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
+                                <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Rotation</label>
+                                <input type="number" value="${currentRotation}" min="0" max="359" step="1"
+                                       onchange="compositionEditor.updateLayerRotation('${layer.id}', parseFloat(this.value));"
+                                       oninput="compositionEditor.updateRotationKnob('${knobId}', parseFloat(this.value));"
+                                       class="position-input">
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: center; align-self: stretch;">
+                                <svg id="${knobId}" width="50" height="100%" viewBox="0 0 50 50" preserveAspectRatio="xMidYMid meet" style="cursor: grab; user-select: none; min-height: 50px; max-height: 80px;">
+                                    <circle cx="25" cy="25" r="22" fill="none" stroke="var(--accent-color)" stroke-width="2" opacity="0.3"/>
+                                    <line x1="25" y1="25" x2="25" y2="7" stroke="var(--accent-color)" stroke-width="3" stroke-linecap="round" transform="rotate(${currentRotation} 25 25)"/>
+                                    <circle cx="25" cy="25" r="4" fill="var(--accent-color)"/>
+                                    <text x="25" y="30" text-anchor="middle" font-size="8" fill="var(--txt-color)" opacity="0.5">${Math.round(currentRotation)}°</text>
+                                </svg>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: end;">
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
+                                <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Width</label>
+                                <input type="number" value="${renderData.width}" min="1" step="1"
+                                       onchange="compositionEditor.updateLayerSize('${layer.id}', parseInt(this.value), null)"
+                                       class="position-input" style="width: 100%;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px; justify-content: flex-end;">
+                                <button onclick="compositionEditor.toggleAspectRatioLock('${layer.id}')"
+                                        style="padding: 0.5vmax; cursor: pointer; background: none; border: none; border-radius: 4px; font-size: 0.75vmax;"
+                                        title="${aspectRatioLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}">${lockIcon}</button>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
+                                <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Height</label>
+                                <input type="number" value="${renderData.height}" min="1" step="1"
+                                       onchange="compositionEditor.updateLayerSize('${layer.id}', null, parseInt(this.value))"
                                        class="position-input" style="width: 100%;">
                             </div>
                         </div>
@@ -3177,8 +3473,14 @@ class CompositionEditor {
                 keyframeTimelineHTML += "</div>";
             } else {
                 const positionDisplay = isLayerSelected ? "grid" : "none";
+                const currentRotation = renderData.rotation !== undefined ? renderData.rotation : 0;
+                const aspectRatioLocked =
+                    renderData.aspectRatioLocked !== undefined ? renderData.aspectRatioLocked : true;
+                const lockIcon = aspectRatioLocked ? "🔒" : "🔓";
+                const knobId = `rot-knob-simple-${layer.id}`;
+
                 positionHTML = `
-                    <div class="layer-position" style="flex: 1; display: ${positionDisplay}; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
+                    <div class="layer-position" style="display: ${positionDisplay}; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; padding: 8px; background: var(--bg-color-section); border-radius: 4px;">
                         <div style="display: flex; flex-direction: column; gap: 2px;">
                             <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">X</label>
                             <input type="number" value="${renderData.x}" min="0" max="${this.canvasWidth}" step="1"
@@ -3190,6 +3492,40 @@ class CompositionEditor {
                             <input type="number" value="${renderData.y}" min="0" max="${this.canvasHeight}" step="1"
                                    onchange="compositionEditor.updateLayerPosition('${layer.id}', ${renderData.x}, parseInt(this.value), false)"
                                    class="position-input" style="width: 100%;">
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: end; grid-column: 1 / -1;">
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
+                                <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Rotation</label>
+                                <input type="number" value="${currentRotation}" min="0" max="359" step="1"
+                                       onchange="compositionEditor.updateLayerRotation('${layer.id}', parseFloat(this.value));"
+                                       oninput="compositionEditor.updateRotationKnob('${knobId}', parseFloat(this.value));"
+                                       class="position-input">
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: center; align-self: stretch;">
+                                <svg id="${knobId}" width="50" height="100%" viewBox="0 0 50 50" preserveAspectRatio="xMidYMid meet" style="cursor: grab; user-select: none; min-height: 50px; max-height: 80px;">
+                                    <circle cx="25" cy="25" r="22" fill="none" stroke="var(--accent-color)" stroke-width="2" opacity="0.3"/>
+                                    <line x1="25" y1="25" x2="25" y2="7" stroke="var(--accent-color)" stroke-width="3" stroke-linecap="round" transform="rotate(${currentRotation} 25 25)"/>
+                                    <circle cx="25" cy="25" r="4" fill="var(--accent-color)"/>
+                                    <text x="25" y="30" text-anchor="middle" font-size="8" fill="var(--txt-color)" opacity="0.5">${Math.round(currentRotation)}°</text>
+                                </svg>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
+                                <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Width</label>
+                                <input type="number" value="${renderData.width}" min="1" step="1"
+                                       onchange="compositionEditor.updateLayerSize('${layer.id}', parseInt(this.value), null)"
+                                       class="position-input" style="width: 100%;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px; justify-content: flex-end;">
+                                <button onclick="compositionEditor.toggleAspectRatioLock('${layer.id}')"
+                                        style="padding: 0.5vmax; cursor: pointer; background: none; border: none; border-radius: 4px; font-size: 0.75vmax;"
+                                        title="${aspectRatioLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}">${lockIcon}</button>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
+                                <label style="font-size: 0.7em; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Height</label>
+                                <input type="number" value="${renderData.height}" min="1" step="1"
+                                       onchange="compositionEditor.updateLayerSize('${layer.id}', null, parseInt(this.value))"
+                                       class="position-input" style="width: 100%;">
+                            </div>
                         </div>
                     </div>
                 `;
@@ -3312,6 +3648,11 @@ class CompositionEditor {
             `;
 
             container.appendChild(layerDiv);
+
+            setTimeout(() => {
+                const knobId = layer.hasKeyframes ? `rot-knob-${layer.id}` : `rot-knob-simple-${layer.id}`;
+                this.initRotationKnob(knobId, layer.id);
+            }, 0);
         });
 
         this.attachKeyframeDragListeners();
@@ -4023,10 +4364,26 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                 const canvasIndex = renderData.isAnimated ? layer.currentSpriteIndex : 0;
                 const spriteCanvas = renderData.spriteCanvases[canvasIndex];
                 if (spriteCanvas) {
-                    exportCtx.drawImage(spriteCanvas, renderData.x, renderData.y);
+                    this.drawImageWithTransform(
+                        exportCtx,
+                        spriteCanvas,
+                        renderData.x,
+                        renderData.y,
+                        renderData.width || spriteCanvas.width,
+                        renderData.height || spriteCanvas.height,
+                        renderData.rotation,
+                    );
                 }
             } else if (renderData.image && renderData.imageLoaded) {
-                exportCtx.drawImage(renderData.image, renderData.x, renderData.y, renderData.width, renderData.height);
+                this.drawImageWithTransform(
+                    exportCtx,
+                    renderData.image,
+                    renderData.x,
+                    renderData.y,
+                    renderData.width,
+                    renderData.height,
+                    renderData.rotation,
+                );
             }
         }
 
@@ -4140,11 +4497,25 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
         const interpolatedX = prevKeyframe.x + (nextKeyframe.x - prevKeyframe.x) * progress;
         const interpolatedY = prevKeyframe.y + (nextKeyframe.y - prevKeyframe.y) * progress;
 
+        const prevRotation = prevKeyframe.rotation !== undefined ? prevKeyframe.rotation : 0;
+        const nextRotation = nextKeyframe.rotation !== undefined ? nextKeyframe.rotation : 0;
+        const interpolatedRotation = prevRotation + (nextRotation - prevRotation) * progress;
+
+        const prevWidth = prevKeyframe.width || currentAsset.width;
+        const nextWidth = nextKeyframe.width || currentAsset.width;
+        const interpolatedWidth = prevWidth + (nextWidth - prevWidth) * progress;
+
+        const prevHeight = prevKeyframe.height || currentAsset.height;
+        const nextHeight = nextKeyframe.height || currentAsset.height;
+        const interpolatedHeight = prevHeight + (nextHeight - prevHeight) * progress;
+
         return {
             x: Math.round(interpolatedX),
             y: Math.round(interpolatedY),
-            width: prevKeyframe.width || currentAsset.width,
-            height: prevKeyframe.height || currentAsset.height,
+            rotation: interpolatedRotation,
+            aspectRatioLocked: prevKeyframe.aspectRatioLocked !== undefined ? prevKeyframe.aspectRatioLocked : true,
+            width: Math.round(interpolatedWidth),
+            height: Math.round(interpolatedHeight),
             type: currentAsset.type,
             image: currentAsset.image,
             imageLoaded: currentAsset.imageLoaded,
@@ -4273,16 +4644,40 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
                             const spriteCanvas = renderData.spriteCanvases[spriteFrameIndex];
                             if (spriteCanvas) {
-                                frameCtx.drawImage(spriteCanvas, renderX, renderY);
+                                this.drawImageWithTransform(
+                                    frameCtx,
+                                    spriteCanvas,
+                                    renderX,
+                                    renderY,
+                                    renderData.width || spriteCanvas.width,
+                                    renderData.height || spriteCanvas.height,
+                                    renderData.rotation,
+                                );
                             }
                         } else {
                             const spriteCanvas = renderData.spriteCanvases[0];
                             if (spriteCanvas) {
-                                frameCtx.drawImage(spriteCanvas, renderX, renderY);
+                                this.drawImageWithTransform(
+                                    frameCtx,
+                                    spriteCanvas,
+                                    renderX,
+                                    renderY,
+                                    renderData.width || spriteCanvas.width,
+                                    renderData.height || spriteCanvas.height,
+                                    renderData.rotation,
+                                );
                             }
                         }
                     } else if (renderData.image && renderData.imageLoaded) {
-                        frameCtx.drawImage(renderData.image, renderX, renderY, renderData.width, renderData.height);
+                        this.drawImageWithTransform(
+                            frameCtx,
+                            renderData.image,
+                            renderX,
+                            renderY,
+                            renderData.width,
+                            renderData.height,
+                            renderData.rotation,
+                        );
                     }
                 }
 
@@ -4624,6 +5019,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                     galleryRef: galleryRef,
                     x: layer.x,
                     y: layer.y,
+                    rotation: layer.rotation !== undefined ? layer.rotation : 0,
                     width: layer.width,
                     height: layer.height,
                     visible: layer.visible,
@@ -4650,6 +5046,7 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                         time: kf.time,
                         x: kf.x,
                         y: kf.y,
+                        rotation: kf.rotation !== undefined ? kf.rotation : 0,
                         width: kf.width,
                         height: kf.height,
                         galleryRef: kfGalleryRef || null,
@@ -4939,15 +5336,25 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                     const canvasIndex = renderData.isAnimated ? layer.currentSpriteIndex : 0;
                     const spriteCanvas = renderData.spriteCanvases[canvasIndex];
                     if (spriteCanvas) {
-                        exportCtx.drawImage(spriteCanvas, renderData.x, renderData.y);
+                        this.drawImageWithTransform(
+                            exportCtx,
+                            spriteCanvas,
+                            renderData.x,
+                            renderData.y,
+                            renderData.width || spriteCanvas.width,
+                            renderData.height || spriteCanvas.height,
+                            renderData.rotation,
+                        );
                     }
                 } else if (renderData.image && renderData.imageLoaded) {
-                    exportCtx.drawImage(
+                    this.drawImageWithTransform(
+                        exportCtx,
                         renderData.image,
                         renderData.x,
                         renderData.y,
                         renderData.width,
                         renderData.height,
+                        renderData.rotation,
                     );
                 }
             }
@@ -5075,16 +5482,40 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
                             const spriteCanvas = renderData.spriteCanvases[spriteFrameIndex];
                             if (spriteCanvas) {
-                                frameCtx.drawImage(spriteCanvas, renderX, renderY);
+                                this.drawImageWithTransform(
+                                    frameCtx,
+                                    spriteCanvas,
+                                    renderX,
+                                    renderY,
+                                    renderData.width || spriteCanvas.width,
+                                    renderData.height || spriteCanvas.height,
+                                    renderData.rotation,
+                                );
                             }
                         } else {
                             const spriteCanvas = renderData.spriteCanvases[0];
                             if (spriteCanvas) {
-                                frameCtx.drawImage(spriteCanvas, renderX, renderY);
+                                this.drawImageWithTransform(
+                                    frameCtx,
+                                    spriteCanvas,
+                                    renderX,
+                                    renderY,
+                                    renderData.width || spriteCanvas.width,
+                                    renderData.height || spriteCanvas.height,
+                                    renderData.rotation,
+                                );
                             }
                         }
                     } else if (renderData.image && renderData.imageLoaded) {
-                        frameCtx.drawImage(renderData.image, renderX, renderY, renderData.width, renderData.height);
+                        this.drawImageWithTransform(
+                            frameCtx,
+                            renderData.image,
+                            renderX,
+                            renderY,
+                            renderData.width,
+                            renderData.height,
+                            renderData.rotation,
+                        );
                     }
                 }
 
@@ -5305,6 +5736,8 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                         time: kfDesc.time,
                         x: kfDesc.x,
                         y: kfDesc.y,
+                        rotation: kfDesc.rotation !== undefined ? kfDesc.rotation : 0,
+                        aspectRatioLocked: kfDesc.aspectRatioLocked !== undefined ? kfDesc.aspectRatioLocked : true,
                         width: kfDesc.width,
                         height: kfDesc.height,
                         assetRef: kfDesc.galleryRef,
@@ -5450,6 +5883,8 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                     blobUrl: asset.url,
                     x: layerDesc.x,
                     y: layerDesc.y,
+                    rotation: layerDesc.rotation !== undefined ? layerDesc.rotation : 0,
+                    aspectRatioLocked: layerDesc.aspectRatioLocked !== undefined ? layerDesc.aspectRatioLocked : true,
                     width: layerDesc.width,
                     height: layerDesc.height,
                 };
