@@ -30,7 +30,7 @@ class GalleryManager {
         this.isLooping = false;
         this.spriteSheetData = null;
         this.extractedSprites = [];
-        this.globalImageViewMode = "original";
+        this.globalImageViewMode = "cropped";
         this.currentlyCropping = false;
         this.cropQueue = [];
         this.isCropping = false;
@@ -104,11 +104,6 @@ class GalleryManager {
 
     init() {}
 
-    /**
-     * Improves subtitle by replacing encrypted hashes with friendly names from hashToFilename
-     * @param {string} baseFileName - The original baseFileName (e.g., "img/faces/aab510d75d377c95[BUST].png")
-     * @returns {object} Object with { subtitle: improvedString, original: originalString }
-     */
     improveSubtitle(baseFileName) {
         if (!baseFileName) return { subtitle: baseFileName, original: baseFileName };
 
@@ -128,11 +123,6 @@ class GalleryManager {
         };
     }
 
-    /**
-     * Extracts all searchable terms from baseFileName using hashToFilename mapping
-     * @param {string} baseFileName - The original baseFileName (e.g., "img/faces/aab510d75d377c95[BUST].png")
-     * @returns {string} Space-separated searchable terms (e.g., "andrew_1 aab510d75d377c95 aab510d75d377c95[BUST]")
-     */
     getSearchableTerms(baseFileName) {
         if (!baseFileName) return "";
 
@@ -163,12 +153,6 @@ class GalleryManager {
         return terms.join(" ");
     }
 
-    /**
-     * Gets the display name from hashToName mapping if available
-     * @param {string} name - The current asset name (e.g., "andrew_1.png")
-     * @param {string} baseFileName - The original baseFileName (e.g., "img/faces/aab510d75d377c95[BUST].png")
-     * @returns {string} The display name with extension if found, otherwise the original name
-     */
     getFriendlyName(name, baseFileName) {
         if (!baseFileName) return name;
 
@@ -183,11 +167,6 @@ class GalleryManager {
         return name;
     }
 
-    /**
-     * Gets the hashToName value for an asset
-     * @param {string} baseFileName - The original baseFileName
-     * @returns {string|null} The hashToName value if found, otherwise null
-     */
     getHashToNameValue(baseFileName) {
         if (!baseFileName || typeof hashToName === "undefined") return null;
 
@@ -199,31 +178,16 @@ class GalleryManager {
         return null;
     }
 
-    /**
-     * Checks if an asset is a ground based on hashToName
-     * @param {string} baseFileName - The original baseFileName
-     * @returns {boolean} True if the asset is a ground
-     */
     isGround(baseFileName) {
         const hashName = this.getHashToNameValue(baseFileName);
         return hashName && hashName.startsWith("ground_");
     }
 
-    /**
-     * Checks if an asset is a parallaxe based on hashToName
-     * @param {string} baseFileName - The original baseFileName
-     * @returns {boolean} True if the asset is a parallax
-     */
     isParallaxe(baseFileName) {
         const hashName = this.getHashToNameValue(baseFileName);
         return hashName && hashName.startsWith("parallax_");
     }
 
-    /**
-     * Checks if an asset is a pure background (not ground or parallaxe)
-     * @param {string} baseFileName - The original baseFileName
-     * @returns {boolean} True if the asset is a pure background
-     */
     isPureBackground(baseFileName) {
         const hashName = this.getHashToNameValue(baseFileName);
         if (!hashName) return true;
@@ -686,30 +650,33 @@ class GalleryManager {
         const cellWidth = img.width / cols;
         const cellHeight = img.height / rows;
 
-        let headerHtml = "";
-        if (asset.variants !== null && asset.variants.length > 0) {
-            const selectId = `variantSelect-${Math.random().toString(36).slice(2)}`;
-            headerHtml = `
-                <h4 class="sprite-sheet-preview-info-title">Sprite Sheet:</h4>
-                <select id="${selectId}" class="preview-control-input inline compact">
-                    ${asset.variants
-                        .map(
-                            (v, idx) =>
-                                `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
-                                    ${v.rows}x${v.cols}
-                                </option>`,
-                        )
-                        .join("")}
-                </select>`;
-        } else {
-            headerHtml = `<h4 class="sprite-sheet-preview-info-title">Sprite Sheet: ${cols}x${rows}</h4>`;
+        const titleBar = document.querySelector(".preview-title-bar");
+        if (titleBar) {
+            const cropBoxContainer = titleBar.querySelector("#previewCropBoxContainer");
+            if (asset.variants !== null && asset.variants.length > 0) {
+                const selectId = `variantSelect-${Math.random().toString(36).slice(2)}`;
+                titleBar.innerHTML = `Preview<span id="previewCropBoxContainer">${cropBoxContainer ? cropBoxContainer.innerHTML : ""}</span>
+                    <span style="display: flex; flex-direction: row; align-items: center; gap: 0.5vmax; margin-left: 1vmax;">
+                        <span class="sprite-sheet-preview-info-title" style="margin: 0;">Sprite Sheet:</span>
+                        <select id="${selectId}" class="preview-control-input inline compact" style="margin: 0;">
+                            ${asset.variants
+                                .map(
+                                    (v, idx) =>
+                                        `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
+                                            ${v.rows}x${v.cols}
+                                        </option>`,
+                                )
+                                .join("")}
+                        </select>
+                    </span>`;
+            } else {
+                titleBar.innerHTML = `Preview<span id="previewCropBoxContainer">${cropBoxContainer ? cropBoxContainer.innerHTML : ""}</span>
+                    <span class="sprite-sheet-preview-info-title" style="margin: 0; margin-left: 1vmax;">Sprite Sheet: ${cols}x${rows}</span>`;
+            }
         }
 
         contentDiv.innerHTML = `
             <div class="sprite-sheet-preview">
-                <div style="display: flex; flex-direction: row; align-items: center;">
-                    ${headerHtml}
-                </div>
                 <div style="display: flex; justify-content: center; align-items: center; padding: 60px;">
                     <div class="spinner" style="border: 4px solid rgba(255, 255, 255, 0.3); border-top: 4px solid #fff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
                 </div>
@@ -717,7 +684,7 @@ class GalleryManager {
         controlsDiv.innerHTML = "";
 
         if (asset.variants !== null && asset.variants.length > 0) {
-            const select = contentDiv.querySelector("select");
+            const select = titleBar ? titleBar.querySelector("select") : null;
             if (select) {
                 select.addEventListener("change", (e) => {
                     const idx = parseInt(e.target.value, 10);
@@ -796,66 +763,22 @@ class GalleryManager {
             return; // User navigated away, abort
         }
 
-        if (asset.variants !== null && asset.variants.length > 0) {
-            const selectId = `variantSelect-${Math.random().toString(36).slice(2)}`;
-            contentDiv.innerHTML = `
-                <div class="sprite-sheet-preview">
-                    <div style="display: flex; flex-direction: row; align-items: center;">
-                    <h4 class="sprite-sheet-preview-info-title">
-                        Sprite Sheet:</h4>
-                    <select id="${selectId}" class="preview-control-input inline compact">
-                        ${asset.variants
-                            .map(
-                                (v, idx) =>
-                                    `<option value="${idx}" ${v.rows === rows && v.cols === cols ? "selected" : ""}>
-                                        ${v.rows}x${v.cols}
-                                    </option>`,
-                            )
-                            .join("")}
-                    </select></div>
-
-                    <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
-                        ${this.extractedSprites
-                            .map(
-                                (sprite, i) => `
-                                    <div class="sprite-cell-preview"
-                                        data-index="${i}"
-                                        title="${asset.name} #${i}"
-                                        onclick="galleryManager.toggleSpriteSelection(${i}, event)">
-                                        <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
-                                    </div>`,
-                            )
-                            .join("")}
-                    </div>
-                </div>`;
-
-            const select = contentDiv.querySelector(`#${selectId}`);
-            select.addEventListener("change", (e) => {
-                const idx = parseInt(e.target.value, 10);
-                const variant = asset.variants[idx];
-                this.previewAsset(name, "System sprites", "images", variant);
-            });
-        } else {
-            contentDiv.innerHTML = `
-                <div class="sprite-sheet-preview">
-                <div style="display: flex; flex-direction: row; align-items: center;">
-                    <h4 class="sprite-sheet-preview-info-title">Sprite Sheet: ${cols}x${rows}</h4>
-                    </div>
-                    <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
-                        ${this.extractedSprites
-                            .map(
-                                (sprite, i) => `
-                                    <div class="sprite-cell-preview"
-                                        data-index="${i}"
-                                        title="${asset.name} #${i}"
-                                        onclick="galleryManager.toggleSpriteSelection(${i}, event)">
-                                        <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
-                                    </div>`,
-                            )
-                            .join("")}
-                    </div>
-                </div>`;
-        }
+        contentDiv.innerHTML = `
+            <div class="sprite-sheet-preview">
+                <div class="sprite-grid" style="grid-template-columns: repeat(${cols}, 1fr);">
+                    ${this.extractedSprites
+                        .map(
+                            (sprite, i) => `
+                                <div class="sprite-cell-preview"
+                                    data-index="${i}"
+                                    title="${asset.name} #${i}"
+                                    onclick="galleryManager.toggleSpriteSelection(${i}, event)">
+                                    <canvas id="sprite-preview-${i}" width="${cellWidth}" height="${cellHeight}"></canvas>
+                                </div>`,
+                        )
+                        .join("")}
+                </div>
+            </div>`;
 
         this.extractedSprites.forEach((sprite, i) => {
             const targetCanvas = document.getElementById(`sprite-preview-${i}`);
@@ -1342,13 +1265,13 @@ class GalleryManager {
             const jsonViewer = document.createElement("andypf-json-viewer");
 
             jsonViewer.data = jsonData;
-            jsonViewer.setAttribute("indent", "4");
+            jsonViewer.setAttribute("indent", "2");
             jsonViewer.setAttribute("expanded", "1");
             jsonViewer.setAttribute("theme", "tcoaal-dark");
             jsonViewer.setAttribute("show-data-types", "false");
             jsonViewer.setAttribute("show-toolbar", "true");
             jsonViewer.setAttribute("expand-icon-type", "arrow");
-            jsonViewer.setAttribute("show-copy", "true");
+            jsonViewer.setAttribute("show-copy", "false");
             jsonViewer.setAttribute("show-size", "false");
 
             viewerWrapper.appendChild(jsonViewer);
@@ -1631,17 +1554,12 @@ class GalleryManager {
 
     toggleSpriteSelection(index, event = null) {
         if (event && event.shiftKey) {
+            const previousSelection = [...this.selectedSprites];
             this.selectedSprites = [index];
 
-            document.querySelectorAll(".sprite-cell-preview").forEach((cell) => {
-                cell.classList.remove("selected");
-            });
-            const cell = document.querySelector(`.sprite-cell-preview[data-index="${index}"]`);
-            if (cell) {
-                cell.classList.add("selected");
-            }
-
             this.addSpriteToCompositionEditor(0, event);
+
+            this.selectedSprites = previousSelection;
             return;
         }
 

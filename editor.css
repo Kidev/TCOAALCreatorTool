@@ -42,9 +42,8 @@ h6 {
 
 /* LAYOUT & CONTAINERS */
 .editor-container {
-    margin: 0 auto;
-    padding: 11vh 2vw 2vw;
-    width: 95vw;
+    padding: 11vh 1vw 1vw;
+    width: 100%;
     min-width: 370px;
 }
 
@@ -1898,10 +1897,11 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     flex: 1;
     position: sticky;
     top: var(--header-height);
+    max-height: calc(100vh - var(--header-height));
     display: flex;
     flex-direction: column;
     background: var(--bg-color-section);
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .preview-panel-header {
@@ -1911,6 +1911,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
     padding: 0 1vmax;
     background: var(--bg-color-section-lighter);
     border-bottom: 1px solid var(--accent-color);
+    flex: 0 0 auto;
 }
 
 .preview-panel-header h3 {
@@ -2092,6 +2093,10 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 .preview-panel-content {
     padding: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    /*flex: 1 1 auto;*/
+    min-height: 0;
+    /*display: flex;*/
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -2132,6 +2137,8 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     padding: 1vmax;
     background: var(--bg-color-section-lighter);
     border-top: 1px solid var(--accent-color);
+    flex: 0 0 auto;
+    overflow-x: hidden;
 }
 
 .preview-control-group {
@@ -2312,12 +2319,17 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 
 .sprite-sheet-preview {
     padding: 1vmax;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 .sprite-grid {
     display: grid;
     gap: 0.1vmax;
     background: var(--bg-color-section);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sprite-cell-preview {
@@ -2414,7 +2426,10 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 .gallery-preview-panel {
     position: sticky !important;
     top: var(--header-height) !important;
-    overflow-y: auto !important;
+    max-height: calc(100vh - 10vh) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 .gallery-left-panel {
@@ -2455,7 +2470,10 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 
 @media (min-width: 801px) {
     #gallerySection .gallery-preview-panel.right {
-        overflow: auto;
+        max-height: calc(100vh - var(--header-height));
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
     }
 }
 
@@ -2489,7 +2507,10 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     flex: 0 0 33.333%;
     position: sticky;
     top: 0;
-    overflow: auto;
+    max-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 #gallerySection,
