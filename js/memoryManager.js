@@ -20,8 +20,8 @@ class MemoryManager {
     constructor() {
         this.db = null;
         this.dbName = "TCOAALAssets";
-        this.dbVersion = 5;
-        this.DATA_VERSION = "1.3.0";
+        this.dbVersion = 6;
+        this.DATA_VERSION = "1.4.1";
         this.isReady = false;
         this.initPromise = this.initDB();
         this.haveDataStored = false;
@@ -238,6 +238,7 @@ class MemoryManager {
         if (type === "data") {
             assetRecord.jsonText = assetData.jsonText;
             assetRecord.isValid = assetData.isValid;
+            assetRecord.txtText = assetData.txtText;
         }
 
         return new Promise((resolve, reject) => {
@@ -323,6 +324,7 @@ class MemoryManager {
                     if (asset.type === "data") {
                         assetData.jsonText = asset.jsonText;
                         assetData.isValid = asset.isValid;
+                        assetData.txtText = asset.txtText;
                     }
 
                     if (asset.croppedBlob) {

@@ -32,6 +32,7 @@ class GameImporter {
         this.filenameMap = filenamesMapped;
         this.customMenuRightPortraitFile = "ashley-teen_19.png";
         this.customMenuLeftPortraitFile = "andrew-teen_19.png";
+        this.dialogueFileFound = false;
     }
 
     async importGame(files) {
@@ -42,6 +43,14 @@ class GameImporter {
 
         const folders = [
             { path: "www/data", type: "json", category: "Maps", assetType: "data" },
+            {
+                path: "www/languages",
+                type: "txt",
+                category: "Maps",
+                assetType: "data",
+                specificFile: "dialogue.txt",
+                recursive: true,
+            },
             { path: "www/audio/bgm", type: "ogg", category: "Background songs", assetType: "audio" },
             { path: "www/audio/bgs", type: "ogg", category: "Background sounds", assetType: "audio" },
             { path: "www/audio/me", type: "ogg", category: "Event sounds", assetType: "audio" },
@@ -68,6 +77,10 @@ class GameImporter {
 
             gameFolder ||= path === this.hash;
 
+            if (path.includes("www/languages") && path.endsWith("dialogue.txt")) {
+                this.dialogueFileFound = true;
+            }
+
             for (const validPath of validFolders) {
                 if (path.includes(validPath)) {
                     relevantFiles.push(file);
@@ -90,6 +103,8 @@ class GameImporter {
 
         await this.saveImportedAssets();
 
+        this.parseDialogueFile();
+
         await this.extractUIAssets();
 
         if (window.isForcedImport) {
@@ -100,6 +115,7 @@ class GameImporter {
         const mode = urlParams.get("mode");
         const useParam = urlParams.get("use");
         this.showProgress(false);
+
         if (mode === "gallery") {
             document.getElementById("gallerySection").style.display = "block";
             document.getElementById("download-all-button").style.display = "block";
@@ -123,7 +139,19 @@ class GameImporter {
     }
 
     async processFolder(filesByPath, folderInfo) {
-        const folderFiles = Object.keys(filesByPath).filter((path) => path.includes(folderInfo.path + "/"));
+        let folderFiles;
+
+        if (folderInfo.recursive) {
+            folderFiles = Object.keys(filesByPath).filter((path) => {
+                return path.includes(folderInfo.path + "/");
+            });
+
+            if (folderInfo.specificFile === "dialogue.txt") {
+                const dialogueFiles = folderFiles.filter((f) => f.includes("dialogue.txt"));
+            }
+        } else {
+            folderFiles = Object.keys(filesByPath).filter((path) => path.includes(folderInfo.path + "/"));
+        }
 
         for (const filePath of folderFiles) {
             const file = filesByPath[filePath];
@@ -131,10 +159,19 @@ class GameImporter {
 
             if (!fileName || fileName.startsWith(".")) continue;
 
+            if (folderInfo.specificFile && fileName !== folderInfo.specificFile) continue;
+
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                const basePathNoExtension = folderInfo.path.replace("www/", "") + "/" + fileName;
-                const originalPath = basePathNoExtension + "." + folderInfo.type;
+
+                let originalPath;
+                let basePathNoExtension = folderInfo.path.replace("www/", "") + "/" + fileName;
+                if (folderInfo.type === "txt") {
+                    originalPath = folderInfo.path.replace("www/", "") + "/" + fileName;
+                } else {
+                    originalPath = basePathNoExtension + "." + folderInfo.type;
+                }
+
                 const decrypted = await this.decryptFile(
                     new Uint8Array(arrayBuffer),
                     folderInfo.path.replace("www/", "") + "/" + fileName,
@@ -147,7 +184,7 @@ class GameImporter {
                     const url = URL.createObjectURL(blob);
 
                     const baseFileName = fileName.replace(/\.[^/.]+$/, "");
-                    const mappedName = this.filenameMap[baseFileName] || fileName;
+                    const mappedName = this.filenameMap[baseFileName] || baseFileName;
                     const assetName = mappedName + "." + folderInfo.type;
 
                     if (folderInfo.type === "png") {
@@ -288,6 +325,58 @@ class GameImporter {
                                 console.warn("Failed to save data to memory:", assetName, error);
                             }
                         }
+                    } else if (folderInfo.type === "txt") {
+                        if (!this.importedAssets.data[folderInfo.category]) {
+                            this.importedAssets.data[folderInfo.category] = {};
+                        }
+
+                        let txtText = new TextDecoder("utf-8").decode(decrypted);
+
+                        const txtBlob = new Blob([txtText], {
+                            type: "text/plain",
+                        });
+                        const txtUrl = URL.createObjectURL(txtBlob);
+
+                        let displayName = fileName;
+
+                        const assetData = {
+                            url: txtUrl,
+                            blob: txtBlob,
+                            name: displayName,
+                            originalName: fileName,
+                            baseFileName: originalPath,
+                            txtText: txtText,
+                        };
+
+                        this.importedAssets.data[folderInfo.category][displayName] = assetData;
+
+                        if (fileName === "dialogue.txt") {
+                            /*console.log("Successfully imported dialogue.txt:", {
+                                category: folderInfo.category,
+                                assetName: displayName,
+                                originalName: fileName,
+                                textLength: txtText.length,
+                                firstLines: txtText.split("\n").slice(0, 5),
+                            });*/
+                            const text = document.getElementById("importProgressText");
+                            if (text) {
+                                text.textContent = "Found dialogue.txt";
+                            }
+                            this.dialogueFileFound = true;
+                        }
+
+                        if (window.memoryManager) {
+                            try {
+                                await window.memoryManager.savePartialAsset(
+                                    assetData,
+                                    originalPath,
+                                    folderInfo.category,
+                                    "data",
+                                );
+                            } catch (error) {
+                                console.warn("Failed to save data to memory:", assetName, error);
+                            }
+                        }
                     }
                 }
 
@@ -393,7 +482,42 @@ class GameImporter {
         const text = document.getElementById("importProgressText");
 
         if (fill) fill.style.width = percentage + "%";
-        if (text) text.textContent = `Processing game assets... ${percentage}%`;
+        if (text) {
+            const baseText = `Processing game assets... ${percentage}%`;
+            if (this.dialogueFileFound) {
+                text.innerHTML = `${baseText}<br><small style="font-size: 0.85em;">Found dialogue.txt</small>`;
+            } else {
+                text.textContent = baseText;
+            }
+        }
+    }
+
+    static showDialogueInfoModal() {
+        const existing = document.getElementById("dialogueInfoModal");
+        if (existing) existing.remove();
+
+        const modalHTML = `
+            <div id="dialogueInfoModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 999999;">
+                <div style="background: #1a1a1a; border: 2px solid; border-radius: 8px; padding: 2em; max-width: 700px; color: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                    <h2 style="display:flex; justify-content:center; margin-top: 0;">Generate the file dialogue.txt</h2>
+                    <br>
+                    <p>If your game folder contains <code style="background: #333; padding: 2px 6px; border-radius: 3px;">dialogue.txt</code> in <code style="background: #333; padding: 2px 6px; border-radius: 3px;">www/languages</code>, some hashes will be replaced by their true in game text. The file is not present by default, but is easy to generate. To get it:</p>
+                    <br>
+                    <ul style="text-align: left; line-height: 1.6;">
+                        <li><strong>Go in your game folder</strong></li>
+                        <li><strong>Go in the languages tool folder</strong>: <code style="background: #333; padding: 2px 6px; border-radius: 3px;">www/languages/tool/</code></li>
+                        <li><strong>Run Translator.exe</strong></li>
+                        <li><strong>Enter a folder name</strong> by typing <code style="background: #333; padding: 2px 6px; border-radius: 3px;">en</code> in the <strong>Folder</strong> text box</li>
+                        <li><strong>Press Generate Folder</strong></li>
+                    </ul>
+                    <br>
+                    <p style="margin-bottom: 0;"><strong>You are done!</strong> It is now in your game files at <code style="background: #333; padding: 2px 6px; border-radius: 3px;">www/languages/tool/en/dialogue.txt</code></p>
+                    <div style="display:flex; justify-content: center"><button onclick="document.getElementById('dialogueInfoModal').remove()" style="margin-top: 1vmax; padding: 0.5vmax 1.5vmax; cursor: pointer; font-weight: bold; font-size: 1.25vmax;">Got it!</button></div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML("beforeend", modalHTML);
     }
 
     async saveImportedAssets() {
@@ -409,6 +533,54 @@ class GameImporter {
             if (typeof reconstructCompositionsToGallery === "function") {
                 await reconstructCompositionsToGallery(pending, pendingSource);
             }
+        }
+    }
+
+    parseDialogueFile() {
+        if (!this.importedAssets.data || !this.importedAssets.data["Maps"]) {
+            window.dialogueHashMapping = null;
+            return;
+        }
+
+        const dialogueAsset = Object.values(this.importedAssets.data["Maps"]).find(
+            (asset) => asset.originalName === "dialogue.txt",
+        );
+
+        if (!dialogueAsset || !dialogueAsset.txtText) {
+            window.dialogueHashMapping = null;
+            return;
+        }
+
+        const hashMapping = {};
+        const lines = dialogueAsset.txtText.split("\n");
+
+        for (const line of lines) {
+            const colonMatch = line.match(/#([A-Za-z0-9]+)\s*:\s*(.+)/);
+            const parenMatch = line.match(/#([A-Za-z0-9]+)\s*\(([^)]+)\)/);
+
+            let hash, text;
+            if (colonMatch) {
+                hash = colonMatch[1];
+                text = colonMatch[2].trim();
+            } else if (parenMatch) {
+                hash = parenMatch[1];
+                text = parenMatch[2].trim();
+            }
+
+            if (hash && text) {
+                hashMapping[hash] = text;
+            }
+        }
+
+        window.dialogueHashMapping = hashMapping;
+
+        if (window.memoryManager) {
+            window.memoryManager
+                .saveMetadata("dialogueHashMapping", hashMapping)
+                .then(() => {})
+                .catch((error) => {
+                    console.error("Failed to save dialogue hash mappings:", error);
+                });
         }
     }
 

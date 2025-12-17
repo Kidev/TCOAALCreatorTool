@@ -378,6 +378,7 @@ class GalleryManager {
             <img src="${parallaxeAsset.url}" alt="${parallaxeName}" class="preview-image" style="position: absolute;">
         </div>`;
 
+        controlsDiv.style.display = "block";
         controlsDiv.innerHTML = `
             <div class="asset-image-preview-title-line"><div class="asset-filename-title">${title}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
             </div>
@@ -805,6 +806,7 @@ class GalleryManager {
             subtitleOriginal = improved.original;
         }
 
+        controlsDiv.style.display = "block";
         controlsDiv.innerHTML = `
                 <div class="asset-image-preview-title-line"><div class="asset-filename-title">${titleWithoutSize}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
 </div>
@@ -878,6 +880,7 @@ class GalleryManager {
             subtitleOriginal = improved.original;
         }
 
+        controlsDiv.style.display = "block";
         controlsDiv.innerHTML = `
             <div class="asset-image-preview-title-line"><div class="asset-filename-title">${title}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
             </div>
@@ -1020,6 +1023,7 @@ class GalleryManager {
             subtitleOriginal = improved.original;
         }
 
+        controlsDiv.style.display = "block";
         controlsDiv.innerHTML = `
             <div class="asset-filename-title">${title}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
             <div class="preview-control-group-add-editor">
@@ -1208,11 +1212,13 @@ class GalleryManager {
     async previewData(asset, name, contentDiv, controlsDiv) {
         this.updateCropButtonInPreviewTitle(false);
 
+        const isTxtFile = name.endsWith(".txt");
+
         contentDiv.innerHTML = `
             <div class="json-preview-container">
                 <div class="json-preview-loading">
                     <div class="loading-spinner"></div>
-                    <div>Loading JSON...</div>
+                    <div>Loading ${isTxtFile ? "text" : "JSON"}...</div>
                 </div>
             </div>
         `;
@@ -1228,7 +1234,9 @@ class GalleryManager {
 
         if (isMaps) {
             controlsDiv.innerHTML = "";
+            controlsDiv.style.display = "none";
         } else {
+            controlsDiv.style.display = "block";
             controlsDiv.innerHTML = `
                 <div class="asset-filename-title">${title}<div class="asset-filename-subtitle" title="${subtitleOriginal}">${subtitle}</div></div>
                 <div class="preview-control-group-add-editor">
@@ -1243,7 +1251,50 @@ class GalleryManager {
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         try {
-            const jsonData = JSON.parse(asset.jsonText || "{}");
+            if (isTxtFile && asset.txtText) {
+                const toolbarInfo = isMaps
+                    ? `<span class="json-info"><strong>${title}</strong><br/><span style="font-size: 0.85em; opacity: 0.8;" title="${subtitleOriginal}">${subtitle}</span></span>`
+                    : `<span class="json-info">Text File</span>`;
+
+                contentDiv.innerHTML = `
+                        <div class="json-preview-toolbar">
+                            ${toolbarInfo}
+                            <div class="json-toolbar-buttons">
+                                <input type="text"
+                                       id="txtSearchInput"
+                                       placeholder="Search..."
+                                       class="txt-search-input"
+                                       oninput="galleryManager.searchTxtContent(this.value)"
+                                       style="margin-right: 8px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--txt-color); font-size: 0.9em;">
+                                <button class="json-tool-btn" onclick="galleryManager.prevTxtMatch()" title="Previous match" style="display: none;" id="txtPrevBtn">↑</button>
+                                <button class="json-tool-btn" onclick="galleryManager.nextTxtMatch()" title="Next match" style="display: none;" id="txtNextBtn">↓</button>
+                                <span id="txtMatchCount" style="margin: 0 8px; font-size: 0.85em; color: var(--txt-faded); display: none;"></span>
+                                <button class="json-tool-btn" onclick="galleryManager.togglePreviewExpand()" title="Expand preview">⛶</button>
+                            </div>
+                        </div>
+                    <div class="json-preview-container">
+
+                        <div class="json-preview-content" id="txtPreviewContent">
+                            <div class="txt-viewer-wrapper"></div>
+                        </div>
+                    </div>
+                `;
+
+                const wrapperDiv = contentDiv.querySelector(".txt-viewer-wrapper");
+                this.currentTxtContent = asset.txtText;
+                this.renderTxtContent(asset.txtText, wrapperDiv);
+                return;
+            }
+
+            let jsonData = JSON.parse(asset.jsonText || "{}");
+
+            if (isMaps) {
+                await this.buildHashMaps();
+
+                this.extractAudioProperties(jsonData);
+
+                jsonData = this.replaceHashesInObject(jsonData);
+            }
 
             const toolbarInfo = isMaps
                 ? `<span class="json-info"><strong>${title}</strong><br/><span style="font-size: 0.85em; opacity: 0.8;" title="${subtitleOriginal}">${subtitle}</span></span>`
@@ -1254,6 +1305,15 @@ class GalleryManager {
                     <div class="json-preview-toolbar">
                         ${toolbarInfo}
                         <div class="json-toolbar-buttons">
+                            <button class="json-tool-btn" onclick="galleryManager.prevJsonMatch()" title="Previous match (Shift+Enter)" id="jsonPrevBtn" style="display: none;">↑</button>
+                            <button class="json-tool-btn" onclick="galleryManager.nextJsonMatch()" title="Next match (Enter)" id="jsonNextBtn" style="display: none;">↓</button>
+                            <input type="text"
+                                   id="jsonSearchInput"
+                                   placeholder="Search..."
+                                   class="json-search-input"
+                                   oninput="galleryManager.searchJsonContent(this.value)"
+                                   onkeydown="if(event.key==='Enter') galleryManager.nextJsonMatch()"
+                                   style="padding: 0.5vmax 0.8vmax; font-family: Consolas, Monaco, 'Courier New', monospace; font-size: 0.85vmax; background: rgb(45, 45, 45); border: 1px solid rgb(62, 62, 62); border-radius: 4px; color: rgb(255, 255, 255); box-sizing: border-box; margin-right: 8px;">
                             <button class="json-tool-btn" onclick="galleryManager.togglePreviewExpand()" title="Expand preview">⛶</button>
                         </div>
                     </div>
@@ -1270,11 +1330,26 @@ class GalleryManager {
             jsonViewer.setAttribute("theme", "tcoaal-dark");
             jsonViewer.setAttribute("show-data-types", "false");
             jsonViewer.setAttribute("show-toolbar", "true");
-            jsonViewer.setAttribute("expand-icon-type", "arrow");
+            jsonViewer.setAttribute("expand-icon-type", "square");
             jsonViewer.setAttribute("show-copy", "false");
             jsonViewer.setAttribute("show-size", "false");
 
             viewerWrapper.appendChild(jsonViewer);
+
+            this.currentJsonViewer = jsonViewer;
+
+            setTimeout(() => {
+                if (jsonViewer.shadowRoot) {
+                    const toolbar = jsonViewer.shadowRoot.querySelector(".toolbar");
+                    if (toolbar) {
+                        toolbar.style.display = "none";
+                    }
+                }
+            }, 50);
+
+            if (isMaps) {
+                setTimeout(() => this.addAssetTooltips(jsonViewer), 500);
+            }
         } catch (error) {
             console.error("Failed to render JSON:", error);
             contentDiv.innerHTML = `
@@ -1857,6 +1932,8 @@ class GalleryManager {
             clearInterval(this.animationInterval);
             this.animationInterval = null;
         }
+
+        this.stopAllAudio();
 
         this.selectedSprites = [];
         this.extractedSprites = [];
@@ -2548,6 +2625,929 @@ class GalleryManager {
 
         if (window.compositionEditor.autoOpen === true && !window.compositionEditor.isOpen) {
             window.compositionEditor.open();
+        }
+    }
+
+    renderTxtContent(txtContent, containerElement, searchTerm = "") {
+        const lines = txtContent.split("\n");
+        let html =
+            '<div class="txt-viewer-lines" style="font-family: monospace; font-size: 0.9em; line-height: 1.6; padding: 0; margin: 0;">';
+
+        lines.forEach((line, index) => {
+            const lineNum = index + 1;
+            let highlightedLine = this.highlightIniSyntax(line);
+
+            if (searchTerm) {
+                highlightedLine = this.highlightSearchTerm(highlightedLine, searchTerm);
+            }
+
+            html += `
+                <div class="txt-line" style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <span class="txt-line-num" style="min-width: 50px; padding: 4px 12px; text-align: right; color: var(--txt-faded); background: rgba(0,0,0,0.2); user-select: none; border-right: 1px solid rgba(255,255,255,0.1);">${lineNum}</span>
+                    <span class="txt-line-content" style="padding: 4px 12px; flex: 1; white-space: pre-wrap; word-wrap: break-word;">${highlightedLine || "&nbsp;"}</span>
+                </div>
+            `;
+        });
+
+        html += "</div>";
+        containerElement.innerHTML = html;
+    }
+
+    highlightIniSyntax(line) {
+        const escaped = this.escapeHtml(line);
+
+        if (/^\s*[#;]/.test(line) || /^\s*\/\//.test(line)) {
+            return `<span style="color: var(--green); opacity: 0.7;">${escaped}</span>`;
+        }
+
+        if (/^\s*\[.*\]\s*$/.test(line)) {
+            return `<span style="color: var(--purple); font-weight: bold;">${escaped}</span>`;
+        }
+
+        const kvMatch = line.match(/^(\s*)([^=:]+?)\s*([:=])\s*(.*)$/);
+        if (kvMatch) {
+            const indent = kvMatch[1];
+            const key = kvMatch[2];
+            const separator = kvMatch[3];
+            const value = kvMatch[4];
+
+            return `${this.escapeHtml(indent)}<span style="color: var(--blue);">${this.escapeHtml(key)}</span><span style="color: var(--txt-faded);">${this.escapeHtml(separator)}</span> <span style="color: var(--yellow);">${this.escapeHtml(value)}</span>`;
+        }
+
+        return escaped;
+    }
+
+    highlightSearchTerm(html, searchTerm) {
+        if (!searchTerm || searchTerm.trim() === "") return html;
+
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = html;
+
+        const textContent = tempDiv.textContent || "";
+        const lowerText = textContent.toLowerCase();
+        const lowerSearch = searchTerm.toLowerCase();
+
+        if (lowerText.includes(lowerSearch)) {
+            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+            const highlighted = html.replace(
+                regex,
+                '<mark style="background: var(--yellow); color: var(--bg-color); padding: 2px 4px; border-radius: 2px; font-weight: bold;">$1</mark>',
+            );
+            return highlighted;
+        }
+
+        return html;
+    }
+
+    searchTxtContent(searchTerm) {
+        if (!this.currentTxtContent) return;
+
+        const wrapperDiv = document.querySelector(".txt-viewer-wrapper");
+        if (!wrapperDiv) return;
+
+        if (this.searchTimeout) {
+            clearTimeout(this.searchTimeout);
+        }
+
+        this.searchTimeout = setTimeout(() => {
+            this.currentTxtSearchTerm = searchTerm;
+            this.currentTxtMatchIndex = 0;
+            this.renderTxtContentAsync(this.currentTxtContent, wrapperDiv, searchTerm);
+        }, 150);
+    }
+
+    renderTxtContentAsync(txtContent, containerElement, searchTerm = "") {
+        const lines = txtContent.split("\n");
+        this.txtSearchMatches = [];
+
+        containerElement.innerHTML =
+            '<div style="padding: 20px; text-align: center; color: var(--txt-faded);">Rendering...</div>';
+
+        const chunkSize = 100;
+        let currentChunk = 0;
+
+        const renderChunk = () => {
+            const start = currentChunk * chunkSize;
+            const end = Math.min(start + chunkSize, lines.length);
+
+            if (currentChunk === 0) {
+                containerElement.innerHTML =
+                    '<div class="txt-viewer-lines" style="font-family: monospace; font-size: 0.9em; line-height: 1.6; padding: 0; margin: 0;"></div>';
+            }
+
+            const linesContainer = containerElement.querySelector(".txt-viewer-lines");
+            let html = "";
+
+            for (let i = start; i < end; i++) {
+                const lineNum = i + 1;
+                let highlightedLine = this.highlightIniSyntax(lines[i]);
+
+                if (searchTerm && lines[i].toLowerCase().includes(searchTerm.toLowerCase())) {
+                    this.txtSearchMatches.push(lineNum);
+                    highlightedLine = this.highlightSearchTerm(highlightedLine, searchTerm);
+                }
+
+                html += `
+                    <div class="txt-line" id="txt-line-${lineNum}" style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <span class="txt-line-num" style="min-width: 50px; padding: 4px 12px; text-align: right; color: var(--txt-faded); background: rgba(0,0,0,0.2); user-select: none; border-right: 1px solid rgba(255,255,255,0.1);">${lineNum}</span>
+                        <span class="txt-line-content" style="padding: 4px 12px; flex: 1; white-space: pre-wrap; word-wrap: break-word;">${highlightedLine || "&nbsp;"}</span>
+                    </div>
+                `;
+            }
+
+            linesContainer.innerHTML += html;
+
+            currentChunk++;
+
+            if (end < lines.length) {
+                requestAnimationFrame(renderChunk);
+            } else {
+                this.updateTxtSearchUI();
+                if (this.txtSearchMatches.length > 0) {
+                    this.scrollToTxtMatch(0);
+                }
+            }
+        };
+
+        renderChunk();
+    }
+
+    updateTxtSearchUI() {
+        const prevBtn = document.getElementById("txtPrevBtn");
+        const nextBtn = document.getElementById("txtNextBtn");
+        const countSpan = document.getElementById("txtMatchCount");
+
+        if (this.txtSearchMatches && this.txtSearchMatches.length > 0) {
+            if (prevBtn) prevBtn.style.display = "inline-block";
+            if (nextBtn) nextBtn.style.display = "inline-block";
+            if (countSpan) {
+                countSpan.style.display = "inline";
+                countSpan.textContent = `${this.currentTxtMatchIndex + 1}/${this.txtSearchMatches.length}`;
+            }
+        } else {
+            if (prevBtn) prevBtn.style.display = "none";
+            if (nextBtn) nextBtn.style.display = "none";
+            if (countSpan) countSpan.style.display = "none";
+        }
+    }
+
+    scrollToTxtMatch(index) {
+        if (!this.txtSearchMatches || this.txtSearchMatches.length === 0) return;
+
+        this.currentTxtMatchIndex = index;
+        const lineNum = this.txtSearchMatches[index];
+
+        const lineNumbers = document.querySelectorAll(".line-number");
+        let lineElement = null;
+
+        for (const span of lineNumbers) {
+            if (span.textContent.trim() === String(lineNum)) {
+                lineElement = span.parentElement;
+                break;
+            }
+        }
+
+        if (lineElement) {
+            const viewerWrapper = document.getElementById("jsonViewerWrapper");
+
+            if (viewerWrapper) {
+                const lineRect = lineElement.getBoundingClientRect();
+                const wrapperRect = viewerWrapper.getBoundingClientRect();
+                const scrollOffset = lineRect.top - wrapperRect.top - wrapperRect.height / 2 + lineRect.height / 2;
+
+                viewerWrapper.scrollTop += scrollOffset;
+            }
+
+            lineElement.style.backgroundColor = "rgba(255, 255, 0, 0.1)";
+            setTimeout(() => {
+                lineElement.style.backgroundColor = "";
+            }, 1000);
+        } else {
+            console.warn("Could not find line element for line number", lineNum);
+        }
+
+        this.updateTxtSearchUI();
+    }
+
+    nextTxtMatch() {
+        if (!this.txtSearchMatches || this.txtSearchMatches.length === 0) return;
+        const nextIndex = (this.currentTxtMatchIndex + 1) % this.txtSearchMatches.length;
+        this.scrollToTxtMatch(nextIndex);
+    }
+
+    prevTxtMatch() {
+        if (!this.txtSearchMatches || this.txtSearchMatches.length === 0) return;
+        const prevIndex =
+            this.currentTxtMatchIndex === 0 ? this.txtSearchMatches.length - 1 : this.currentTxtMatchIndex - 1;
+        this.scrollToTxtMatch(prevIndex);
+    }
+
+    async buildHashMaps() {
+        if (this.labelHashMap && this.assetHashMap) return;
+
+        this.labelHashMap = {};
+        this.assetHashMap = {};
+
+        if (window.gameImporterAssets && window.gameImporterAssets.data && window.gameImporterAssets.data["Labels"]) {
+            const labelsCategory = window.gameImporterAssets.data["Labels"];
+
+            for (const labelFile in labelsCategory) {
+                const labelAsset = labelsCategory[labelFile];
+                if (labelAsset.jsonText) {
+                    try {
+                        const labelData = JSON.parse(labelAsset.jsonText);
+                        for (const tableKey in labelData) {
+                            const table = labelData[tableKey];
+                            if (typeof table === "object") {
+                                for (const hash in table) {
+                                    if (hash.length === 8) {
+                                        const value = table[hash];
+                                        let text = "";
+                                        if (Array.isArray(value)) {
+                                            text = value.join("\\n");
+                                        } else if (typeof value === "string") {
+                                            text = value;
+                                        }
+                                        this.labelHashMap[hash] = text;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Failed to parse label file:", labelFile, e);
+                    }
+                }
+            }
+        }
+
+        if (window.gameImporterAssets) {
+            if (window.gameImporterAssets.images) {
+                for (const category in window.gameImporterAssets.images) {
+                    const assets = window.gameImporterAssets.images[category];
+                    for (const assetName in assets) {
+                        const asset = assets[assetName];
+
+                        let hash = null;
+                        if (asset.originalName) {
+                            hash = this.extractHashFromFilename(asset.originalName);
+                        }
+                        if (!hash && asset.baseFileName) {
+                            hash = this.extractHashFromPath(asset.baseFileName);
+                        }
+                        if (hash) {
+                            this.assetHashMap[hash] = {
+                                type: "image",
+                                url: asset.croppedUrl || asset.url,
+                                path: asset.baseFileName,
+                                name: assetName,
+                                category: category,
+                            };
+                        }
+                    }
+                }
+            }
+
+            if (window.gameImporterAssets.audio) {
+                for (const category in window.gameImporterAssets.audio) {
+                    const assets = window.gameImporterAssets.audio[category];
+                    for (const assetName in assets) {
+                        const asset = assets[assetName];
+
+                        let hash = null;
+                        if (asset.originalName) {
+                            hash = this.extractHashFromFilename(asset.originalName);
+                        }
+                        if (!hash && asset.baseFileName) {
+                            hash = this.extractHashFromPath(asset.baseFileName);
+                        }
+                        if (hash) {
+                            this.assetHashMap[hash] = {
+                                type: "audio",
+                                url: asset.url,
+                                blob: asset.blob,
+                                path: asset.baseFileName,
+                                name: assetName,
+                                category: category,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        const sampleHashes = Object.keys(this.assetHashMap).slice(0, 10);
+    }
+
+    extractHashFromFilename(filename) {
+        if (!filename) return null;
+
+        const match1 = filename.match(/^!?([a-f0-9]{16,})(?:\.[a-z0-9]+)?$/i);
+        if (match1) return match1[1].toLowerCase();
+
+        const match2 = filename.match(/!?([a-f0-9]{16,})/i);
+        if (match2) return match2[1].toLowerCase();
+
+        return null;
+    }
+
+    extractHashFromPath(path) {
+        if (!path) return null;
+
+        const match = path.match(/\/!?([a-f0-9]{16,})\./i);
+        if (match) return match[1].toLowerCase();
+
+        const match2 = path.match(/\/!?([a-f0-9]{16,})$/i);
+        if (match2) return match2[1].toLowerCase();
+
+        const match3 = path.match(/!?([a-f0-9]{16,})/i);
+        if (match3) return match3[1].toLowerCase();
+
+        return null;
+    }
+
+    extractAudioProperties(obj) {
+        if (!this.audioPropertiesMap) {
+            this.audioPropertiesMap = {};
+        }
+
+        const initialCount = Object.keys(this.audioPropertiesMap).length;
+
+        const processNode = (node) => {
+            if (Array.isArray(node)) {
+                node.forEach((item) => processNode(item));
+            } else if (node !== null && typeof node === "object") {
+                if (node.name && typeof node.name === "string") {
+                    const hashMatch = node.name.match(/!?([a-f0-9]{16,})(?:\.[a-z0-9]+)?/i);
+                    if (hashMatch) {
+                        const hash = hashMatch[1].toLowerCase();
+                        const asset = this.assetHashMap[hash];
+
+                        if (asset && asset.type === "audio") {
+                            const properties = {};
+                            if (node.volume !== undefined) properties.volume = node.volume;
+                            if (node.pitch !== undefined) properties.pitch = node.pitch;
+                            if (node.pan !== undefined) properties.pan = node.pan;
+
+                            if (Object.keys(properties).length > 0) {
+                                this.audioPropertiesMap[hash] = properties;
+                            }
+                        }
+                    }
+                }
+
+                for (const key in node) {
+                    processNode(node[key]);
+                }
+            }
+        };
+
+        processNode(obj);
+
+        const newCount = Object.keys(this.audioPropertiesMap).length;
+        if (newCount > initialCount) {
+        }
+    }
+
+    replaceHashesInObject(obj, parentKey = null, parentObj = null) {
+        if (typeof obj === "string") {
+            return this.replaceHashesInString(obj, parentKey, parentObj);
+        } else if (Array.isArray(obj)) {
+            return obj.map((item) => this.replaceHashesInObject(item));
+        } else if (obj !== null && typeof obj === "object") {
+            const newObj = {};
+            for (const key in obj) {
+                newObj[key] = this.replaceHashesInObject(obj[key], key, obj);
+            }
+            return newObj;
+        }
+        return obj;
+    }
+
+    replaceHashesInString(str, parentKey = null, parentObj = null) {
+        const originalStr = str;
+
+        const replacements = [];
+
+        str = str.replace(/\b([a-zA-Z0-9]{8})\b/g, (match, hash, offset) => {
+            if (this.labelHashMap[hash]) {
+                const replacement = this.labelHashMap[hash];
+                replacements.push({
+                    hash,
+                    replacement,
+                    position: offset,
+                    context: originalStr.substring(
+                        Math.max(0, offset - 20),
+                        Math.min(originalStr.length, offset + match.length + 20),
+                    ),
+                });
+                return replacement;
+            }
+            return match;
+        });
+
+        return str;
+    }
+
+    searchJsonContent(searchTerm) {
+        if (!this.currentJsonViewer) return;
+
+        const prevBtn = document.getElementById("jsonPrevBtn");
+        const nextBtn = document.getElementById("jsonNextBtn");
+
+        if (searchTerm && searchTerm.trim()) {
+            if (prevBtn) prevBtn.style.display = "inline-block";
+            if (nextBtn) nextBtn.style.display = "inline-block";
+        } else {
+            if (prevBtn) prevBtn.style.display = "none";
+            if (nextBtn) nextBtn.style.display = "none";
+        }
+
+        setTimeout(() => {
+            const shadowRoot = this.currentJsonViewer.shadowRoot;
+            if (!shadowRoot) {
+                console.warn("Shadow root not available");
+                return;
+            }
+
+            const previousMatches = shadowRoot.querySelectorAll(".data-row.match");
+            previousMatches.forEach((row) => {
+                row.classList.remove("match", "current");
+                row.style.backgroundColor = "";
+            });
+
+            if (!searchTerm || !searchTerm.trim()) {
+                return;
+            }
+
+            const allRows = shadowRoot.querySelectorAll(".data-row");
+            const searchLower = searchTerm.toLowerCase();
+
+            allRows.forEach((row) => {
+                const keyValueWrapper = row.querySelector(":scope > .key-value-wrapper");
+                if (!keyValueWrapper) return;
+
+                let rowOwnText = "";
+                const key = keyValueWrapper.querySelector(".key");
+                const value = keyValueWrapper.querySelector(".value");
+
+                if (key) {
+                    rowOwnText += key.textContent;
+                }
+                if (value) {
+                    const valueClone = value.cloneNode(true);
+                    const nestedRows = valueClone.querySelectorAll(".data-row");
+                    nestedRows.forEach((nested) => nested.remove());
+                    rowOwnText += valueClone.textContent;
+                }
+
+                if (rowOwnText.toLowerCase().includes(searchLower)) {
+                    row.classList.add("match");
+                    row.style.backgroundColor = "rgba(255, 255, 0, 0.2)";
+
+                    this.expandJsonParentRows(row);
+                }
+            });
+
+            const matches = shadowRoot.querySelectorAll(".data-row.match");
+            if (matches.length > 0) {
+                setTimeout(() => {
+                    this.scrollToFirstJsonMatch(shadowRoot);
+                }, 50);
+            }
+        }, 100);
+    }
+
+    expandJsonParentRows(row) {
+        let currentElement = row.parentElement;
+
+        while (currentElement) {
+            if (currentElement.classList && currentElement.classList.contains("data-row")) {
+                currentElement.classList.add("expanded");
+            }
+            currentElement = currentElement.parentElement;
+        }
+    }
+
+    scrollToFirstJsonMatch(shadowRoot) {
+        if (!shadowRoot) return;
+
+        const matches = shadowRoot.querySelectorAll(".data-row.match");
+
+        if (matches.length === 0) {
+            console.warn("Could not find any match elements");
+            return;
+        }
+
+        matches.forEach((match) => {
+            match.classList.remove("current");
+            match.style.backgroundColor = "rgba(255, 255, 0, 0.2)";
+        });
+
+        const firstMatch = matches[0];
+        firstMatch.classList.add("current");
+        firstMatch.style.backgroundColor = "rgba(255, 255, 0, 0.4)";
+
+        this.expandJsonParentRows(firstMatch);
+
+        this.scrollToJsonMatch(firstMatch);
+    }
+
+    scrollToJsonMatch(matchElement) {
+        if (!matchElement) return;
+
+        const viewerWrapper = document.getElementById("jsonViewerWrapper");
+        if (viewerWrapper) {
+            requestAnimationFrame(() => {
+                const matchRect = matchElement.getBoundingClientRect();
+                const wrapperRect = viewerWrapper.getBoundingClientRect();
+                const scrollOffset = matchRect.top - wrapperRect.top - wrapperRect.height / 2 + matchRect.height / 2;
+
+                viewerWrapper.scrollTop += scrollOffset;
+            });
+        }
+    }
+
+    nextJsonMatch() {
+        if (!this.currentJsonViewer) {
+            console.warn("No json viewer available");
+            return;
+        }
+
+        const shadowRoot = this.currentJsonViewer.shadowRoot;
+        if (!shadowRoot) {
+            console.warn("No shadow root available");
+            return;
+        }
+
+        const matches = shadowRoot.querySelectorAll(".data-row.match");
+
+        if (matches.length === 0) {
+            console.warn("No matches found");
+            return;
+        }
+
+        let currentIndex = -1;
+        matches.forEach((match, idx) => {
+            if (match.classList.contains("current")) {
+                currentIndex = idx;
+            }
+        });
+
+        matches.forEach((match) => {
+            match.classList.remove("current");
+            match.style.backgroundColor = "rgba(255, 255, 0, 0.2)";
+        });
+
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % matches.length;
+
+        const nextMatch = matches[nextIndex];
+        nextMatch.classList.add("current");
+        nextMatch.style.backgroundColor = "rgba(255, 255, 0, 0.4)";
+
+        this.expandJsonParentRows(nextMatch);
+
+        this.scrollToJsonMatch(nextMatch);
+    }
+
+    prevJsonMatch() {
+        if (!this.currentJsonViewer) {
+            console.warn("No json viewer available");
+            return;
+        }
+
+        const shadowRoot = this.currentJsonViewer.shadowRoot;
+        if (!shadowRoot) {
+            console.warn("No shadow root available");
+            return;
+        }
+
+        const matches = shadowRoot.querySelectorAll(".data-row.match");
+
+        if (matches.length === 0) {
+            console.warn("No matches found");
+            return;
+        }
+
+        let currentIndex = -1;
+        matches.forEach((match, idx) => {
+            if (match.classList.contains("current")) {
+                currentIndex = idx;
+            }
+        });
+
+        matches.forEach((match) => {
+            match.classList.remove("current");
+            match.style.backgroundColor = "rgba(255, 255, 0, 0.2)";
+        });
+
+        const prevIndex = currentIndex <= 0 ? matches.length - 1 : currentIndex - 1;
+
+        const prevMatch = matches[prevIndex];
+        prevMatch.classList.add("current");
+        prevMatch.style.backgroundColor = "rgba(255, 255, 0, 0.4)";
+
+        this.expandJsonParentRows(prevMatch);
+
+        this.scrollToJsonMatch(prevMatch);
+    }
+
+    addAssetTooltips(jsonViewer) {
+        this.stopAllAudio();
+
+        const shadowRoot = jsonViewer.shadowRoot;
+        if (!shadowRoot) {
+            console.warn("JSON viewer shadow root not accessible");
+            return;
+        }
+
+        if (this.jsonMutationObserver) {
+            this.jsonMutationObserver.disconnect();
+        }
+
+        setTimeout(() => {
+            this.processAssetMarkersInShadowDOM(shadowRoot);
+
+            this.jsonMutationObserver = new MutationObserver((mutations) => {
+                let shouldReprocess = false;
+
+                for (const mutation of mutations) {
+                    if (mutation.type === "childList") {
+                        if (mutation.addedNodes.length > 0) {
+                            shouldReprocess = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldReprocess) {
+                    clearTimeout(this.jsonProcessingTimeout);
+                    this.jsonProcessingTimeout = setTimeout(() => {
+                        this.processAssetMarkersInShadowDOM(shadowRoot);
+                    }, 50);
+                }
+            });
+
+            this.jsonMutationObserver.observe(shadowRoot, {
+                childList: true,
+                subtree: true,
+            });
+        }, 100);
+    }
+
+    processAssetMarkersInShadowDOM(root) {
+        const elements = root.querySelectorAll(
+            "span.string:not([data-asset-processed]), .value-data:not([data-asset-processed])",
+        );
+        let processedCount = 0;
+
+        elements.forEach((element) => {
+            const text = element.textContent.trim();
+
+            element.setAttribute("data-original-text", text);
+
+            let hashMatch = text.match(/^"?!?([a-f0-9]{16,})(?:\.[a-z0-9]+)?"?$/i);
+
+            if (!hashMatch) {
+                const specialMatches = text.match(/[a-f0-9]{16,}/gi);
+                if (specialMatches && specialMatches.length > 0) {
+                    const validAssets = [];
+                    specialMatches.forEach((hashStr) => {
+                        const hashLower = hashStr.toLowerCase();
+                        const asset = this.assetHashMap[hashLower];
+                        if (asset) {
+                            validAssets.push({ hash: hashLower, asset: asset });
+                        }
+                    });
+
+                    if (validAssets.length > 0) {
+                        element.setAttribute("data-asset-processed", "true");
+
+                        element.setAttribute("data-asset-hashes", JSON.stringify(validAssets.map((v) => v.hash)));
+
+                        element.setAttribute("data-asset-type", validAssets[0].asset.type);
+
+                        element.style.color = "var(--yellow)";
+                        element.style.textDecoration = "underline";
+                        element.style.cursor = "help";
+                        element.style.fontWeight = "bold";
+
+                        element.addEventListener("mouseenter", (e) => {
+                            this.showMultipleAssetTooltip(e, validAssets);
+                        });
+
+                        element.addEventListener("mouseleave", () => {
+                            this.hideAssetTooltip();
+                        });
+
+                        processedCount++;
+                    }
+                    return;
+                }
+            }
+
+            if (hashMatch) {
+                const hash = hashMatch[1].toLowerCase();
+                const asset = this.assetHashMap[hash];
+
+                if (asset) {
+                    const audioProps = this.audioPropertiesMap?.[hash] || {};
+                    const volume = audioProps.volume !== undefined ? audioProps.volume : null;
+                    const pitch = audioProps.pitch !== undefined ? audioProps.pitch : null;
+                    const pan = audioProps.pan !== undefined ? audioProps.pan : null;
+
+                    element.setAttribute("data-asset-processed", "true");
+                    element.setAttribute("data-asset-hash", hash);
+                    element.setAttribute("data-asset-type", asset.type);
+
+                    if (volume !== null) element.setAttribute("data-volume", volume);
+                    if (pitch !== null) element.setAttribute("data-pitch", pitch);
+                    if (pan !== null) element.setAttribute("data-pan", pan);
+
+                    element.style.color = "var(--yellow)";
+                    element.style.textDecoration = "underline";
+                    element.style.cursor = asset.type === "audio" ? "pointer" : "help";
+                    element.style.fontWeight = "bold";
+
+                    element.addEventListener("mouseenter", (e) => {
+                        this.showAssetTooltip(e, asset, volume, pitch, pan);
+                    });
+
+                    element.addEventListener("mouseleave", () => {
+                        this.hideAssetTooltip();
+                    });
+
+                    if (asset.type === "audio") {
+                        element.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            this.toggleAudioPlayback(asset, element, volume, pitch, pan);
+                        });
+                    }
+
+                    processedCount++;
+                }
+            }
+        });
+    }
+
+    showMultipleAssetTooltip(event, validAssets) {
+        this.hideAssetTooltip();
+
+        const tooltip = document.createElement("div");
+        tooltip.id = "assetTooltip";
+        tooltip.style.cssText = `
+            position: fixed;
+            background: var(--bg-color);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            z-index: 10000;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        `;
+
+        let content = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+
+        validAssets.forEach(({ hash, asset }, index) => {
+            if (asset.type === "image") {
+                content += `
+                    <div style="border-top: ${index > 0 ? "1px solid var(--border-color)" : "none"}; padding-top: ${index > 0 ? "12px" : "0"};">
+                        <img src="${asset.url}" style="max-width: 360px; max-height: 200px; display: block; border-radius: 4px; margin-bottom: 8px;">
+                        <div style="font-size: 0.85em; color: var(--txt-faded);">${asset.path}</div>
+                    </div>
+                `;
+            } else if (asset.type === "audio") {
+                content += `
+                    <div style="border-top: ${index > 0 ? "1px solid var(--border-color)" : "none"}; padding-top: ${index > 0 ? "12px" : "0"};">
+                        <div style="font-weight: bold; margin-bottom: 4px;">🔊 ${asset.name}</div>
+                        <div style="font-size: 0.85em; color: var(--txt-faded);">${asset.path}</div>
+                    </div>
+                `;
+            }
+        });
+
+        content += "</div>";
+        tooltip.innerHTML = content;
+
+        document.body.appendChild(tooltip);
+
+        const rect = event.target.getBoundingClientRect();
+        tooltip.style.left = rect.left + "px";
+        tooltip.style.top = rect.bottom + 8 + "px";
+
+        this.currentTooltip = tooltip;
+    }
+
+    showAssetTooltip(event, asset, volume = null, pitch = null, pan = null) {
+        this.hideAssetTooltip();
+
+        const tooltip = document.createElement("div");
+        tooltip.id = "assetTooltip";
+        tooltip.style.cssText = `
+            position: fixed;
+            background: var(--bg-color);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            z-index: 10000;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        `;
+
+        if (asset.type === "image") {
+            tooltip.innerHTML = `
+                <img src="${asset.url}" style="max-width: 280px; max-height: 200px; display: block; border-radius: 4px;">
+                <div style="margin-top: 8px; font-size: 0.85em; color: var(--txt-faded);">${asset.path}</div>
+            `;
+        } else if (asset.type === "audio") {
+            let propertiesHtml = "";
+            if (volume !== null || pitch !== null || pan !== null) {
+                propertiesHtml = '<div style="margin-top: 8px; font-size: 0.85em; color: var(--txt-color);">';
+                if (volume !== null) propertiesHtml += `Volume: ${volume}%<br>`;
+                if (pitch !== null) propertiesHtml += `Pitch: ${pitch}%<br>`;
+                if (pan !== null) propertiesHtml += `Pan: ${pan}`;
+                propertiesHtml += "</div>";
+            }
+
+            tooltip.innerHTML = `
+                <div style="padding: 8px;">
+                    <div style="font-weight: bold; margin-bottom: 4px;">🔊 ${asset.name}</div>
+                    <div style="font-size: 0.85em; color: var(--txt-faded);">${asset.path}</div>
+                    ${propertiesHtml}
+                    <div style="margin-top: 8px; font-size: 0.85em; color: var(--green);">Click to play/pause</div>
+                </div>
+            `;
+        }
+
+        document.body.appendChild(tooltip);
+
+        const rect = event.target.getBoundingClientRect();
+        tooltip.style.left = rect.left + "px";
+        tooltip.style.top = rect.bottom + 8 + "px";
+
+        this.currentTooltip = tooltip;
+    }
+
+    hideAssetTooltip() {
+        if (this.currentTooltip) {
+            this.currentTooltip.remove();
+            this.currentTooltip = null;
+        }
+    }
+
+    toggleAudioPlayback(asset, element, volume = null, pitch = null, pan = null) {
+        if (this.currentAudio && this.currentAudio !== element.audioInstance) {
+            this.currentAudio.pause();
+            this.currentAudio.currentTime = 0;
+            if (this.currentAudioElement) {
+                this.currentAudioElement.style.color = "var(--yellow)";
+            }
+        }
+
+        if (!element.audioInstance) {
+            const audio = new Audio(asset.url);
+
+            if (volume !== null) {
+                audio.volume = Math.max(0, Math.min(1, volume / 100));
+            } else {
+                audio.volume = 0.5;
+            }
+
+            if (pitch !== null) {
+                audio.playbackRate = Math.max(0.25, Math.min(4, pitch / 100));
+            }
+
+            element.audioInstance = audio;
+
+            audio.addEventListener("ended", () => {
+                element.style.color = "var(--yellow)";
+            });
+        }
+
+        const audio = element.audioInstance;
+
+        if (audio.paused) {
+            audio.play();
+            element.style.color = "var(--green)";
+            this.currentAudio = audio;
+            this.currentAudioElement = element;
+        } else {
+            audio.pause();
+            audio.currentTime = 0;
+            element.style.color = "var(--yellow)";
+            this.currentAudio = null;
+            this.currentAudioElement = null;
+        }
+    }
+
+    stopAllAudio() {
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio.currentTime = 0;
+            this.currentAudio = null;
+        }
+        if (this.currentAudioElement) {
+            this.currentAudioElement.style.color = "var(--yellow)";
+            this.currentAudioElement = null;
         }
     }
 }

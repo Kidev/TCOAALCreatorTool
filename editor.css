@@ -2094,7 +2094,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     padding: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    /*flex: 1 1 auto;*/
+    flex: 1 1 auto;
     min-height: 0;
     /*display: flex;*/
     flex-direction: column;
@@ -2426,7 +2426,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 .gallery-preview-panel {
     position: sticky !important;
     top: var(--header-height) !important;
-    max-height: calc(100vh - 10vh) !important;
+    /*max-height: calc(100vh - 10vh) !important;*/
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
@@ -2507,7 +2507,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     flex: 0 0 33.333%;
     position: sticky;
     top: 0;
-    max-height: 100vh;
+    /*max-height: 100vh;*/
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -4399,10 +4399,18 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     font-family: "TCOAAL", monospace;
 }
 
+#previewPanelContent {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
 .json-preview-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     background-color: #1e1e1e;
     color: #d4d4d4;
     font-family: "Consolas", "Monaco", "Courier New", monospace;
@@ -4415,6 +4423,9 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
     padding: 8px 12px;
     background-color: #2d2d2d;
     border-bottom: 1px solid #3e3e3e;
+    position: sticky;
+    top: 0;
+    z-index: 15;
 }
 
 .json-info {
@@ -4424,7 +4435,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 
 .json-toolbar-buttons {
     display: flex;
-    gap: 6px;
+    justify-content: flex-end;
 }
 
 .json-tool-btn {
@@ -4498,7 +4509,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 }
 
 .gallery-only-mode .json-viewer-wrapper {
-    max-height: calc(100vh - 200px);
+    max-height: calc(95vh);
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -4808,13 +4819,47 @@ pre.line-numbers > code {
 
 .labels-line-value {
     display: inline-block;
-    width: 90%;
+    width: 80%;
     color: #ffffff;
     font-weight: bold;
     font-size: 0.9em;
     vertical-align: top;
     white-space: pre-wrap;
     box-sizing: border-box;
+}
+
+.labels-use-btn {
+    margin-left: auto;
+    padding: 0.4vmax 1vmax;
+    background-color: #444444;
+    color: #ffffff;
+    border: 1px solid #666666;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 0.2s,
+        visibility 0.2s,
+        transform 0.1s;
+}
+
+.labels-line:hover .labels-use-btn {
+    opacity: 1;
+    visibility: visible;
+}
+
+.labels-use-btn:hover {
+    background-color: #555555;
+    border-color: #888888;
+    transform: scale(1.05);
+}
+
+.labels-use-btn:active {
+    transform: scale(0.98);
 }
 
 .labels-page-info {
@@ -4970,4 +5015,56 @@ pre.line-numbers > code {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Fix browser autocomplete/autofill styling override for all search boxes and text inputs */
+input[type="text"]:-webkit-autofill,
+input[type="text"]:-webkit-autofill:hover,
+input[type="text"]:-webkit-autofill:focus,
+input[type="text"]:-webkit-autofill:active,
+input[type="search"]:-webkit-autofill,
+input[type="search"]:-webkit-autofill:hover,
+input[type="search"]:-webkit-autofill:focus,
+input[type="search"]:-webkit-autofill:active {
+    -webkit-text-fill-color: rgb(255, 255, 255) !important;
+    -webkit-box-shadow: 0 0 0 1000px rgb(45, 45, 45) inset !important;
+    box-shadow: 0 0 0 1000px rgb(45, 45, 45) inset !important;
+    background-color: rgb(45, 45, 45) !important;
+    background: rgb(45, 45, 45) !important;
+    border: 1px solid rgb(62, 62, 62) !important;
+    color: rgb(255, 255, 255) !important;
+    font-family: Consolas, Monaco, "Courier New", monospace !important;
+    caret-color: rgb(255, 255, 255) !important;
+    transition:
+        background-color 5000s ease-in-out 0s,
+        color 5000s ease-in-out 0s !important;
+    -webkit-transition:
+        background-color 5000s ease-in-out 0s,
+        color 5000s ease-in-out 0s !important;
+}
+
+/* Additional specificity for search inputs */
+#gallerySearchInput:-webkit-autofill,
+#gallerySearchInput:-webkit-autofill:hover,
+#gallerySearchInput:-webkit-autofill:focus,
+#gallerySearchInput:-webkit-autofill:active,
+#jsonSearchInput:-webkit-autofill,
+#jsonSearchInput:-webkit-autofill:hover,
+#jsonSearchInput:-webkit-autofill:focus,
+#jsonSearchInput:-webkit-autofill:active {
+    -webkit-text-fill-color: rgb(255, 255, 255) !important;
+    -webkit-box-shadow: 0 0 0 1000px rgb(45, 45, 45) inset !important;
+    box-shadow: 0 0 0 1000px rgb(45, 45, 45) inset !important;
+    background-color: rgb(45, 45, 45) !important;
+    background: rgb(45, 45, 45) !important;
+    border: 1px solid rgb(62, 62, 62) !important;
+    color: rgb(255, 255, 255) !important;
+    font-family: Consolas, Monaco, "Courier New", monospace !important;
+    caret-color: rgb(255, 255, 255) !important;
+    transition:
+        background-color 5000s ease-in-out 0s,
+        color 5000s ease-in-out 0s !important;
+    -webkit-transition:
+        background-color 5000s ease-in-out 0s,
+        color 5000s ease-in-out 0s !important;
 }

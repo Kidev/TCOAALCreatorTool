@@ -4456,38 +4456,44 @@ const hashToName = {
 
     // === Sound Effects (SE) ===
     "4927480862c30f3b": "got_item", // "item_got"
-    "5aa70e50915bd7ad": "wind_5", // "Wind5"
-    "1d351c0ab5681031": "key", // "Key"
+    "5aa70e50915bd7ad": "magic", // "Wind5"
+    "1d351c0ab5681031": "happy", // "Key"
     "d0e18e78dc615508": "rustle", // "rustle"
-    "41b1633ff75cba66": "blow_2", // "Blow2"
+    "41b1633ff75cba66": "slam_twice", // "Blow2"
     "46117eb2380afb81": "door_1", // "Door1"
+    "be5cde56452260ec": "door_2", // "Open4"
+    "bcf151331223b851": "door_3", // "Close1"
     "cdf9ee20ed312175": "crash", // "Crash"
     "3f55df3996a099e3": "statue", // "statue"
-    "20cb27ef60c8b250": "open_1", // "Open1"
+    "20cb27ef60c8b250": "open", // "Open1"
     "1d869cca761d1f5b": "sand", // "Sand"
-    "dbe371e3fdd67bf4": "Water1",
-    "7f6266a05d031a94": "se_12",
-    "ec37304323499aab": "water_1", // "Water1"
+    "dbe371e3fdd67bf4": "water",
+    "7f6266a05d031a94": "coins_1",
+    "cb2a17c9188b66f0": "coins_2",
+    "e99b9a3350a587d3": "coins_3",
+    "ec37304323499aab": "whoosh_1", // "Water1"
+    "229ab081684616dc": "whoosh_2",
     "c9d55115b9d0b6f9": "flush", // "flush"
-    "50ca3ee851312aa4": "coin", // "Coin"
-    "b3fc15b021e3c149": "monster_4", // "Monster4"
-    "735d49a50f0035d0": "earth_1", // "Earth1"
+    "50ca3ee851312aa4": "hit", // "Coin"
+    "b3fc15b021e3c149": "monster_1", // "Monster4"
+    "d6ed1157a201bd9e": "monster_2",
+    "735d49a50f0035d0": "break", // "Earth1"
     "62edfeeb6f00900e": "title_sting", // "title_sting"
-    "be5cde56452260ec": "open_4", // "Open4"
     "c1266f7aba56e843": "phone_disconnect", // "phone_disconnect"
     "9d86dfcb61613a37": "phone_clank", // "phone_clank"
-    "3b7017b29acd17a2": "switch_2", // "Switch2"
+    "03bcac3737f12e6b": "phone_ring", // "phone_ring"
+    "201755faa2d12641": "phone_beep",
+    "c5c1bd2fb7a56bd5": "phone_long_beep", // bellding
+    "3b7017b29acd17a2": "switch", // "Switch2"
     "b12d6f9f4b9e1ca3": "knock", // "knock"
     "90b3e9ebf8f919e5": "walk_away", // "walkaway"
-    "dc247e4f1a7a8f98": "darkness_3", // "Darkness3"
-    "5982909527ac5860": "Key",
-    "03bcac3737f12e6b": "phone_ring", // "phone_ring"
+    "dc247e4f1a7a8f98": "teleport", // "Darkness3"
+    "5982909527ac5860": "empty_gun",
     "74ea5e851fc15d23": "washing_machine", // "washingmachine"
     "c3a2ef1f7d840426": "blood_stab", // "blood_stab"
-    "3b465a976e2823ee": "blood_b", // "blood_b"
-    "bcf151331223b851": "close1", // "Close1"
-    "fb7aee8c4eb079e3": "blingy_sp", // "blingy_sp"
-    "b97672d340e2da9c": "blood_a", // "blood_a"
+    "fb7aee8c4eb079e3": "super_happy", // "blingy_sp"
+    "b97672d340e2da9c": "blood_1", // "blood_a"
+    "3b465a976e2823ee": "blood_2", // "blood_b"
     "662e331644396903": "match", // "match"
     "ae7cc7dcfc1c1506": "ambulance", // "ambulance"
     "75eda64e97d4c13a": "transceiver", // "Transceiver"
@@ -4495,7 +4501,7 @@ const hashToName = {
     "e4b12af62524a5fe": "confirm", // "confirm"
     "97bd49ca4170d542": "car_door", // "cardoor"
     "e3cd5a4b1a1e0890": "elevator_door", // "elevatordoor"
-    "c44c4edbf7c90767": "bellding", // "bellding"
+    "c44c4edbf7c90767": "bell_ding", // "bellding"
     "a5da3da2ae6ed664": "coin", // coin
     "e7ba7d67c89feb44": "carpull", // "carpull"
     "b1d996591fd54afe": "rustle_foliage", // "rustle_foliage"
@@ -4507,30 +4513,24 @@ const hashToName = {
     "58e443f31a974fd0": "blade", // "blade"
     "232221889c283071": "blender", // "blender"
     "65c1e576d21efce7": "dig", // "dig"
-    "e9e21bdbb6892e29": "confirm",
-    "1bf231bddc4a2083": "se_54",
+    "e9e21bdbb6892e29": "page_turn",
+    "1bf231bddc4a2083": "metallic_hit",
     "34c4159bda097c78": "draw", // "draw"
-    "d6ed1157a201bd9e": "56",
     "4ef4c15bf90a0b1c": "axe", // "axe"
-    "64cf9328a37d37bd": "heal_2", // "Heal2"
-    "4eaf69352441868c": "se_59",
-    "b5136fcb0987fd4d": "se_60",
-    "7dd808ff989006e3": "se_61",
-    "1b12df87d700b9de": "blood_stab",
-    "2cc88d940d6f65df": "se_63",
+    "64cf9328a37d37bd": "heal", // "Heal2"
+    "4eaf69352441868c": "drill",
+    "b5136fcb0987fd4d": "wood_hit",
+    "7dd808ff989006e3": "ring",
+    "1b12df87d700b9de": "blood_stabs",
+    "2cc88d940d6f65df": "rewind",
     "65b8897cb0e998b2": "blingy", // "blingy"
-    "201755faa2d12641": "se_65",
-    "229ab081684616dc": "se_66",
-    "b26e0849339bdaf0": "se_67",
-    "5ce6fc5a596ddc3f": "se_68",
-    "cb2a17c9188b66f0": "se_69",
-    "73a2bdfa3b0feb0d": "spam", // "spam"
-    "6f74ae580cef73f5": "se_71",
-    "74380a0d0e3c7c48": "curtain_alt", // "curtain"
-    "4cee1acde9c80ff6": "se_73", // Darkness3
-    "c5c1bd2fb7a56bd5": "se_74", // bellding
-    "e99b9a3350a587d3": "se_75",
-    "45e50cc8a9de3bc3": "fall", // "Fall"
+    "b26e0849339bdaf0": "super_bling",
+    "73a2bdfa3b0feb0d": "wrong", // "spam"
+    "6f74ae580cef73f5": "big_ding",
+    "5ce6fc5a596ddc3f": "applause_bravo",
+    "74380a0d0e3c7c48": "applause_crowd", // "curtain"
+    "4cee1acde9c80ff6": "church_bell", // Darkness3
+    "45e50cc8a9de3bc3": "fall_cartoon", // "Fall"
 
     // "b5136fcb0987fd4d": "Water1", // .ogg
     // "5adf3c7054e7a170": "balcony", // .ogg

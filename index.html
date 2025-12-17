@@ -104,6 +104,16 @@
                     Import Game Assets
                 </button>
 
+                <p style="font-size: 1.2vmax; color: var(--txt-color)">
+                    <a
+                        href="#"
+                        onclick="event.preventDefault(); GameImporter.showDialogueInfoModal();"
+                        style="color: var(--default); text-decoration: underline"
+                    >
+                        How to unlock additional features?
+                    </a>
+                </p>
+
                 <p
                     class="forced-import-note"
                     style="
@@ -167,7 +177,7 @@
                         <div class="preview-panel-content" id="previewPanelContent">
                             <div class="preview-placeholder">Select an item to preview</div>
                         </div>
-                        <div class="preview-controls" id="previewControls"></div>
+                        <div class="preview-controls" id="previewControls" style="display: block"></div>
                     </div>
                 </div>
             </div>

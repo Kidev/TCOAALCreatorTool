@@ -3577,6 +3577,11 @@ async function preloadSavedDataAssets(shouldCrop = false) {
                 const savedAssets = await window.memoryManager.loadSavedAssets();
                 window.gameImporterAssets = savedAssets;
 
+                const dialogueHashMapping = await window.memoryManager.loadMetadata("dialogueHashMapping");
+                if (dialogueHashMapping) {
+                    window.dialogueHashMapping = dialogueHashMapping;
+                }
+
                 await window.memoryManager.loadExternalAssets();
 
                 if (window.pendingCompositions && window.pendingCompositions.length > 0) {
@@ -3761,6 +3766,20 @@ function updateGalleryCategories() {
         categories.sort((a, b) => {
             const indexA = imageOrder.indexOf(a);
             const indexB = imageOrder.indexOf(b);
+
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+
+            if (indexA !== -1) return -1;
+
+            if (indexB !== -1) return 1;
+
+            return a.localeCompare(b);
+        });
+    } else if (isDataTab) {
+        const dataOrder = ["Labels", "Maps"];
+        categories.sort((a, b) => {
+            const indexA = dataOrder.indexOf(a);
+            const indexB = dataOrder.indexOf(b);
 
             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
 
@@ -4513,6 +4532,10 @@ async function updateGalleryContent() {
     }
 
     assetEntries.forEach(([name, asset], index) => {
+        if (currentGalleryTab === "data" && currentGalleryCategory === "Maps" && name.endsWith(".txt")) {
+            return;
+        }
+
         if (asset.baseFileName && typeof ignoreAssets !== "undefined") {
             const shouldIgnore = ignoreAssets.some((hash) => asset.baseFileName.includes(hash));
             if (shouldIgnore) return;
@@ -5086,7 +5109,18 @@ let labelsTableState = {
     searchTerm: "",
 };
 
-function renderLabelsTreeView(container, assets) {
+async function renderLabelsTreeView(container, assets) {
+    if (!window.dialogueHashMapping && window.memoryManager) {
+        try {
+            const dialogueHashMapping = await window.memoryManager.loadMetadata("dialogueHashMapping");
+            if (dialogueHashMapping && Object.keys(dialogueHashMapping).length > 0) {
+                window.dialogueHashMapping = dialogueHashMapping;
+            }
+        } catch (error) {
+            console.error("Failed to load dialogue hash mappings:", error);
+        }
+    }
+
     const labelsAsset = Object.values(assets).find(
         (asset) => asset.name.startsWith("labels") || asset.originalName.startsWith("labels"),
     );
@@ -5156,7 +5190,14 @@ function renderLabelsTreeView(container, assets) {
                 }
                 valueStr = valueStr.replace(/\\"/g, '"');
 
-                return keyStr.toLowerCase().includes(lowerSearch) || valueStr.toLowerCase().includes(lowerSearch);
+                let keyMatches = keyStr.toLowerCase().includes(lowerSearch);
+
+                if (!keyMatches && window.dialogueHashMapping && window.dialogueHashMapping[keyStr]) {
+                    const mappedName = window.dialogueHashMapping[keyStr];
+                    keyMatches = mappedName.toLowerCase().includes(lowerSearch);
+                }
+
+                return keyMatches || valueStr.toLowerCase().includes(lowerSearch);
             });
             totalItems = entries.length;
         }
@@ -5187,9 +5228,30 @@ function renderLabelsTreeView(container, assets) {
             }
 
             valueStr = valueStr.replace(/\\"/g, '"');
-            const keyStr = isArray ? `[${key}]` : String(key);
+            let keyStr = isArray ? `[${key}]` : String(key);
+            let displayKey = keyStr;
+            let titleAttr = "";
 
-            line.innerHTML = `<span class="labels-line-key">${escapeHtml(keyStr)}</span><span class="labels-line-value">${escapeHtml(valueStr)}</span>`;
+            if (window.dialogueHashMapping) {
+                if (window.dialogueHashMapping[keyStr]) {
+                    displayKey = window.dialogueHashMapping[keyStr];
+                    titleAttr = ` title="${escapeHtml(keyStr)}"`;
+                } else {
+                }
+            } else {
+            }
+
+            line.innerHTML = `<span class="labels-line-key"${titleAttr}>${escapeHtml(displayKey)}</span><span class="labels-line-value">${escapeHtml(valueStr)}</span>`;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get("mode");
+            if (mode === "editor") {
+                const useButton = document.createElement("button");
+                useButton.className = "labels-use-btn";
+                useButton.textContent = "Use";
+                useButton.onclick = () => useLabelLine(keyStr, displayKey, valueStr);
+                line.appendChild(useButton);
+            }
 
             container.appendChild(line);
         });
@@ -5223,6 +5285,134 @@ function filterLabelsLines(searchTerm) {
     labelsTableState.searchTerm = searchTerm;
     labelsTableState.currentPage = 1;
     updateGalleryContent();
+}
+
+function useLabelLine(keyStr, displayKey, valueStr) {
+    try {
+        if (!projectData) {
+            console.error("projectData is not defined!");
+            return;
+        }
+        if (!projectData.scenes) {
+            console.error("projectData.scenes is not defined!");
+            return;
+        }
+        if (!projectData.characters) {
+            console.warn("projectData.characters is not defined, initializing as empty object");
+            projectData.characters = {};
+        }
+
+        let processedValue = valueStr.trim();
+        if (processedValue.startsWith('"') && processedValue.endsWith('"')) {
+            processedValue = processedValue.slice(1, -1);
+        }
+
+        let lines = processedValue.split("\n").filter((line) => line.trim().length > 0);
+
+        const line1 = lines[0] || "";
+        const line2 = lines[1] || "";
+
+        let speaker = "";
+
+        if (window.dialogueHashMapping && window.dialogueHashMapping[keyStr]) {
+            const mappedName = window.dialogueHashMapping[keyStr];
+
+            if (mappedName.toLowerCase() === "narrator") {
+                speaker = "";
+            } else {
+                const characterExists = Object.keys(projectData.characters || {}).some((charName) => {
+                    if (charName === mappedName) return true;
+                    const char = projectData.characters[charName];
+                    return char.aliases && char.aliases.includes(mappedName);
+                });
+
+                if (characterExists) {
+                    speaker = mappedName;
+                }
+            }
+        }
+
+        const newScene = {
+            ...JSON.parse(JSON.stringify(DEFAULTS.scene)),
+            line1: line1,
+            line2: line2,
+            speaker: speaker,
+        };
+
+        projectData.scenes.push(newScene);
+        const newSceneIndex = projectData.scenes.length - 1;
+
+        const previouslyExpanded = Array.from(expandedScenes);
+        previouslyExpanded.forEach((prevIndex) => {
+            const previewSpeaker = document.getElementById(`previewSpeaker-${prevIndex}`);
+            if (previewSpeaker && previewSpeaker._glitchEffect) {
+                previewSpeaker._glitchEffect.stop();
+                delete previewSpeaker._glitchEffect;
+            }
+            const previewLine1 = document.getElementById(`previewLine1-${prevIndex}`);
+            if (previewLine1 && previewLine1._glitchEffect) {
+                previewLine1._glitchEffect.stop();
+                delete previewLine1._glitchEffect;
+            }
+            const previewLine2 = document.getElementById(`previewLine2-${prevIndex}`);
+            if (previewLine2 && previewLine2._glitchEffect) {
+                previewLine2._glitchEffect.stop();
+                delete previewLine2._glitchEffect;
+            }
+        });
+
+        expandedScenes.clear();
+        expandedScenes.add(newSceneIndex);
+
+        updateScenesList();
+
+        const allSectionHeaders = document.querySelectorAll(".section button.section-header.collapsible");
+        allSectionHeaders.forEach((header) => {
+            const isScenes = header.textContent.trim() === "Scenes";
+            const content = header.nextElementSibling;
+
+            if (isScenes) {
+                if (!header.classList.contains("active")) {
+                    header.classList.add("active");
+                    if (content) {
+                        content.style.display = "block";
+                    }
+                }
+            } else {
+                if (header.classList.contains("active")) {
+                    header.classList.remove("active");
+                    if (content) {
+                        content.style.display = "none";
+                    }
+                }
+            }
+        });
+
+        closeGallery();
+
+        setTimeout(() => {
+            const scenesList = document.getElementById("scenesList");
+            const editorOverlay = document.getElementById("editorOverlay");
+
+            if (!scenesList || !editorOverlay) {
+                console.warn("Could not find scenesList or editorOverlay");
+                return;
+            }
+
+            const sceneItems = scenesList.querySelectorAll(".scene-item");
+            if (sceneItems[newSceneIndex]) {
+                const targetItem = sceneItems[newSceneIndex];
+                const itemTop = targetItem.offsetTop;
+
+                scenesList.scrollTop = itemTop - 10;
+            } else {
+                console.warn("Could not find scene item at index:", newSceneIndex);
+            }
+        }, 100);
+    } catch (error) {
+        console.error("Error in useLabelLine:", error);
+        alert("Error creating scene: " + error.message);
+    }
 }
 
 function updateLabelsTablePreview(totalItems = 0, totalPages = 0, startIndex = 0, endIndex = 0) {

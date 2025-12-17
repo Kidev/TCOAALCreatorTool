@@ -945,11 +945,6 @@ function decodeCodeFromURL(encodedString) {
         }
         decompressed = decompressed.replaceAll("await_", "await ");
 
-        /*const needsAsync = decompressed.includes("setCompositions");
-        console.log(
-            needsAsync ? `async function setupScene() ${decompressed}` : `function setupScene() ${decompressed}`,
-        );
-        return needsAsync ? `async function setupScene() ${decompressed}` : `function setupScene() ${decompressed}`;*/
         return `function setupScene() ${decompressed}`;
     } catch (error) {
         console.error("Error decoding code from URL:", error);
@@ -1028,7 +1023,8 @@ function showGalleryAssetsModal(mode = "viewer") {
         message.innerHTML = `
             This ${mode === "viewer" ? "shared link" : "sequence"} uses gallery assets, but no game assets have been imported yet.<br><br>
             <strong>Gallery assets (backgrounds, busts, sounds) will not be displayed.</strong><br><br>
-            You can import your game assets now or continue without them.
+            You can import your game assets now or continue without them.<br>
+            <a href="#" onclick="event.preventDefault(); GameImporter.showDialogueInfoModal();" style="color: var(--green); text-decoration: underline; font-size: 0.9em;">More info about dialogue.txt enhanced features</a>
         `;
         message.style.cssText = `
             margin: 0 0 1.5rem 0;
@@ -1946,7 +1942,7 @@ function setupGalleryOnlyMode() {
                             <div class="preview-panel-content" id="previewPanelContent">
                                 <div class="preview-placeholder">Select an item to preview</div>
                             </div>
-                            <div class="preview-controls" id="previewControls"></div>
+                            <div class="preview-controls" id="previewControls" style="display: block;"></div>
                         </div>
                     </div>
                 </div>
@@ -2483,7 +2479,7 @@ async function checkAssetsAndShowForcedImport() {
 
         if (storageState === "none") {
             const urlParams = new URLSearchParams(window.location.search);
-            window.intendedMode = urlParams.get("mode") || "gallery";
+            window.intendedMode = urlParams.get("mode") || null;
             window.intendedUseParam = urlParams.get("use") || null;
 
             const overlay = document.getElementById("forcedImportOverlay");
@@ -2598,16 +2594,20 @@ function handleForcedImport() {
         }
 
         if (success) {
-            const intendedMode = window.intendedMode || "gallery";
+            const currentMode = new URLSearchParams(window.location.search).get("mode");
+            const intendedMode = window.intendedMode || currentMode;
             const intendedUseParam = window.intendedUseParam;
 
-            const newUrl = new URL(window.location);
-            newUrl.searchParams.set("mode", intendedMode);
-            if (intendedUseParam) {
-                newUrl.searchParams.set("use", intendedUseParam);
+            if (intendedMode) {
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set("mode", intendedMode);
+                if (intendedUseParam) {
+                    newUrl.searchParams.set("use", intendedUseParam);
+                }
+                window.location.href = newUrl.toString();
+            } else {
+                window.location.reload();
             }
-
-            window.location.href = newUrl.toString();
         } else {
             if (overlay) {
                 overlay.style.display = "flex";
