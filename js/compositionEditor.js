@@ -4786,7 +4786,9 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
                 const response = await fetch(kf.blobUrl);
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                const adjustedDuration = (audioBuffer.duration / kf.speed) * 1000;
+                const pitchRatio = Math.pow(2, (kf.pitch || 0) / 12);
+                const combinedRate = (kf.speed || 1.0) * pitchRatio;
+                const adjustedDuration = (audioBuffer.duration / combinedRate) * 1000;
                 const totalTime = kf.time + adjustedDuration;
                 maxDuration = Math.max(maxDuration, totalTime);
             }
@@ -4815,7 +4817,8 @@ Pitch: ${kf.pitch >= 0 ? "+" : ""}${kf.pitch.toFixed(1)}`;
 
                 const source = offlineContext.createBufferSource();
                 source.buffer = audioBuffer;
-                source.playbackRate.value = kf.speed;
+                const pitchRatio = Math.pow(2, (kf.pitch || 0) / 12);
+                source.playbackRate.value = (kf.speed || 1.0) * pitchRatio;
 
                 source.connect(offlineContext.destination);
                 source.start(kf.time / 1000);

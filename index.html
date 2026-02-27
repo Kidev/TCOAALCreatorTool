@@ -765,6 +765,10 @@ Right click to erase the saved dialog"
                 const gameScript = document.createElement("script");
                 if (mode === "ashley-on-duty") {
                     gameScript.src = `js/ashleyOnDuty-ep${episode}.js`;
+                    window._aodLoadPromise = new Promise((resolve) => {
+                        gameScript.addEventListener("load", resolve);
+                        gameScript.addEventListener("error", resolve);
+                    });
                 }
                 document.currentScript.parentNode.insertBefore(gameScript, document.currentScript.nextSibling);
             })();

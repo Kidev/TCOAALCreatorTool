@@ -2773,6 +2773,9 @@ document.addEventListener("DOMContentLoaded", async function () {
         openEditor();
     } else if (mode === "ashley-on-duty") {
         const episode = parseInt(urlParams.get("episode") || "1");
+        if (window._aodLoadPromise) {
+            await window._aodLoadPromise;
+        }
         await startAshleyOnDuty(episode);
     } else if (mode === "help") {
         setupHelpMode();
