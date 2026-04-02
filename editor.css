@@ -1657,7 +1657,7 @@ div.header-buttons button.tcoaal-button-small.tcoaal-button-small-header.disable
 .gallery-item-name {
     margin-top: 0.5vmax;
     text-align: center;
-    font-size: 0.8vmax;
+    /*font-size: 0.8vmax;*/
     color: var(--txt-color);
     word-break: normal;
 }
@@ -2414,7 +2414,7 @@ input[type="number"]#animationSpeed::-webkit-outer-spin-button {
 }
 
 .data-icon {
-    font-size: 1.2vmax;
+    font-size: 1.0vmax;
     color: var(--default);
     font-weight: 900;
 }

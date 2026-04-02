@@ -36,9 +36,9 @@ const assetCategoryOrder = {
     "Sound effects": 3,
 };
 
-const numberOfPictures = 1012;
+const numberOfPictures = 1039;
 const numberOfBackgrounds = 285;
-const numberOfData = 234;
+const numberOfData = 236;
 
 const spritesSheetsVariants = {
     "spritessheet_16x16_system_12.png": {
@@ -288,6 +288,8 @@ const filenamesMapped = {
     "f3a481a4b3309457": "map_unknown_29",
     "f4fce3b5b60b3c5b": "map_unknown_30",
     "f7049de2b41b8c72": "map_unknown_31",
+    "40dbcd3de77fdabe": "map_unknown_32",
+    "8602a539356079fb": "map_unknown_33",
 
     // === Spritesheets ===
     "29de30eb871e6a80": "spritessheet_12x8_characters_1",
@@ -308,6 +310,7 @@ const filenamesMapped = {
     "6125287f520bf9d4": "spritessheet_12x8_characters_16",
     "2a6a9ef435715ef2": "spritessheet_12x8_characters_17", // "Actor4"
     "70aea8d2df30f33a": "spritessheet_12x8_characters_18", // "Actor5"
+    "6e3f1e659f08ec83": "spritessheet_12x8_characters_19",
     "42f813e66a22d1ca": "spritessheet_1x1_system_1", // "stamp"
     "7264681f0ab11b47": "spritessheet_1x5_system_2", // "VNButtons"
     "3be2dd83cc8de939": "spritessheet_8x10_system_3", // "States"
@@ -1634,6 +1637,34 @@ const filenamesMapped = {
     "2bab77dfc3ca7d15": "pictures_1008", // "tv_2a"
     "91b682859f543183": "pictures_1009", // "Book"
     "357bc4b6fb86168e": "pictures_1010",
+    "0ac3554320029f1d": "pictures_1011",
+    "9c081b28cde59ba8": "pictures_1012",
+    "aa83d8c9e28dc55d": "pictures_1013",
+    "0d0d35d629f2435d": "pictures_1014",
+    "18a842128f4dc9b6": "pictures_1015",
+    "aa205425b620a205": "pictures_1016",
+    "02fa1b61c67c9c8d": "pictures_1017",
+    "25eb9916d669e528": "pictures_1018",
+    "c3287c61536b7005": "pictures_1019",
+    "05bff35c74e5aaa0": "pictures_1020",
+    "63ef08b2a0ebc0d3": "pictures_1021",
+    "d138df0b707f6b60": "pictures_1022",
+    "1d2436867c1d54e1": "pictures_1023",
+    "76afbb1f2763c63d": "pictures_1024",
+    "e5670181733e5c4a": "pictures_1025",
+    "1ebae9d5989d75aa": "pictures_1026",
+    "725c2be976276acf": "pictures_1027",
+    "f9eae41814f23444": "pictures_1028",
+    "2fb4a58d12be6015": "pictures_1029",
+    "95552aa8ba12836a": "pictures_1030",
+    "fc3eb79b1e2a9d5e": "pictures_1031",
+    "4d58f3db68eb9b2f": "pictures_1032",
+    "503891a530a7adc2": "pictures_1033",
+    "ffc601214dd7a4cd": "pictures_1034",
+    "8b7813fa4aa9b755": "pictures_1035",
+    "a4b5915e2c19bdee": "pictures_1036",
+    "8deb6d66bb072c25": "pictures_1037",
+    "a5a9089e428ebf81": "pictures_1038",
     "icon": "pictures_icon",
 
     // === Music (ME) ===
@@ -1781,6 +1812,12 @@ const filenamesMapped = {
     "31731470b57f4dff[BUST]": "andrew_59",
     "3cdcebeabfb8cbc1[BUST]": "andrew_60",
     "624c543d26b59444[BUST]": "andrew_61",
+    "1087986e4bc8fd95[BUST]": "andrew_62",
+    "b492fec53dca3896[BUST]": "andrew_63",
+    "d13d9578d1749384[BUST]": "andrew_64",
+    "e0d8c652bda25aa9[BUST]": "andrew_65",
+    "f8eaecfd9052ed6f[BUST]": "andrew_66",
+    
     // Andy
     "e420d45fcd6e1da8[BUST]": "andy_1", // "bk_oh"
     "a362bdabdb2c271c[BUST]": "andy_2", // "bk_ew"
@@ -1806,6 +1843,11 @@ const filenamesMapped = {
     "bb691307e2e16c20[BUST]": "andy_22",
     "9567c539d89b85c7[BUST]": "andy_23",
     "64016ec4e0c68f08[BUST]": "andy_24",
+    "41e003050d4c7f8c[BUST]": "andy_25",
+    "95721375114564fd[BUST]": "andy_26",
+    "d40aef1d9d5c24aa[BUST]": "andy_27",
+    "feaaa49b8a1c01be[BUST]": "andy_28",
+    
     // Andrew Teen
     "b085875ddb694717[BUST]": "andrew-teen_1",
     "cfb9af84e0b812df[BUST]": "andrew-teen_2",
@@ -1888,6 +1930,10 @@ const filenamesMapped = {
     "03db74dbd50e6c82[BUST]": "ashley_53",
     "edc59a797608e379[BUST]": "ashley_54",
     "727a2aba4b80b348[BUST]": "ashley_55",
+    "01e1d00b0689c1d0[BUST]": "ashley_56",
+    "52266eebef144332[BUST]": "ashley_57",
+    "c9332570c9560224[BUST]": "ashley_58",
+    
     // Leyley
     "0ff2357cb019f30f[BUST]": "leyley_1", // "sk_meh"
     "d292115d110ba256[BUST]": "leyley_2", // "sk_miffed"
@@ -1906,6 +1952,10 @@ const filenamesMapped = {
     "eb9a50fd8b6847f3[BUST]": "leyley_15",
     "63fc8e6752a45207[BUST]": "leyley_16",
     "cf4bed6921eb7961[BUST]": "leyley_17",
+    "8c4db83d3837fde1[BUST]": "leyley_18",
+    "74204dde990d5e3b[BUST]": "leyley_19",
+    "beb34ef3295704b8[BUST]": "leyley_20",
+    
     // Ashley Teen
     "cec38f20835c0e69[BUST]": "ashley-teen_1",
     "6640749e62f598b6[BUST]": "ashley-teen_2",
@@ -2089,6 +2139,8 @@ const filenamesMapped = {
     "5ceaa5f530967bba[BUST]": "effects_12",
     "85d55dd94eb20928[BUST]": "effects_13",
     "01abb8e1a27d953f[BUST]": "effects_14",
+    "10aaeab911cf214d[BUST]": "effects_15",
+    
     // Douglas Past
     "f031204dce7d2bc8[BUST]": "douglas-past_1",
     "967327be50ce2306[BUST]": "douglas-past_2",
