@@ -1905,17 +1905,17 @@ function setupGalleryOnlyMode() {
                             <div class="dialog-line speaker-line">Ashley</div>
                             <div class="dialog-line text-line menu-dialog-text" style="top:34%;color:${Color.PURPLE}">"Well?&nbsp;Well??&nbsp;What&nbsp;do&nbsp;you&nbsp;think??</div>
                             <div class="dialog-line text-line menu-dialog-text" style="top:54%;color:${Color.PURPLE}">Listen&nbsp;to&nbsp;our&nbsp;songs&nbsp;on&nbsp;<a target="_blank" rel="noopener" style="color:${Color.PURPLE};" href="https://www.youtube.com/watch?v=DDdyCHu3Qe4&list=PL8FwCzf2tokHnEYuMvpWuQqQpdNBE7e-k" >YouTube</a>!!"</div>
-                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}" style="opacity: 0; transition: opacity 0.3s ease;">
+                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url || ""}" style="opacity: 0; transition: opacity 0.3s ease;">
                         </div>
                         <div id="dialog-content-box2" class="dialog-content">
                             <div class="dialog-line speaker-line">Kidev</div>
                             <div class="dialog-line text-line menu-dialog-text" style="top:34%;color:${Color.GREY_BLUE};opacity:0;">"Need&nbsp;help&nbsp;using&nbsp;a&nbsp;tool?</div>
                             <div class="dialog-line text-line menu-dialog-text" style="top:54%;color:${Color.GREY_BLUE};opacity:0;">Take a look at the Help option in the menu!"</div>
-                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url}" style="opacity: 0; transition: opacity 0.3s ease;">
+                            <img class="dialogArrow-fake-class" src="${window.uiAssets?.dialogArrow?.url || ""}" style="opacity: 0; transition: opacity 0.3s ease;">
                         </div>
                     </div>
-                    <img src="${window.uiAssets?.menuPortraitLeft?.url}" class="bust-image left">
-                    <img src="${window.uiAssets?.menuPortraitRight?.url}" class="bust-image right">
+                    <img src="${window.uiAssets?.menuPortraitLeft?.url || ""}" class="bust-image left">
+                    <img src="${window.uiAssets?.menuPortraitRight?.url || ""}" class="bust-image right">
                     
                 </div>
                 <div id="gallerySection" class="section" style="display: none; background: none;padding:0;margin:0;box-shadow:none;">
@@ -2264,6 +2264,18 @@ async function handleGalleryOnlyImport() {
             if (!(await gameImporter.importGame(files))) {
                 return;
             }
+
+            await loadAndInjectUIAssets();
+
+            // Update already-rendered menu portrait/arrow images with freshly loaded uiAssets
+            document.querySelectorAll(".dialogArrow-fake-class").forEach((img) => {
+                if (window.uiAssets?.dialogArrow?.url) img.src = window.uiAssets.dialogArrow.url;
+            });
+            const bustLeft = document.querySelector(".bust-image.left");
+            const bustRight = document.querySelector(".bust-image.right");
+            if (bustLeft && window.uiAssets?.menuPortraitLeft?.url) bustLeft.src = window.uiAssets.menuPortraitLeft.url;
+            if (bustRight && window.uiAssets?.menuPortraitRight?.url)
+                bustRight.src = window.uiAssets.menuPortraitRight.url;
 
             const editorOverlay = document.getElementById("editorOverlay");
             if (editorOverlay) {

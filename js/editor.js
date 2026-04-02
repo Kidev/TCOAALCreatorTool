@@ -5069,12 +5069,25 @@ async function cropAllImages() {
                                 } catch (error) {}
                             }
 
-                            const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
+                            const thumbImg = document.querySelector(
+                                `.gallery-item[data-filename="${name}"] img:not(.gallery-item-fav-star)`,
+                            );
                             if (thumbImg) {
                                 thumbImg.src = url;
                             }
 
                             window.gameImporterAssets.images[category][name] = asset;
+
+                            if (
+                                window.galleryManager?.currentAsset?.name === name &&
+                                window.galleryManager?.currentAsset?.category === category
+                            ) {
+                                const contentDiv = document.getElementById("previewPanelContent");
+                                const controlsDiv = document.getElementById("previewControls");
+                                if (contentDiv && controlsDiv) {
+                                    window.galleryManager.previewImage(asset, name, contentDiv, controlsDiv);
+                                }
+                            }
                         }
                         resolve();
                     });

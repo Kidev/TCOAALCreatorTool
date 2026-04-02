@@ -2101,10 +2101,22 @@ class GalleryManager {
 
                         updateLoadingBar((100 * (count + 1)) / lenQueue, name);
 
-                        const thumbImg = document.querySelector(`.gallery-item[data-filename="${name}"] img`);
+                        const thumbImg = document.querySelector(
+                            `.gallery-item[data-filename="${name}"] img:not(.gallery-item-fav-star)`,
+                        );
                         if (thumbImg) {
                             thumbImg.src = asset.croppedUrl;
-                            thumbImg.click();
+                        }
+                        if (
+                            this.currentAsset &&
+                            this.currentAsset.name === name &&
+                            this.currentAsset.category === category
+                        ) {
+                            const contentDiv = document.getElementById("previewPanelContent");
+                            const controlsDiv = document.getElementById("previewControls");
+                            if (contentDiv && controlsDiv) {
+                                this.previewImage(asset, name, contentDiv, controlsDiv);
+                            }
                         }
                         asset.cropping = false;
                         window.gameImporterAssets.images[category][name] = asset;
