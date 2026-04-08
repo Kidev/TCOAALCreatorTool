@@ -1873,6 +1873,15 @@ function setupGalleryOnlyMode() {
                         </button>
                     </div>
                     <button
+                        id="playTCOAALBtn"
+                        class="play-tcoaal-btn tcoaal-button"
+                        onclick="window.open('https://play-tcoaal.kidev.org', '_blank')"
+                        title="Play TCOAAL with mods directly in your browser"
+                        style="width:35vmax;margin-top:0.5vmax;"
+                    >
+                        Play TCOAAL
+                    </button>
+                    <button
                         id="playGameButton"
                         class="play-game-btn tcoaal-button"
                         title="When her brother is in danger, or when hussies attack...\nYou can be sure that Ashley's on Duty!\n\nEPISODE 1\nEPISODE 2\nEPISODE 3 - SOON"
