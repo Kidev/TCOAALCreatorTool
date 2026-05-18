@@ -24,9 +24,6 @@ class GameImporter {
             data: {},
         };
         this.signature = "TCOAAL";
-        this.hash = atob(
-            "VGhlIENvZmZpbiBvZiBBbmR5IGFuZCBMZXlsZXkvd3d3L0NvcHlyaWdodHMgLSBDb2ZmaW4gb2YgQW5keSBhbmQgTGV5bGV5LnR4dA==",
-        );
         this.fileCounter = 0;
         this.totalFiles = 0;
         this.filenameMap = filenamesMapped;
@@ -70,12 +67,9 @@ class GameImporter {
             validFolders.push(folder.path);
         }
 
-        let gameFolder = false;
         for (const file of files) {
             const path = file.webkitRelativePath || file.name;
             filesByPath[path] = file;
-
-            gameFolder ||= path === this.hash;
 
             if (path.includes("www/languages") && path.endsWith("dialogue.txt")) {
                 this.dialogueFileFound = true;
@@ -87,10 +81,6 @@ class GameImporter {
                     break;
                 }
             }
-        }
-        if (!gameFolder) {
-            alert("Invalid game folder");
-            return false;
         }
 
         this.totalFiles = relevantFiles.length;

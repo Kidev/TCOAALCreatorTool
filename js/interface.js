@@ -1875,7 +1875,7 @@ function setupGalleryOnlyMode() {
                     <button
                         id="playTCOAALBtn"
                         class="play-tcoaal-btn tcoaal-button"
-                        onclick="window.open('https://play-tcoaal.kidev.org', '_blank')"
+                        onclick="window.open('https://tcoaal.app', '_blank')"
                         title="Play TCOAAL with mods directly in your browser"
                         style="width:35vmax;margin-top:0.5vmax;"
                     >
