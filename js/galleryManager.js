@@ -943,7 +943,7 @@ class GalleryManager {
             <div style="display:flex;flex-direction: column; gap: 4px;">
 
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
+                    <input id="volumeSlider" type="range" min="0" max="100" step="1" value="100"
                     oninput="galleryManager.setAudioVolume(this.value)" title="Volume: 100%"
                     style="flex: 1; height: 12px; border-radius: 3px; cursor: pointer;">
                     <span id="volumeValue" style="font-size: 12px; font-weight: bold; min-width: 80px; text-align: right;">Volume: 100%</span>
@@ -958,10 +958,10 @@ class GalleryManager {
 
 
                <div style="display: flex; align-items: center; gap: 8px;">
-                    <input id="pitchSlider" type="range" min="-12" max="12" step="0.5" value="0"
-                    oninput="galleryManager.setAudioPitch(this.value)" title="Pitch: 0"
+                    <input id="pitchSlider" type="range" min="50" max="150" step="1" value="100"
+                    oninput="galleryManager.setAudioPitch(this.value)" title="Pitch: 100%"
                     style="flex: 1; height: 12px; border-radius: 3px; cursor: pointer;">
-                    <span id="pitchValue" style="font-size: 12px; font-weight: bold; min-width: 80px; text-align: right;">Pitch: +0.0</span>
+                    <span id="pitchValue" style="font-size: 12px; font-weight: bold; min-width: 80px; text-align: right;">Pitch: 100%</span>
                 </div>
 
 
@@ -1075,7 +1075,7 @@ class GalleryManager {
         const pitchSlider = document.getElementById("pitchSlider");
 
         this.currentAudioSpeed = speedSlider ? parseFloat(speedSlider.value) : 1.0;
-        this.currentAudioPitch = pitchSlider ? parseFloat(pitchSlider.value) : 0;
+        this.currentAudioPitch = pitchSlider ? parseFloat(pitchSlider.value) : 100;
 
         this.updateAudioPlaybackRate();
 
@@ -1349,6 +1349,18 @@ class GalleryManager {
 
             if (isMaps) {
                 setTimeout(() => this.addAssetTooltips(jsonViewer), 500);
+
+                if (this.pendingMapContentSearch) {
+                    const searchHash = this.pendingMapContentSearch;
+                    this.pendingMapContentSearch = null;
+                    setTimeout(() => {
+                        const input = document.getElementById("jsonSearchInput");
+                        if (input) {
+                            input.value = searchHash;
+                            this.searchJsonContent(searchHash);
+                        }
+                    }, 650);
+                }
             }
         } catch (error) {
             console.error("Failed to render JSON:", error);
@@ -1562,7 +1574,8 @@ class GalleryManager {
         const vol = parseFloat(value);
         if (isNaN(vol)) return;
 
-        const volume = Math.pow(vol, 2.5);
+        // RPG Maker applies volume linearly to the gain node (buffer.volume = volume / 100).
+        const volume = Math.max(0, Math.min(1, vol / 100));
 
         if (this.currentAudio) {
             this.currentAudio.volume = volume;
@@ -1570,7 +1583,7 @@ class GalleryManager {
 
         const slider = document.getElementById("volumeSlider");
         const label = document.getElementById("volumeValue");
-        const pct = Math.round(vol * 100);
+        const pct = Math.round(vol);
 
         if (slider) slider.title = `Volume: ${pct}%`;
         if (label) label.textContent = `Volume: ${pct}%`;
@@ -1592,29 +1605,32 @@ class GalleryManager {
     }
 
     setAudioPitch(value) {
-        const pitchSemitones = parseFloat(value);
-        if (isNaN(pitchSemitones)) return;
+        const pitchPercent = parseFloat(value);
+        if (isNaN(pitchPercent)) return;
 
-        this.currentAudioPitch = pitchSemitones;
+        // RPG Maker pitch is a percentage (100 = normal); the playbackRate is pitch / 100.
+        this.currentAudioPitch = pitchPercent;
 
         this.updateAudioPlaybackRate();
 
         const slider = document.getElementById("pitchSlider");
         const label = document.getElementById("pitchValue");
+        const pct = Math.round(pitchPercent);
 
-        if (slider) slider.title = `Pitch: ${pitchSemitones >= 0 ? "+" : ""}${pitchSemitones.toFixed(1)}`;
-        if (label) label.textContent = `Pitch: ${pitchSemitones >= 0 ? "+" : ""}${pitchSemitones.toFixed(1)}`;
+        if (slider) slider.title = `Pitch: ${pct}%`;
+        if (label) label.textContent = `Pitch: ${pct}%`;
     }
 
     updateAudioPlaybackRate() {
         if (!this.currentAudio) return;
 
         const speed = this.currentAudioSpeed || 1.0;
-        const pitchSemitones = this.currentAudioPitch || 0;
+        const pitchPercent = this.currentAudioPitch || 100;
 
-        const pitchRatio = Math.pow(2, pitchSemitones / 12);
+        // Match the game: pitch is applied as a resampling ratio (pitch / 100).
+        const pitchRatio = pitchPercent / 100;
 
-        this.currentAudio.playbackRate = speed * pitchRatio;
+        this.currentAudio.playbackRate = Math.max(0.25, Math.min(4, speed * pitchRatio));
 
         if (this.currentAudio.preservesPitch !== undefined) {
             this.currentAudio.preservesPitch = false;
@@ -2614,7 +2630,11 @@ class GalleryManager {
         const pitchSlider = document.getElementById("pitchSlider");
 
         const speed = speedSlider ? parseFloat(speedSlider.value) : 1.0;
-        const pitch = pitchSlider ? parseFloat(pitchSlider.value) : 0;
+        const pitchPercent = pitchSlider ? parseFloat(pitchSlider.value) : 100;
+
+        // The composition editor stores pitch in semitones; convert from the
+        // RPG Maker percentage used by the preview box (100% -> 0 semitones).
+        const pitch = pitchPercent > 0 ? 12 * Math.log2(pitchPercent / 100) : 0;
 
         const assetData = {
             name: name,
@@ -2948,6 +2968,106 @@ class GalleryManager {
         }
 
         const sampleHashes = Object.keys(this.assetHashMap).slice(0, 10);
+    }
+
+    // Normalize a name/path/hash into a comparable form so that
+    // "Hallucination Connect", "hallucination_connect" and
+    // "audio/bgm/hallucination_connect.ogg" all share a common shape.
+    normalizeSearchString(str) {
+        if (!str) return "";
+        return str
+            .toLowerCase()
+            .replace(/[_\-\s/]+/g, " ")
+            .trim();
+    }
+
+    // Resolve a free-text content-search term to the set of 16-char asset
+    // hashes it refers to. Matches against the raw hash, the encrypted path,
+    // the resolved filename, the resolved path and the good-looking title.
+    resolveContentSearchHashes(term) {
+        const result = new Set();
+        if (!term || !term.trim()) return result;
+
+        const needle = this.normalizeSearchString(term);
+        if (!needle) return result;
+
+        const considerHash = (hash) => {
+            if (!hash || result.has(hash)) return;
+
+            const reps = [hash];
+
+            const asset = this.assetHashMap ? this.assetHashMap[hash] : null;
+            if (asset && asset.path) reps.push(asset.path);
+
+            const friendly = typeof hashToFilename !== "undefined" ? hashToFilename[hash] : null;
+            if (friendly) {
+                reps.push(friendly);
+                reps.push(this.formatAssetTitle(friendly));
+                if (asset && asset.path) reps.push(asset.path.replace(hash, friendly));
+            }
+
+            const display = typeof hashToName !== "undefined" ? hashToName[hash] : null;
+            if (display) reps.push(display);
+
+            for (const rep of reps) {
+                if (this.normalizeSearchString(rep).includes(needle)) {
+                    result.add(hash);
+                    return;
+                }
+            }
+        };
+
+        if (this.assetHashMap) {
+            for (const hash of Object.keys(this.assetHashMap)) considerHash(hash);
+        }
+        if (typeof hashToFilename !== "undefined") {
+            for (const hash of Object.keys(hashToFilename)) considerHash(hash);
+        }
+        if (typeof hashToName !== "undefined") {
+            for (const hash of Object.keys(hashToName)) considerHash(hash);
+        }
+
+        return result;
+    }
+
+    // Build (and cache) the resolved hashes for a content-search term.
+    async filterMapsByContent(term) {
+        await this.buildHashMaps();
+        const hashes = this.resolveContentSearchHashes(term);
+        this.mapContentSearchTerm = term;
+        this.mapContentSearchHashes = hashes;
+        return hashes;
+    }
+
+    _getMapLowerText(name) {
+        if (!this._mapLowerTextCache) this._mapLowerTextCache = {};
+        if (this._mapLowerTextCache[name] !== undefined) return this._mapLowerTextCache[name];
+        const asset = window.gameImporterAssets?.data?.["Maps"]?.[name];
+        const text = asset && asset.jsonText ? asset.jsonText.toLowerCase() : "";
+        this._mapLowerTextCache[name] = text;
+        return text;
+    }
+
+    mapMatchesContentHashes(name, hashes) {
+        if (!hashes || hashes.size === 0) return false;
+        const text = this._getMapLowerText(name);
+        if (!text) return false;
+        for (const hash of hashes) {
+            if (text.includes(hash)) return true;
+        }
+        return false;
+    }
+
+    // First resolved hash actually present in the given map (used to drive the
+    // in-JSON search when the map is opened).
+    getMapMatchedHash(name, hashes) {
+        if (!hashes || hashes.size === 0) return null;
+        const text = this._getMapLowerText(name);
+        if (!text) return null;
+        for (const hash of hashes) {
+            if (text.includes(hash)) return hash;
+        }
+        return null;
     }
 
     extractHashFromFilename(filename) {
@@ -3393,6 +3513,11 @@ class GalleryManager {
                             e.stopPropagation();
                             this.toggleAudioPlayback(asset, element, volume, pitch, pan);
                         });
+                        element.addEventListener("contextmenu", (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            this.downloadEditedAudio(asset, volume, pitch, pan);
+                        });
                     }
 
                     processedCount++;
@@ -3485,7 +3610,7 @@ class GalleryManager {
                     <div style="font-weight: bold; margin-bottom: 4px;">🔊 ${asset.name}</div>
                     <div style="font-size: 0.85em; color: var(--txt-faded);">${asset.path}</div>
                     ${propertiesHtml}
-                    <div style="margin-top: 8px; font-size: 0.85em; color: var(--green);">Click to play/pause</div>
+                    <div style="margin-top: 8px; font-size: 0.85em; color: var(--green);">left click to play/pause<br>right click to download edited</div>
                 </div>
             `;
         }
@@ -3526,6 +3651,14 @@ class GalleryManager {
 
             if (pitch !== null) {
                 audio.playbackRate = Math.max(0.25, Math.min(4, pitch / 100));
+
+                // RPG Maker plays through a WebAudio AudioBufferSourceNode, whose
+                // playbackRate resamples the buffer (pitch AND tempo change together).
+                // HTML5 <audio> defaults to preservesPitch=true (tempo-only), so we
+                // disable it to reproduce the in-game pitch shift.
+                if ("preservesPitch" in audio) audio.preservesPitch = false;
+                if ("mozPreservesPitch" in audio) audio.mozPreservesPitch = false;
+                if ("webkitPreservesPitch" in audio) audio.webkitPreservesPitch = false;
             }
 
             element.audioInstance = audio;
@@ -3549,6 +3682,122 @@ class GalleryManager {
             this.currentAudio = null;
             this.currentAudioElement = null;
         }
+    }
+
+    // Download an audio asset with the same volume/pitch edits applied as the
+    // in-JSON playback (volume -> gain, pitch -> playbackRate resampling).
+    async downloadEditedAudio(asset, volume = null, pitch = null, pan = null) {
+        if (!asset || asset.type !== "audio" || !asset.url) return;
+
+        const rate = pitch !== null ? Math.max(0.25, Math.min(4, pitch / 100)) : 1;
+        const gain = volume !== null ? Math.max(0, Math.min(1, volume / 100)) : 1;
+
+        // No effective edit: hand back the original file untouched.
+        if (rate === 1 && gain === 1) {
+            const a = document.createElement("a");
+            a.href = asset.url;
+            a.download = asset.name || "audio";
+            a.click();
+            return;
+        }
+
+        try {
+            const response = await fetch(asset.url);
+            const arrayBuffer = await response.arrayBuffer();
+
+            const decodeCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
+            await decodeCtx.close();
+
+            const sampleRate = audioBuffer.sampleRate;
+            const channels = audioBuffer.numberOfChannels;
+            const length = Math.max(1, Math.ceil((audioBuffer.duration / rate) * sampleRate));
+
+            const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+                channels,
+                length,
+                sampleRate,
+            );
+
+            const source = offlineCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.playbackRate.value = rate;
+
+            const gainNode = offlineCtx.createGain();
+            gainNode.gain.value = gain;
+
+            source.connect(gainNode);
+            gainNode.connect(offlineCtx.destination);
+
+            source.start(0);
+            const rendered = await offlineCtx.startRendering();
+
+            const wavBlob = this.audioBufferToWav(rendered);
+            const url = URL.createObjectURL(wavBlob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = this.getEditedAudioFilename(asset, volume, pitch);
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (error) {
+            console.error("Failed to download edited audio:", error);
+        }
+    }
+
+    getEditedAudioFilename(asset, volume, pitch) {
+        let base = asset.name || "audio";
+        base = base.replace(/\.[^/.]+$/, "");
+
+        const parts = [];
+        if (volume !== null && volume !== 100) parts.push(`vol${volume}`);
+        if (pitch !== null && pitch !== 100) parts.push(`pitch${pitch}`);
+        const suffix = parts.length ? "_" + parts.join("_") : "";
+
+        return `${base}${suffix}.wav`;
+    }
+
+    audioBufferToWav(buffer) {
+        const numChannels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        const numFrames = buffer.length;
+        const bytesPerSample = 2;
+        const blockAlign = numChannels * bytesPerSample;
+        const dataSize = numFrames * blockAlign;
+
+        const arrayBuffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(arrayBuffer);
+
+        const writeString = (offset, str) => {
+            for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+        };
+
+        writeString(0, "RIFF");
+        view.setUint32(4, 36 + dataSize, true);
+        writeString(8, "WAVE");
+        writeString(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true); // PCM
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * blockAlign, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, 8 * bytesPerSample, true);
+        writeString(36, "data");
+        view.setUint32(40, dataSize, true);
+
+        const channelData = [];
+        for (let ch = 0; ch < numChannels; ch++) channelData.push(buffer.getChannelData(ch));
+
+        let offset = 44;
+        for (let i = 0; i < numFrames; i++) {
+            for (let ch = 0; ch < numChannels; ch++) {
+                let sample = Math.max(-1, Math.min(1, channelData[ch][i]));
+                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+                offset += 2;
+            }
+        }
+
+        return new Blob([arrayBuffer], { type: "audio/wav" });
     }
 
     stopAllAudio() {

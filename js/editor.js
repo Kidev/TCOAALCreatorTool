@@ -3938,6 +3938,57 @@ function selectGalleryCategory(category) {
     updateGalleryContent();
 }
 
+// Combined name + content filtering for the Data/Maps gallery.
+// The name search matches the map's own name; the content search matches maps
+// that reference an asset (by hash, encrypted path, resolved name or title).
+async function applyMapsContentFilter() {
+    const contentContainer = document.getElementById("galleryContent");
+    if (!contentContainer) return;
+
+    const nameInput = document.getElementById("gallerySearchInput");
+    const contentInput = document.getElementById("mapsContentSearchInput");
+    const items = contentContainer.querySelectorAll(".gallery-item");
+
+    const nameTerm = (nameInput?.value || "").toLowerCase();
+    const contentTerm = (contentInput?.value || "").trim();
+
+    let contentHashes = null;
+    if (contentTerm) {
+        contentHashes = await window.galleryManager.filterMapsByContent(contentTerm);
+    } else {
+        window.galleryManager.mapContentSearchHashes = null;
+        window.galleryManager.mapContentSearchTerm = "";
+    }
+
+    items.forEach((item) => {
+        let visible = true;
+
+        if (nameTerm) {
+            const filename = (item.dataset.filename || "").toLowerCase();
+            const originalName = (item.dataset.originalName || "").toLowerCase();
+            const formatName = (item.dataset.formatName || "").toLowerCase();
+            const searchableTerms = (item.dataset.searchableTerms || "").toLowerCase();
+
+            visible =
+                filename.includes(nameTerm) ||
+                originalName.includes(nameTerm) ||
+                formatName.includes(nameTerm) ||
+                searchableTerms.includes(nameTerm);
+        }
+
+        if (visible && contentTerm) {
+            visible =
+                !!contentHashes &&
+                contentHashes.size > 0 &&
+                window.galleryManager.mapMatchesContentHashes(item.dataset.filename, contentHashes);
+        }
+
+        item.style.display = visible ? "" : "none";
+    });
+
+    window.galleryManager.selectFirstElement();
+}
+
 async function updateGalleryContent() {
     const contentContainer = document.getElementById("galleryContent");
     if (!contentContainer || !window.gameImporterAssets || !currentGalleryCategory) return;
@@ -4325,6 +4376,13 @@ async function updateGalleryContent() {
         }
     }
 
+    // The Maps content-search input only applies to the Maps category; drop any stale one elsewhere
+    const isMapsCategory = currentGalleryTab === "data" && currentGalleryCategory === "Maps";
+    if (!isMapsCategory) {
+        const staleContentSearch = document.getElementById("mapsContentSearchInput");
+        if (staleContentSearch) staleContentSearch.remove();
+    }
+
     // Add search input for all categories (except Labels which has its own search)
     if (!(currentGalleryTab === "data" && currentGalleryCategory === "Labels")) {
         // Determine which container to use
@@ -4341,6 +4399,12 @@ async function updateGalleryContent() {
             searchInput.placeholder = "Search...";
 
             searchInput.addEventListener("input", function () {
+                // Maps uses a combined name + content filter
+                if (currentGalleryTab === "data" && currentGalleryCategory === "Maps") {
+                    applyMapsContentFilter();
+                    return;
+                }
+
                 const searchTerm = this.value.toLowerCase();
                 const items = contentContainer.querySelectorAll(".gallery-item");
 
@@ -4394,6 +4458,7 @@ async function updateGalleryContent() {
         // Add search input to appropriate container
         if (targetContainer) {
             // With dropdown: search takes 75%, add it first
+            searchInput.placeholder = "Search...";
             searchInput.style.cssText = `
                 width: 75%;
                 padding: 0.5vmax 0.8vmax;
@@ -4441,9 +4506,7 @@ async function updateGalleryContent() {
                 document.getElementById("galleryCategories").appendChild(searchContainer);
             }
 
-            // Search takes 75%, spacer 25% (on right)
-            searchInput.style.cssText = `
-                width: 75%;
+            const sharedInputStyle = `
                 padding: 0.5vmax 0.8vmax;
                 font-family: Consolas, Monaco, "Courier New", monospace;
                 font-size: 0.85vmax;
@@ -4454,12 +4517,43 @@ async function updateGalleryContent() {
                 box-sizing: border-box;
             `;
 
-            // Add search input and spacer (spacer on right)
-            const spacer = document.createElement("div");
-            spacer.style.width = "25%";
             searchContainer.innerHTML = "";
-            searchContainer.appendChild(searchInput);
-            searchContainer.appendChild(spacer);
+
+            if (isMapsCategory) {
+                // Maps: split the line in two — name search (left) + content search (right)
+                searchInput.placeholder = "Search maps...";
+                searchInput.style.cssText = `flex: 1 1 0; min-width: 0;` + sharedInputStyle;
+                searchContainer.appendChild(searchInput);
+
+                let contentSearchInput = document.getElementById("mapsContentSearchInput");
+                if (!contentSearchInput) {
+                    contentSearchInput = document.createElement("input");
+                    contentSearchInput.id = "mapsContentSearchInput";
+                    contentSearchInput.type = "text";
+                    contentSearchInput.addEventListener("input", function () {
+                        applyMapsContentFilter();
+                    });
+                }
+                contentSearchInput.placeholder = "Search content (asset name or hash)...";
+                contentSearchInput.value = "";
+                contentSearchInput.style.cssText = `flex: 1 1 0; min-width: 0;` + sharedInputStyle;
+                searchContainer.appendChild(contentSearchInput);
+
+                if (window.galleryManager) {
+                    window.galleryManager.mapContentSearchHashes = null;
+                    window.galleryManager.mapContentSearchTerm = "";
+                    window.galleryManager.pendingMapContentSearch = null;
+                }
+            } else {
+                // Search takes 75%, spacer 25% (on right)
+                searchInput.placeholder = "Search...";
+                searchInput.style.cssText = `width: 75%;` + sharedInputStyle;
+
+                const spacer = document.createElement("div");
+                spacer.style.width = "25%";
+                searchContainer.appendChild(searchInput);
+                searchContainer.appendChild(spacer);
+            }
         }
     } else {
         const searchInput = document.getElementById("gallerySearchInput");
@@ -4612,6 +4706,17 @@ async function updateGalleryContent() {
             });
             ev.currentTarget.classList.add("selected");
             window.galleryManager.scrollIfRequired(ev.currentTarget);
+
+            // When a content search is active on Maps, auto-search the matching
+            // asset hash inside the opened JSON.
+            if (currentGalleryTab === "data" && currentGalleryCategory === "Maps") {
+                const contentHashes = window.galleryManager.mapContentSearchHashes;
+                window.galleryManager.pendingMapContentSearch =
+                    contentHashes && contentHashes.size > 0
+                        ? window.galleryManager.getMapMatchedHash(name, contentHashes)
+                        : null;
+            }
+
             window.galleryManager.previewAsset(name, actualCategory, currentGalleryTab);
         };
         item.oncontextmenu = async function (ev) {
